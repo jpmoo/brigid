@@ -1,19 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, FileText, Maximize2, Minimize2, Pin, PinOff } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, LogOut, Maximize2, Minimize2, Settings } from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
 import type { TemplateBody } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { BodyEditor } from "../components/BodyEditor.js";
-import { DocumentView } from "../components/DocumentView.js";
+import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
+import { useAuth } from "../auth/AuthContext.js";
+import type { BreakChip } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
-const PANEL_KEY = "brigid.outline.pinned";
 const MODE_KEY = "brigid.view.mode";
 
 interface AddRequest {
@@ -23,6 +24,7 @@ interface AddRequest {
 
 export function WorkPage() {
   const { id = "" } = useParams<{ id: string }>();
+  const { username, logout } = useAuth();
 
   const [work, setWork] = useState<Work | null>(null);
   const [levels, setLevels] = useState<WorkLevel[]>([]);
@@ -33,12 +35,14 @@ export function WorkPage() {
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [pinned, setPinned] = useState(() => localStorage.getItem(PANEL_KEY) !== "false");
-  const [panelOpen, setPanelOpen] = useState(true);
-  // Zen hides the outline *and* the header — nothing but the manuscript.
+  // Zen hides the header and lets the outline retract; outside zen the outline
+  // is simply always there.
   const [zen, setZen] = useState(false);
-  const [mode, setMode] = useState<ViewMode>(
-    () => (localStorage.getItem(MODE_KEY) as ViewMode) || "reading",
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [mode, setMode] = useState<ViewMode>(() =>
+    // "reading" was the earlier name for this mode; map it forward so an
+    // existing browser doesn't come back to a mode that no longer exists.
+    localStorage.getItem(MODE_KEY) === "manuscript" ? "manuscript" : "book",
   );
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
@@ -69,10 +73,6 @@ export function WorkPage() {
   }, [load]);
 
   useEffect(() => {
-    localStorage.setItem(PANEL_KEY, String(pinned));
-  }, [pinned]);
-
-  useEffect(() => {
     localStorage.setItem(MODE_KEY, mode);
   }, [mode]);
 
@@ -81,7 +81,10 @@ export function WorkPage() {
   useEffect(() => {
     if (!zen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setZen(false);
+      if (e.key === "Escape") {
+        setZen(false);
+        setPanelOpen(false);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -105,6 +108,18 @@ export function WorkPage() {
     });
   }, [blocks, levels, templates, work]);
 
+  // The outline shows each break attached above the block it precedes, so the
+  // structure reads the same in both panes.
+  const breaks = useMemo(() => {
+    const map = new Map<string, BreakChip>();
+    for (const item of items) {
+      if (item.kind === "break") {
+        map.set(item.blockId, { templateName: item.templateName, detached: item.detached });
+      }
+    }
+    return map;
+  }, [items]);
+
   const totalWords = useMemo(
     () =>
       blocks.reduce((sum, b) => {
@@ -114,9 +129,17 @@ export function WorkPage() {
     [blocks, templateMap],
   );
 
-  const registerRef = useCallback((blockId: string, el: HTMLDivElement | null) => {
-    if (el) blockRefs.current.set(blockId, el);
-    else blockRefs.current.delete(blockId);
+  const registerRef = useCallback((key: string, el: HTMLDivElement | null) => {
+    if (el) blockRefs.current.set(key, el);
+    else blockRefs.current.delete(key);
+  }, []);
+
+  const scrollToBreak = useCallback((blockId: string) => {
+    setSelectedId(blockId);
+    blockRefs.current.get(breakRefKey(blockId))?.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
   }, []);
 
   const selectAndScroll = useCallback((blockId: string) => {
@@ -149,14 +172,13 @@ export function WorkPage() {
   if (loading) return <div className="loading">Opening…</div>;
   if (!work) return <div className="loading">{error ?? "Not found."}</div>;
 
-  const showPanel = !zen && (pinned || panelOpen);
+  // Outside zen the outline is always shown; inside zen it retracts to an edge
+  // and slides back out when the pointer reaches it.
+  const showPanel = !zen || panelOpen;
 
   return (
     <div className={`work-shell${zen ? " zen" : ""}`}>
       <header className="app-header">
-        <Link className="btn ghost" to="/" title="Back to library">
-          <ArrowLeft size={16} />
-        </Link>
         <BrandMark />
         <div className="work-title">
           <strong>{work.title}</strong>
@@ -169,11 +191,11 @@ export function WorkPage() {
         <div className="segmented compact" role="group" aria-label="View mode">
           <button
             type="button"
-            aria-pressed={mode === "reading"}
-            onClick={() => setMode("reading")}
-            title="Reading — comfortable, book-like"
+            aria-pressed={mode === "book"}
+            onClick={() => setMode("book")}
+            title="Book — comfortable, book-like typography"
           >
-            <BookOpen size={13} /> Reading
+            <BookOpen size={13} /> Book
           </button>
           <button
             type="button"
@@ -184,14 +206,6 @@ export function WorkPage() {
             <FileText size={13} /> Manuscript
           </button>
         </div>
-        <button
-          className="btn ghost"
-          type="button"
-          title={pinned ? "Let the outline float" : "Dock the outline"}
-          onClick={() => setPinned((v) => !v)}
-        >
-          {pinned ? <Pin size={16} /> : <PinOff size={16} />}
-        </button>
         <button
           className="btn ghost"
           type="button"
@@ -206,11 +220,9 @@ export function WorkPage() {
 
       <div className={`work-body${showPanel ? "" : " panel-hidden"}`}>
         <aside
-          className={`outline-panel${pinned ? " pinned" : " floating"}`}
-          // Unpinned, the panel hovers over the document and retracts when the
-          // pointer leaves — the writer gets the full measure back for reading.
-          onMouseEnter={() => !pinned && setPanelOpen(true)}
-          onMouseLeave={() => !pinned && setPanelOpen(false)}
+          className={`outline-panel${zen ? " floating" : " docked"}`}
+          onMouseEnter={() => zen && setPanelOpen(true)}
+          onMouseLeave={() => zen && setPanelOpen(false)}
         >
           <div className="outline-head-bar">
             <span>Outline</span>
@@ -224,10 +236,35 @@ export function WorkPage() {
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
             onSelect={selectAndScroll}
+            breaks={breaks}
+            onSelectBreak={scrollToBreak}
             onAdd={(relativeTo, placement) => setAdding({ relativeTo, placement })}
             onRename={(blockId) => setRenaming(blocks.find((b) => b.id === blockId) ?? null)}
             onDelete={(blockId) => void onDelete(blockId)}
           />
+
+          {/* Account and navigation live at the foot of the outline, out of the
+              way of the manuscript rather than crowding the title bar. */}
+          <div className="outline-foot">
+            <Link className="btn ghost" to="/" title="Back to library">
+              <ArrowLeft size={15} />
+            </Link>
+            <Link className="btn ghost" to="/settings" title="Settings">
+              <Settings size={15} />
+            </Link>
+            <div className="spacer" />
+            <span className="outline-user" title={username ?? undefined}>
+              {username}
+            </span>
+            <button
+              className="btn ghost"
+              type="button"
+              title="Sign out"
+              onClick={() => void logout()}
+            >
+              <LogOut size={15} />
+            </button>
+          </div>
         </aside>
 
         <main className="document-pane">

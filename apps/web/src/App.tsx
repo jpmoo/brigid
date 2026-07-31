@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext.js";
 import { LibraryPage } from "./pages/LibraryPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
+import { SettingsPage } from "./pages/SettingsPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
 import { WorkPage } from "./pages/WorkPage.js";
 
@@ -20,6 +21,7 @@ export function App() {
     <Routes>
       <Route path="/" element={<LibraryPage />} />
       <Route path="/works/:id" element={<WorkPage />} />
+      <Route path="/settings" element={<SettingsPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

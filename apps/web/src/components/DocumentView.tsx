@@ -4,8 +4,11 @@ import { Pencil } from "lucide-react";
 import type { DocumentItem, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
-/** Reading is comfortable and book-like; Manuscript sets the page as it exports. */
-export type ViewMode = "reading" | "manuscript";
+/**
+ * Book is comfortable and book-like; Manuscript sets the page exactly as the
+ * templates specify. Both are editable — the mode is presentation only.
+ */
+export type ViewMode = "book" | "manuscript";
 
 function spanStyle(span: ResolvedSpan): CSSProperties {
   return {
@@ -19,7 +22,7 @@ function spanStyle(span: ResolvedSpan): CSSProperties {
 
 /**
  * Typography is the template's, not the app's — nothing about Courier or double
- * spacing is baked in here. Reading mode ignores it entirely and inherits the
+ * spacing is baked in here. Book mode ignores it entirely and inherits the
  * sheet's own type.
  */
 function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
@@ -104,9 +107,12 @@ function Nodes({
   );
 }
 
+/** Breaks register under this key so the outline can scroll to one. */
+export const breakRefKey = (blockId: string) => `break:${blockId}`;
+
 export interface DocumentViewProps {
   items: DocumentItem<Block>[];
-  registerRef: (blockId: string, el: HTMLDivElement | null) => void;
+  registerRef: (key: string, el: HTMLDivElement | null) => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
   mode: ViewMode;
@@ -135,7 +141,11 @@ export function DocumentView({
         item.kind === "break" ? (
           // A break lives between blocks and belongs to neither, so it carries
           // its own affordance rather than hiding inside a block's menu.
-          <div className={`doc-break${item.detached ? " detached" : ""}`} key={`b${i}`}>
+          <div
+            className={`doc-break${item.detached ? " detached" : ""}`}
+            key={`b${i}`}
+            ref={(el) => registerRef(breakRefKey(item.blockId), el)}
+          >
             <div className="doc-break-body" style={typographyStyle(item.typography, mode)}>
               <Nodes nodes={item.nodes} mode={mode} typography={item.typography} />
             </div>

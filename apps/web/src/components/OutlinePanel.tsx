@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, MoreHorizontal, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Scissors } from "lucide-react";
 import type { OutlineEntry } from "@brigid/shared";
 import type { Block, Placement, Template } from "../api.js";
 
@@ -12,8 +12,20 @@ function preview(block: Block): string {
   return text.length > 180 ? `${text.slice(0, 180)}…` : text;
 }
 
+export interface BreakChip {
+  templateName: string;
+  detached: boolean;
+}
+
 export interface OutlinePanelProps {
   entries: OutlineEntry<Block>[];
+  /**
+   * The break rendered before each block, keyed by block id. Shown attached to
+   * the top of its block: a break belongs to the block it precedes and travels
+   * with it, so it is never separately draggable.
+   */
+  breaks: Map<string, BreakChip>;
+  onSelectBreak: (blockId: string) => void;
   templates: Map<string, Template>;
   levels: { depth: number; name: string }[];
   selectedId: string | null;
@@ -26,7 +38,7 @@ export interface OutlinePanelProps {
 }
 
 export function OutlinePanel(props: OutlinePanelProps) {
-  const { entries, templates, levels, selectedId, collapsed } = props;
+  const { entries, templates, levels, selectedId, collapsed, breaks } = props;
 
   // A collapsed block hides its whole subtree, so hidden-ness is inherited.
   const hidden = new Set<string>();
@@ -59,6 +71,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
             templates.get(entry.block.formatId)?.formatSettings?.rendersInDocument ?? true
           }
           {...props}
+          breakChip={breaks.get(entry.block.id) ?? null}
           selected={entry.block.id === selectedId}
           isCollapsed={collapsed.has(entry.block.id)}
         />
@@ -78,6 +91,7 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   rendersInDocument: boolean;
   selected: boolean;
   isCollapsed: boolean;
+  breakChip: BreakChip | null;
 }
 
 function OutlineCard(props: CardProps) {
@@ -87,9 +101,25 @@ function OutlineCard(props: CardProps) {
   const text = preview(block);
 
   return (
+    <div className="outline-item" style={{ marginLeft: entry.depth * 16 }}>
+      {props.breakChip ? (
+        <button
+          className={`outline-break${props.breakChip.detached ? " detached" : ""}`}
+          type="button"
+          title={
+            props.breakChip.detached
+              ? `${props.breakChip.templateName} — edited for this block. Moves with it.`
+              : `${props.breakChip.templateName}. Attached to this block and moves with it.`
+          }
+          onClick={() => props.onSelectBreak(block.id)}
+        >
+          <Scissors size={11} />
+          <span>{props.breakChip.templateName}</span>
+        </button>
+      ) : null}
+
     <div
       className={`outline-card${selected ? " selected" : ""}${props.rendersInDocument ? "" : " note"}`}
-      style={{ marginLeft: entry.depth * 16 }}
     >
       <div className="outline-gutter" title={`${wordFmt.format(block.wordCount)} words`}>
         {wordFmt.format(block.wordCount)}
@@ -166,6 +196,7 @@ function OutlineCard(props: CardProps) {
           </>
         ) : null}
       </div>
+    </div>
     </div>
   );
 }

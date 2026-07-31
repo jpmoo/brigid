@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Archive, BookOpen, LogOut, Plus } from "lucide-react";
+import { Archive, BookOpen, LogOut, Plus, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError, api } from "../api.js";
 import type { Work } from "../api.js";
@@ -54,6 +54,9 @@ export function LibraryPage() {
         <span className="muted" style={{ fontSize: 13 }}>
           {username}
         </span>
+        <Link className="btn ghost" to="/settings" title="Settings">
+          <Settings size={16} />
+        </Link>
         <button className="btn ghost" type="button" onClick={() => void logout()} title="Sign out">
           <LogOut size={16} />
         </button>

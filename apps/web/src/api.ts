@@ -125,6 +125,8 @@ export const api = {
   login: (username: string, password: string) =>
     post<{ username: string }>("/auth/login", { username, password }),
   logout: () => post<{ ok: true }>("/auth/logout"),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<{ ok: true }>("/auth/password", { currentPassword, newPassword }),
 
   listWorks: (archived = false) =>
     request<{ works: Work[] }>(`/works${archived ? "?archived=true" : ""}`),

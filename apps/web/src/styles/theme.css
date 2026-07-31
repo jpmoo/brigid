@@ -558,8 +558,9 @@ input::placeholder {
   transition: transform 0.16s ease, opacity 0.16s ease;
 }
 
-/* Unpinned, the panel floats over the manuscript instead of taking a column
-   from it, and retracts to a thin edge until the pointer comes back. */
+/* In zen the panel floats over the manuscript instead of taking a column from
+   it, and retracts to a thin edge until the pointer comes back. Outside zen it
+   is simply docked. */
 .outline-panel.floating {
   position: absolute;
   top: 0;
@@ -569,9 +570,36 @@ input::placeholder {
   box-shadow: var(--shadow-lift);
 }
 
+/* Retracted, a visible strip stays behind as the hover target — 10px was a mean
+   thing to ask anyone to aim at. */
 .panel-hidden .outline-panel.floating {
-  transform: translateX(calc(-100% + 10px));
-  opacity: 0.5;
+  transform: translateX(calc(-100% + 18px));
+  opacity: 0.6;
+}
+
+.outline-panel.floating::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 18px;
+  height: 100%;
+  border-left: 1px solid var(--border);
+  background: repeating-linear-gradient(
+    to bottom,
+    var(--border-strong) 0 2px,
+    transparent 2px 7px
+  );
+  background-size: 2px 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 0.16s;
+  pointer-events: none;
+}
+
+.panel-hidden .outline-panel.floating::after {
+  opacity: 1;
 }
 
 .outline-head-bar {
@@ -885,14 +913,17 @@ input::placeholder {
 
 /* --- View modes ------------------------------------------------------- */
 
-/* Reading keeps a book measure — roughly 65 characters, which is what makes
-   long prose comfortable. Manuscript takes the viewport, because that's the
-   page it will actually be set on. */
+/* Both modes fill the viewport; what separates them is the type. Book keeps the
+   app's serif and justification, Manuscript takes whatever the templates say. */
+.page-sheet.book,
 .page-sheet.manuscript {
   max-width: none;
   width: calc(100% - 48px);
   margin: 0 24px;
   padding: 48px 56px 96px;
+}
+
+.page-sheet.manuscript {
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
@@ -1109,4 +1140,81 @@ input::placeholder {
 .be-add .btn {
   padding: 5px 10px;
   font-size: 12px;
+}
+
+/* --- Breaks in the outline -------------------------------------------- */
+
+.outline-item {
+  margin-bottom: 3px;
+}
+
+/* A break is attached to the top of the block it precedes and travels with it,
+   so it reads as part of that block's entry and is never separately draggable. */
+.outline-break {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  padding: 3px 8px 3px 40px;
+  background: none;
+  border: 0;
+  border-left: 2px solid var(--border-strong);
+  margin-left: 34px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  cursor: pointer;
+  text-align: left;
+}
+
+.outline-break:hover {
+  color: var(--accent);
+  border-left-color: var(--accent);
+}
+
+.outline-break.detached {
+  color: var(--accent);
+  border-left-style: double;
+  border-left-width: 4px;
+}
+
+.outline-break span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Outline foot: account and navigation ----------------------------- */
+
+.outline-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.outline-panel > .outline-list,
+.outline-panel > .outline-empty {
+  flex: 1;
+}
+
+.outline-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 10px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.outline-user {
+  padding: 0 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 130px;
 }

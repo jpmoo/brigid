@@ -200,8 +200,10 @@ remembered per browser:
 
 | Mode | What it is |
 |---|---|
-| **Reading** | Comfortable and book-like. A ~34em measure, the app's own serif, justified. Ignores template typography entirely. |
-| **Manuscript** | Set exactly as the templates specify, filling the viewport with a margin. |
+| **Book** | Comfortable and book-like — the app's own serif, justified. Ignores template typography entirely. |
+| **Manuscript** | Set exactly as the templates specify. |
+
+Both fill the viewport, and both are editable: the mode is presentation only.
 
 Manuscript typography is **not hardcoded** — no Courier, no double spacing, no
 assumptions. Each template carries a `typography` block (font stack, size,
@@ -209,13 +211,11 @@ line height, alignment, first-line indent in inches) and manuscript mode applies
 it. The built-ins ship with the values submission guidelines conventionally ask
 for, but every one of them is the writer's to change.
 
-**Zen** is a separate control: it hides the outline *and* the header, leaving
-nothing but the manuscript. Escape leaves it, and a faint control in the corner
-does too.
+**Zen** hides the header and lets the outline retract to a strip at the edge,
+sliding back out when the pointer reaches it. Outside zen the outline is simply
+always there — there is no pinning, and no way to half-hide it.
 
-Pinning is distinct from both. Pinned, the outline holds a column of its own;
-unpinned, it floats over the manuscript and retracts to an edge, sliding back
-out on hover.
+Escape leaves zen, and a faint control in the corner does too.
 
 ### 4.1 Page-like, not paginated
 
@@ -290,7 +290,16 @@ Each block in the outline shows:
 - word count, in the left margin of the card
 - the user-specified label / title
 - a couple of lines of content preview
-- a kebab menu (`…`) for per-block actions, TBD
+- a kebab menu (`…`) for per-block actions
+
+The break preceding a block appears **attached to the top of that block's
+entry**, not as a sibling of it: a break belongs to the block it precedes and
+travels with it when the block moves, so it is never separately draggable.
+Clicking it scrolls the document to that break.
+
+The foot of the panel holds the account and navigation controls — back to the
+library, settings, the username, and sign out — keeping them off the title bar
+and away from the manuscript.
 
 Blocks nest visually to show the outline structure, expandable and collapsible per
 node.
