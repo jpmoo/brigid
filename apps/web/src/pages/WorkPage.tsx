@@ -238,7 +238,8 @@ export function WorkPage() {
         }
         if (scrollingTo.current || visible.size === 0) return;
 
-        // Highest on screen wins — that's the one being read.
+        // Smallest top wins: the block that began above the band and still
+        // occupies it is the one the top edge is inside.
         const [topmost] = [...visible.entries()].sort((a, b) => a[1] - b[1]);
         if (!topmost) return;
         setSelectedId((current) => (current === topmost[0] ? current : topmost[0]));
@@ -248,9 +249,11 @@ export function WorkPage() {
         // the margins below are measured against the viewport instead and the
         // band lands in the wrong place — or nowhere.
         root: paneRef.current,
-        // A band across the middle of the pane: the current block is the one
-        // under the reader's eye, which is neither edge.
-        rootMargin: "-35% 0px -45% 0px",
+        // A thin band at the top of the pane. The current block is whichever
+        // one the top edge is inside — the same block a reader would say they
+        // are "at" — so the outline advances as each one reaches the top
+        // rather than waiting for it to reach the middle.
+        rootMargin: "0px 0px -88% 0px",
         threshold: 0,
       },
     );
