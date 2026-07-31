@@ -128,6 +128,17 @@ Break templates additionally carry `indent_first_paragraph`, deciding whether
 the paragraph opening after the break is indented. Absent means flush, the usual
 convention for a chapter opening; house styles that indent throughout set it.
 
+Block formats additionally carry `section_start`, for blocks that begin a new
+*section* in the Word/InDesign sense — its own page numbering (`continue` or
+`restart`, with an optional starting number) and its own running heads
+(`continue`, `restart`, or `suppress`, the last being the convention for front
+matter). Recorded now, consumed at export, where pagination becomes real; the
+drafting view can only mark the boundary.
+
+Breaks are edited **in place, between the blocks**: hovering a break in the
+document reveals its template name and a control that opens it. Editing detaches
+it, per above.
+
 Both categories live in one library, tagged by category, with built-ins flagged
 undeletable.
 
@@ -181,6 +192,30 @@ _PROPOSED._ Break templates carry a `suppress_on_first_child` flag. Separator-st
 breaks (a scene ornament) set it — you don't want an ornament immediately under a
 chapter heading. Heading-style breaks (a chapter break under a part) don't — you
 do want "Part One" followed by "Chapter 1."
+
+### 4.0 Two view modes
+
+The document pane renders in one of two modes, switched from the header and
+remembered per browser:
+
+| Mode | What it is |
+|---|---|
+| **Reading** | Comfortable and book-like. A ~34em measure, the app's own serif, justified. Ignores template typography entirely. |
+| **Manuscript** | Set exactly as the templates specify, filling the viewport with a margin. |
+
+Manuscript typography is **not hardcoded** — no Courier, no double spacing, no
+assumptions. Each template carries a `typography` block (font stack, size,
+line height, alignment, first-line indent in inches) and manuscript mode applies
+it. The built-ins ship with the values submission guidelines conventionally ask
+for, but every one of them is the writer's to change.
+
+**Zen** is a separate control: it hides the outline *and* the header, leaving
+nothing but the manuscript. Escape leaves it, and a faint control in the corner
+does too.
+
+Pinning is distinct from both. Pinned, the outline holds a column of its own;
+unpinned, it floats over the manuscript and retracts to an edge, sliding back
+out on hover.
 
 ### 4.1 Page-like, not paginated
 

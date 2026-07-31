@@ -882,3 +882,231 @@ input::placeholder {
 .work-card-open:hover {
   text-decoration: none;
 }
+
+/* --- View modes ------------------------------------------------------- */
+
+/* Reading keeps a book measure — roughly 65 characters, which is what makes
+   long prose comfortable. Manuscript takes the viewport, because that's the
+   page it will actually be set on. */
+.page-sheet.manuscript {
+  max-width: none;
+  width: calc(100% - 48px);
+  margin: 0 24px;
+  padding: 48px 56px 96px;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  text-align: left;
+}
+
+.page-sheet.manuscript .prose {
+  text-align: left;
+  hyphens: none;
+}
+
+.segmented.compact {
+  margin-bottom: 0;
+  padding: 3px;
+  gap: 2px;
+}
+
+.segmented.compact button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 9px;
+  font-size: 12px;
+}
+
+/* --- Zen -------------------------------------------------------------- */
+
+/* One control takes away the outline *and* the chrome — nothing left but the
+   manuscript. Escape brings it back. */
+.work-shell.zen .app-header {
+  display: none;
+}
+
+.work-shell.zen .document-pane {
+  padding-top: 48px;
+}
+
+.zen-exit {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  opacity: 0.28;
+  transition: opacity 0.15s;
+}
+
+.zen-exit:hover {
+  opacity: 1;
+}
+
+/* --- Breaks as editable objects between blocks ------------------------ */
+
+.doc-break {
+  position: relative;
+  user-select: none;
+  border-radius: 3px;
+}
+
+.doc-break:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 5%, transparent);
+}
+
+.doc-break-edit {
+  position: absolute;
+  top: 50%;
+  right: -8px;
+  transform: translateY(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+  white-space: nowrap;
+}
+
+.doc-break:hover .doc-break-edit {
+  opacity: 1;
+}
+
+.doc-break.detached .doc-break-edit {
+  opacity: 0.5;
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+}
+
+.doc-break.detached:hover .doc-break-edit {
+  opacity: 1;
+}
+
+.section-marker {
+  margin: 0 0 10px;
+  font-family: var(--sans);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-top: 1px solid var(--border);
+  padding-top: 5px;
+}
+
+/* --- Template body editor --------------------------------------------- */
+
+.modal.wide {
+  max-width: 660px;
+}
+
+.body-editor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 18px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.be-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.be-row:last-child {
+  border-bottom: 0;
+}
+
+.be-kind {
+  flex: 0 0 74px;
+  padding-top: 7px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.be-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.be-actions {
+  display: flex;
+  gap: 1px;
+}
+
+.be-para .be-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.be-para .be-controls select {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.be-mark {
+  min-width: 26px;
+  padding: 4px 6px;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.be-mark.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast);
+}
+
+.be-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.be-inline input {
+  width: 72px;
+}
+
+.be-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0 0;
+  flex-wrap: wrap;
+}
+
+.be-add .btn {
+  padding: 5px 10px;
+  font-size: 12px;
+}

@@ -5,3 +5,4 @@ export * from "./words.js";
 export * from "./numbering.js";
 export * from "./outline.js";
 export * from "./render.js";
+export * from "./template-text.js";

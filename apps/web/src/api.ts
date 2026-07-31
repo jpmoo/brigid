@@ -1,5 +1,10 @@
 /** Thin fetch wrapper. Same-origin in production, Vite-proxied in dev. */
 
+import type {
+  BlockFormatSettings,
+  BreakTemplateSettings,
+  TemplateBody,
+} from "@brigid/shared";
 import { apiUrl } from "./base.js";
 
 export class ApiError extends Error {
@@ -74,6 +79,8 @@ export interface Block {
   content: Record<string, unknown> | null;
   contentText: string;
   wordCount: number;
+  breakTemplateId: string | null;
+  breakBody: TemplateBody | null;
 }
 
 export interface Template {
@@ -81,13 +88,9 @@ export interface Template {
   category: "break" | "block-format";
   name: string;
   builtinKey: string | null;
-  body: { nodes: unknown[] };
-  breakSettings: { suppressOnFirstChild: boolean } | null;
-  formatSettings: {
-    countsTowardWordCount: boolean;
-    structural: boolean;
-    rendersInDocument: boolean;
-  } | null;
+  body: TemplateBody;
+  breakSettings: BreakTemplateSettings | null;
+  formatSettings: BlockFormatSettings | null;
 }
 
 export type Placement = "root" | "sibling" | "child" | "parent";
@@ -149,4 +152,12 @@ export const api = {
   moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
     post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),
   deleteBlock: (id: string) => request<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
+
+  detachBreak: (id: string) => post<{ block: Block }>(`/blocks/${id}/break/detach`),
+  updateBreak: (id: string, body: TemplateBody) =>
+    request<{ block: Block }>(`/blocks/${id}/break`, {
+      method: "PATCH",
+      body: JSON.stringify({ body }),
+    }),
+  revertBreak: (id: string) => request<{ block: Block }>(`/blocks/${id}/break`, { method: "DELETE" }),
 };

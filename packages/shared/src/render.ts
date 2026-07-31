@@ -1,7 +1,14 @@
 import { formatNumber } from "./numbering.js";
 import { buildOutline, computeCounters } from "./outline.js";
 import type { BlockNode, LevelLike, OutlineEntry, TemplateLike } from "./outline.js";
-import type { TemplateAlign, TemplateInline, TemplateMarks, TemplateNode } from "./templates.js";
+import type {
+  TemplateAlign,
+  TemplateInline,
+  TemplateMarks,
+  SectionStart,
+  TemplateNode,
+  Typography,
+} from "./templates.js";
 import { VARIABLES } from "./variables.js";
 import type { VariableName } from "./variables.js";
 
@@ -48,6 +55,8 @@ export type DocumentItem<B extends BlockNode = BlockNode> =
       templateName: string;
       /** True when this break has been edited away from its template. */
       detached: boolean;
+      /** Manuscript-mode typography, from the template. Null in reading mode. */
+      typography: Typography | null;
       nodes: ResolvedNode[];
     }
   | {
@@ -56,6 +65,10 @@ export type DocumentItem<B extends BlockNode = BlockNode> =
       entry: OutlineEntry<B>;
       /** The block's format, already resolved. */
       nodes: ResolvedNode[];
+      /** Manuscript-mode typography, from the block's format template. */
+      typography: Typography | null;
+      /** Set when this block starts a new numbering / running-head section. */
+      sectionStart: SectionStart | null;
       /**
        * Whether this block's opening paragraph is indented. A block that merely
        * continues a scene always is; one that opens after a break follows that
@@ -232,6 +245,7 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
           templateId: entry.block.breakTemplateId ?? "",
           templateName: source ? `${source.name} (edited)` : "Edited break",
           detached: true,
+          typography: source?.breakSettings?.typography ?? null,
           nodes: resolveBody(entry.block.breakBody.nodes, ctx),
         });
       } else {
@@ -248,6 +262,7 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
             templateId: breakTemplate.id,
             templateName: breakTemplate.name,
             detached: false,
+            typography: breakTemplate.breakSettings?.typography ?? null,
             nodes: resolveBody(breakTemplate.body.nodes, ctx),
           });
         }
@@ -269,6 +284,8 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
       block: entry.block,
       entry,
       nodes: format ? resolveBody(format.body.nodes, ctx) : [{ type: "content" }],
+      typography: format?.formatSettings?.typography ?? null,
+      sectionStart: format?.formatSettings?.sectionStart ?? null,
       firstLineIndent,
     });
   }

@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, PanelLeftClose, PanelLeftOpen, Pin, PinOff } from "lucide-react";
+import { ArrowLeft, BookOpen, FileText, Maximize2, Minimize2, Pin, PinOff } from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
-import type { TemplateLike } from "@brigid/shared";
+import type { TemplateBody } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
+import { BodyEditor } from "../components/BodyEditor.js";
 import { DocumentView } from "../components/DocumentView.js";
+import type { ViewMode } from "../components/DocumentView.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
 const PANEL_KEY = "brigid.outline.pinned";
+const MODE_KEY = "brigid.view.mode";
 
 interface AddRequest {
   relativeTo: string | null;
@@ -32,6 +35,12 @@ export function WorkPage() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [pinned, setPinned] = useState(() => localStorage.getItem(PANEL_KEY) !== "false");
   const [panelOpen, setPanelOpen] = useState(true);
+  // Zen hides the outline *and* the header — nothing but the manuscript.
+  const [zen, setZen] = useState(false);
+  const [mode, setMode] = useState<ViewMode>(
+    () => (localStorage.getItem(MODE_KEY) as ViewMode) || "reading",
+  );
+  const [editingBreak, setEditingBreak] = useState<Block | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
 
@@ -63,6 +72,21 @@ export function WorkPage() {
     localStorage.setItem(PANEL_KEY, String(pinned));
   }, [pinned]);
 
+  useEffect(() => {
+    localStorage.setItem(MODE_KEY, mode);
+  }, [mode]);
+
+  // Escape leaves zen, so there's always a way back without hunting for a
+  // control that zen itself has hidden.
+  useEffect(() => {
+    if (!zen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setZen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [zen]);
+
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const entries = useMemo(() => buildOutline(blocks), [blocks]);
 
@@ -71,8 +95,7 @@ export function WorkPage() {
     return deriveDocument<Block>({
       blocks,
       levels,
-      // The renderer only needs the structural fields; the API shape is wider.
-      templates: templates as unknown as TemplateLike[],
+      templates,
       work: {
         title: work.title,
         subtitle: work.subtitle,
@@ -126,10 +149,10 @@ export function WorkPage() {
   if (loading) return <div className="loading">Opening…</div>;
   if (!work) return <div className="loading">{error ?? "Not found."}</div>;
 
-  const showPanel = pinned || panelOpen;
+  const showPanel = !zen && (pinned || panelOpen);
 
   return (
-    <div className="work-shell">
+    <div className={`work-shell${zen ? " zen" : ""}`}>
       <header className="app-header">
         <Link className="btn ghost" to="/" title="Back to library">
           <ArrowLeft size={16} />
@@ -143,10 +166,28 @@ export function WorkPage() {
         <span className="muted" style={{ fontSize: 13 }}>
           {wordFmt.format(totalWords)} words
         </span>
+        <div className="segmented compact" role="group" aria-label="View mode">
+          <button
+            type="button"
+            aria-pressed={mode === "reading"}
+            onClick={() => setMode("reading")}
+            title="Reading — comfortable, book-like"
+          >
+            <BookOpen size={13} /> Reading
+          </button>
+          <button
+            type="button"
+            aria-pressed={mode === "manuscript"}
+            onClick={() => setMode("manuscript")}
+            title="Manuscript — set exactly as your templates specify"
+          >
+            <FileText size={13} /> Manuscript
+          </button>
+        </div>
         <button
           className="btn ghost"
           type="button"
-          title={pinned ? "Unpin outline" : "Pin outline"}
+          title={pinned ? "Let the outline float" : "Dock the outline"}
           onClick={() => setPinned((v) => !v)}
         >
           {pinned ? <Pin size={16} /> : <PinOff size={16} />}
@@ -154,10 +195,10 @@ export function WorkPage() {
         <button
           className="btn ghost"
           type="button"
-          title={showPanel ? "Hide outline" : "Show outline"}
-          onClick={() => (pinned ? setPinned(false) : setPanelOpen((v) => !v))}
+          title="Zen — hide everything but the manuscript (Esc to leave)"
+          onClick={() => setZen(true)}
         >
-          {showPanel ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+          <Maximize2 size={16} />
         </button>
       </header>
 
@@ -195,7 +236,21 @@ export function WorkPage() {
             registerRef={registerRef}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            mode={mode}
+            onEditBreak={(blockId) =>
+              setEditingBreak(blocks.find((b) => b.id === blockId) ?? null)
+            }
           />
+          {zen ? (
+            <button
+              className="zen-exit"
+              type="button"
+              title="Leave zen (Esc)"
+              onClick={() => setZen(false)}
+            >
+              <Minimize2 size={15} />
+            </button>
+          ) : null}
         </main>
       </div>
 
@@ -208,6 +263,17 @@ export function WorkPage() {
           onCreated={(created) => {
             setAdding(null);
             setSelectedId(created.id);
+            void load();
+          }}
+        />
+      ) : null}
+
+      {editingBreak ? (
+        <BreakEditor
+          block={editingBreak}
+          onClose={() => setEditingBreak(null)}
+          onSaved={() => {
+            setEditingBreak(null);
             void load();
           }}
         />
@@ -374,6 +440,110 @@ function RenameModal({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+/**
+ * Edits the break that sits *before* a block. A break follows its level's
+ * template until it's edited here, at which point it detaches and becomes this
+ * block's own — so one chapter break can read differently from all the others.
+ */
+function BreakEditor({
+  block,
+  onClose,
+  onSaved,
+}: {
+  block: Block;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [body, setBody] = useState<TemplateBody | null>(
+    block.breakBody ?? null,
+  );
+  const [detached, setDetached] = useState(Boolean(block.breakBody));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function detach() {
+    setError(null);
+    setBusy(true);
+    try {
+      const { block: updated } = await api.detachBreak(block.id);
+      setBody(updated.breakBody ?? { nodes: [] });
+      setDetached(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not detach this break");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (!body) return;
+    setBusy(true);
+    try {
+      await api.updateBreak(block.id, body);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not save");
+      setBusy(false);
+    }
+  }
+
+  async function revert() {
+    if (!confirm("Discard this break's edits and follow the level's template again?")) return;
+    setBusy(true);
+    try {
+      await api.revertBreak(block.id);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not revert");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+        <h2 className="card-title">Break before this block</h2>
+        <p className="card-subtitle">
+          {detached
+            ? "This break is edited for this block alone. Other breaks at the same level are untouched."
+            : "This break follows its level's template, so it changes if you move the block to a different indentation. Edit it to make it this block's own."}
+        </p>
+
+        {error ? <div className="alert error">{error}</div> : null}
+
+        {detached && body ? (
+          <BodyEditor body={body} onChange={setBody} />
+        ) : (
+          <p className="muted" style={{ marginBottom: 18 }}>
+            Nothing here is editable until you detach it.
+          </p>
+        )}
+
+        <div className="modal-actions">
+          {detached ? (
+            <button className="btn secondary" type="button" onClick={() => void revert()} disabled={busy}>
+              Follow the template again
+            </button>
+          ) : null}
+          <div className="spacer" />
+          <button className="btn secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          {detached ? (
+            <button className="btn" type="button" onClick={() => void save()} disabled={busy || !body}>
+              {busy ? "Saving…" : "Save"}
+            </button>
+          ) : (
+            <button className="btn" type="button" onClick={() => void detach()} disabled={busy}>
+              {busy ? "Detaching…" : "Edit just this one"}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

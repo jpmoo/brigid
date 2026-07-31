@@ -1,7 +1,11 @@
 import { Fragment } from "react";
 import type { CSSProperties } from "react";
-import type { DocumentItem, ResolvedNode, ResolvedSpan } from "@brigid/shared";
+import { Pencil } from "lucide-react";
+import type { DocumentItem, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
+
+/** Reading is comfortable and book-like; Manuscript sets the page as it exports. */
+export type ViewMode = "reading" | "manuscript";
 
 function spanStyle(span: ResolvedSpan): CSSProperties {
   return {
@@ -13,20 +17,54 @@ function spanStyle(span: ResolvedSpan): CSSProperties {
   };
 }
 
-function Nodes({ nodes, prose, indentFirst = true }: { nodes: ResolvedNode[]; prose?: string; indentFirst?: boolean }) {
+/**
+ * Typography is the template's, not the app's — nothing about Courier or double
+ * spacing is baked in here. Reading mode ignores it entirely and inherits the
+ * sheet's own type.
+ */
+function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
+  if (mode !== "manuscript" || !t) return {};
+  return {
+    fontFamily: t.fontFamily,
+    fontSize: t.fontSizePt ? `${t.fontSizePt}pt` : undefined,
+    lineHeight: t.lineHeight,
+    textAlign: t.align,
+  };
+}
+
+function Nodes({
+  nodes,
+  prose,
+  indentFirst = true,
+  mode,
+  typography,
+}: {
+  nodes: ResolvedNode[];
+  prose?: string;
+  indentFirst?: boolean;
+  mode: ViewMode;
+  typography: Typography | null;
+}) {
+  const indent =
+    mode === "manuscript" && typography?.firstLineIndentIn !== undefined
+      ? `${typography.firstLineIndentIn}in`
+      : undefined;
+
   return (
     <>
       {nodes.map((node, i) => {
         switch (node.type) {
           case "pageBreak":
-            // Page-like, not paginated: a rule stands in for the boundary until
-            // export, where the break becomes real.
             return <div className="page-break" key={i} aria-label="Page break" />;
           case "spacer":
             return <div className="spacer-lines" key={i} style={{ height: `${node.lines * 1.5}em` }} />;
           case "paragraph":
             return (
-              <p className={`tpl-para align-${node.align}`} key={i}>
+              <p
+                className={`tpl-para align-${node.align}`}
+                key={i}
+                style={mode === "manuscript" ? { textAlign: node.align } : undefined}
+              >
                 {node.spans.map((span, j) => (
                   <span
                     key={j}
@@ -42,7 +80,15 @@ function Nodes({ nodes, prose, indentFirst = true }: { nodes: ResolvedNode[]; pr
             return prose ? (
               <Fragment key={i}>
                 {prose.split(/\n{2,}/).map((para, j) => (
-                  <p className={j === 0 && !indentFirst ? "prose flush" : "prose"} key={j}>
+                  <p
+                    className={j === 0 && !indentFirst ? "prose flush" : "prose"}
+                    key={j}
+                    style={
+                      indent !== undefined && !(j === 0 && !indentFirst)
+                        ? { textIndent: indent }
+                        : undefined
+                    }
+                  >
                     {para}
                   </p>
                 ))}
@@ -63,29 +109,49 @@ export interface DocumentViewProps {
   registerRef: (blockId: string, el: HTMLDivElement | null) => void;
   selectedId: string | null;
   onSelect: (id: string) => void;
+  mode: ViewMode;
+  onEditBreak: (blockId: string) => void;
 }
 
-/**
- * The stitched manuscript. Breaks are derived from each block's depth, so they
- * are rendered here but never editable and never owned by a block.
- */
-export function DocumentView({ items, registerRef, selectedId, onSelect }: DocumentViewProps) {
+export function DocumentView({
+  items,
+  registerRef,
+  selectedId,
+  onSelect,
+  mode,
+  onEditBreak,
+}: DocumentViewProps) {
   if (items.length === 0) {
     return (
-      <div className="page-sheet">
-        <p className="prose empty">
-          This manuscript is empty. Add a block in the outline to begin.
-        </p>
+      <div className={`page-sheet ${mode}`}>
+        <p className="prose empty">This manuscript is empty. Add a block in the outline to begin.</p>
       </div>
     );
   }
 
   return (
-    <div className="page-sheet">
+    <div className={`page-sheet ${mode}`}>
       {items.map((item, i) =>
         item.kind === "break" ? (
-          <div className="doc-break" key={`b${i}`} title={item.templateName} aria-hidden="true">
-            <Nodes nodes={item.nodes} />
+          // A break lives between blocks and belongs to neither, so it carries
+          // its own affordance rather than hiding inside a block's menu.
+          <div className={`doc-break${item.detached ? " detached" : ""}`} key={`b${i}`}>
+            <div className="doc-break-body" style={typographyStyle(item.typography, mode)}>
+              <Nodes nodes={item.nodes} mode={mode} typography={item.typography} />
+            </div>
+            <button
+              className="doc-break-edit"
+              type="button"
+              title={
+                item.detached
+                  ? `${item.templateName} — edited for this block`
+                  : `${item.templateName} — click to edit just this one`
+              }
+              onClick={() => onEditBreak(item.blockId)}
+            >
+              <Pencil size={12} />
+              <span>{item.templateName}</span>
+            </button>
           </div>
         ) : (
           <div
@@ -94,11 +160,22 @@ export function DocumentView({ items, registerRef, selectedId, onSelect }: Docum
             ref={(el) => registerRef(item.block.id, el)}
             onClick={() => onSelect(item.block.id)}
             role="presentation"
+            style={typographyStyle(item.typography, mode)}
           >
+            {item.sectionStart ? (
+              <div className="section-marker" title="Starts a new page-numbering section">
+                {item.sectionStart.pageNumbering === "restart"
+                  ? `page count restarts at ${item.sectionStart.startPageNumber ?? 1}`
+                  : "new section"}
+                {item.sectionStart.runningHeads === "suppress" ? " · no running heads" : ""}
+              </div>
+            ) : null}
             <Nodes
               nodes={item.nodes}
               prose={item.block.contentText}
               indentFirst={item.firstLineIndent}
+              mode={mode}
+              typography={item.typography}
             />
           </div>
         ),

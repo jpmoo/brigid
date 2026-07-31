@@ -1,4 +1,4 @@
-import { deriveDocument } from "@brigid/shared";
+import { deriveDocument, parseInlines, serializeInlines } from "@brigid/shared";
 import type { LevelLike, TemplateLike } from "@brigid/shared";
 
 let failures = 0;
@@ -280,6 +280,23 @@ check(
   "a paragraph of only-empty variables is dropped",
   noSubtitle[0]?.kind === "block" ? noSubtitle[0].nodes.length : null,
   1,
+);
+
+// --- template text tokens ---------------------------------------------------
+check(
+  "variable tokens round-trip through the text editor form",
+  serializeInlines(parseInlines("Chapter {{levelCounter:words-title}} — {{levelTitle}}")),
+  "Chapter {{levelCounter:words-title}} — {{levelTitle}}",
+);
+check(
+  "an unknown token stays literal instead of vanishing",
+  parseInlines("keep {{notAVariable}} intact").map((i) => (i.type === "text" ? i.text : i.name)),
+  ["keep {{notAVariable}} intact"],
+);
+check(
+  "marks apply to every span parsed from one paragraph",
+  parseInlines("Chapter {{levelCounter}}", { smallCaps: true }).every((i) => i.smallCaps === true),
+  true,
 );
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

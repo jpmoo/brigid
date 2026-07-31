@@ -58,6 +58,47 @@ export interface BreakTemplateSettings {
    * already did.
    */
   indentFirstParagraph?: boolean;
+  /** Applied in manuscript mode only. */
+  typography?: Typography;
+}
+
+/**
+ * How a format's text is set when the document is shown as a manuscript.
+ *
+ * Nothing here is assumed — the submission conventions people quote (12pt
+ * Courier, double-spaced, ragged right, half-inch indents) are just the values
+ * the built-ins ship with, and every one of them is the writer's to change.
+ * Reading mode ignores all of it and uses the app's own typography.
+ */
+export interface Typography {
+  /** CSS font stack, exactly as the writer specifies it. */
+  fontFamily?: string;
+  fontSizePt?: number;
+  /** Multiple of the font size. 2 is double-spaced. */
+  lineHeight?: number;
+  align?: "left" | "justify" | "center" | "right";
+  /** Paragraph indent, in inches — the unit submission guidelines use. */
+  firstLineIndentIn?: number;
+  /** Blank space between paragraphs, as a multiple of the line height. */
+  paragraphSpacingEm?: number;
+}
+
+/**
+ * Where a block begins a new *section* of the document, in the sense Word and
+ * InDesign use the word: a stretch with its own page numbering and its own
+ * running heads.
+ *
+ * Front matter usually suppresses running heads and doesn't count toward the
+ * page numbers a submission quotes; the body restarts at 1. All of it is
+ * recorded here and consumed at export, where pagination becomes real — the
+ * drafting view is page-*like* and can only mark the boundary.
+ */
+export interface SectionStart {
+  /** "restart" begins the page count again at `startPageNumber`, default 1. */
+  pageNumbering: "continue" | "restart";
+  startPageNumber?: number;
+  /** "suppress" leaves the running heads off — the convention for front matter. */
+  runningHeads: "continue" | "restart" | "suppress";
 }
 
 export interface BlockFormatSettings {
@@ -70,6 +111,13 @@ export interface BlockFormatSettings {
   structural: boolean;
   /** False for notes: present in the outline, absent from the document. */
   rendersInDocument: boolean;
+  /** Applied in manuscript mode only. */
+  typography?: Typography;
+  /**
+   * Absent means the block simply continues the section it lands in — the case
+   * for ordinary prose.
+   */
+  sectionStart?: SectionStart;
 }
 
 // --- Built-ins ----------------------------------------------------------
