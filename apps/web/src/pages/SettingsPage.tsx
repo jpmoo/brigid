@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
@@ -8,13 +8,21 @@ import { useAuth } from "../auth/AuthContext.js";
 
 export function SettingsPage() {
   const { username } = useAuth();
+  const navigate = useNavigate();
+
+  // Back to wherever the writer came from — usually the work they were in the
+  // middle of, not the library. react-router records its position in history
+  // state; index 0 means this was opened directly and there is nothing behind
+  // it, so fall back to the library rather than leaving the app.
+  const goBack = () => {
+    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
+    if (idx > 0) navigate(-1);
+    else navigate("/");
+  };
 
   return (
     <>
       <header className="app-header">
-        <Link className="btn ghost" to="/" title="Back to library">
-          <ArrowLeft size={16} />
-        </Link>
         <BrandMark />
         <BrandHeading />
         <div className="spacer" />
@@ -24,6 +32,11 @@ export function SettingsPage() {
       </header>
 
       <main className="page">
+        <button className="btn secondary back-link" type="button" onClick={goBack}>
+          <ArrowLeft size={15} />
+          Back
+        </button>
+
         <div className="page-head">
           <h2>Settings</h2>
         </div>
