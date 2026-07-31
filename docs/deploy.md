@@ -7,8 +7,8 @@ surviving reboots via systemd.
 > is therefore driven with `curl` (step 4). Once the web app lands, that step
 > becomes a form in the browser and nothing else here changes.
 
-Substitute your own values for `/opt/brigid` (the checkout) and `jpmoore` (the
-account that owns it) throughout.
+Paths below assume the checkout is at `~/brigid`. Adjust if yours differs.
+
 
 ---
 
@@ -55,7 +55,7 @@ which command you want depends on what's already there.
 **If the directory is empty** — clone into `.`:
 
 ```bash
-cd /opt/brigid
+cd ~/brigid
 git clone https://github.com/jpmoo/brigid.git .
 ```
 
@@ -63,7 +63,7 @@ git clone https://github.com/jpmoo/brigid.git .
 instead of cloning:
 
 ```bash
-cd /opt/brigid
+cd ~/brigid
 git init -b main
 git remote add origin https://github.com/jpmoo/brigid.git
 git fetch origin
@@ -80,11 +80,10 @@ git reset --hard origin/main
 > `git reset --hard` discards local changes to tracked files. Check `git status`
 > first if you're unsure what's there.
 
-Make sure you own the checkout, then install:
+Install dependencies:
 
 ```bash
-sudo chown -R jpmoore:jpmoore /opt/brigid
-cd /opt/brigid
+cd ~/brigid
 pnpm install
 ```
 
@@ -145,7 +144,7 @@ gitignored, which matters more now that the repo is public.
 ## 4. First start and account creation
 
 ```bash
-cd /opt/brigid
+cd ~/brigid
 pnpm start
 ```
 
@@ -186,18 +185,59 @@ foreground server with Ctrl-C before moving on.
 
 ## 5. systemd
 
+A unit file can't expand `~`, `$HOME`, or anything on your PATH, so rather than
+copying the template in `deploy/brigid.service` and editing four fields by hand,
+generate it with those values already substituted. Run this from the checkout:
+
 ```bash
-sudo cp deploy/brigid.service /etc/systemd/system/brigid.service
-which pnpm          # note the path — usually /usr/bin/pnpm
-sudo nano /etc/systemd/system/brigid.service
+sudo tee /etc/systemd/system/brigid.service >/dev/null <<EOF
+[Unit]
+Description=Brigid — self-hosted novel writing application
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$HOME/brigid
+ExecStart=$(command -v pnpm) start
+Restart=on-failure
+RestartSec=5s
+Environment=NODE_ENV=production
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+ReadWritePaths=$HOME/brigid
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=brigid
+
+[Install]
+WantedBy=multi-user.target
+EOF
 ```
 
-Set four things to match your box: `User`, `WorkingDirectory`, `ExecStart` (the
-`which pnpm` path), and `ReadWritePaths`.
+The heredoc is unquoted on purpose: `$USER`, `$HOME`, and `$(command -v pnpm)`
+expand in your shell as it's written, so the unit lands with real absolute
+values. Check them before enabling:
 
-> **Using nvm anyway?** systemd starts a non-login shell, so `pnpm` won't be on
-> PATH. Point `ExecStart` at the absolute interpreter and script instead:
-> `ExecStart=/home/jpmoore/.nvm/versions/node/v22.x.y/bin/node /opt/brigid/apps/server/node_modules/.bin/tsx /opt/brigid/apps/server/src/server.ts`
+```bash
+grep -E 'User=|WorkingDirectory=|ExecStart=|ReadWritePaths=' /etc/systemd/system/brigid.service
+```
+
+Note there's no `ProtectHome=` here. The checkout lives under `/home`, and
+`ProtectHome=read-only` would make `data/brigid.config.json` unwritable — the
+service would start and then fail the moment it tried to persist its config.
+
+> **Using nvm?** systemd starts a non-login shell, so `pnpm` won't be on PATH and
+> `command -v pnpm` above will come back empty. Use the absolute interpreter and
+> script instead:
+> `ExecStart=$HOME/.nvm/versions/node/v22.x.y/bin/node $HOME/brigid/apps/server/node_modules/.bin/tsx $HOME/brigid/apps/server/src/server.ts`
 
 Enable and start:
 
@@ -241,7 +281,7 @@ and the `https://` form of `APP_ORIGIN` in `.env.local` and restart.
 ## 6. Updating
 
 ```bash
-cd /opt/brigid
+cd ~/brigid
 ./restart.sh
 ```
 

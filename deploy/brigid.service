@@ -1,16 +1,15 @@
-# Brigid systemd unit.
+# Brigid systemd unit — reference template.
 #
-# Install:
-#   sudo cp deploy/brigid.service /etc/systemd/system/brigid.service
-#   sudo nano /etc/systemd/system/brigid.service     # set User, WorkingDirectory, ExecStart
-#   sudo systemctl daemon-reload
-#   sudo systemctl enable --now brigid
+# Unit files can't expand ~, $HOME, or PATH, so the four marked values below are
+# placeholders. Rather than copying this file and editing it, prefer the
+# generator in docs/deploy.md step 5, which writes the unit with your real user,
+# checkout path, and pnpm path already substituted.
 #
-# Substitute before enabling:
+# If you do copy this by hand, replace:
 #   User=            the account that owns the checkout
-#   WorkingDirectory the checkout path
-#   ExecStart=       output of `which pnpm` (see docs/deploy.md if you use nvm)
-#   ReadWritePaths=  the checkout path again
+#   WorkingDirectory the absolute checkout path
+#   ExecStart=       output of `command -v pnpm`
+#   ReadWritePaths=  the absolute checkout path again
 
 [Unit]
 Description=Brigid — self-hosted novel writing application
@@ -36,8 +35,9 @@ Environment=NODE_ENV=production
 # The manuscript is the whole point of this machine; keep the blast radius small.
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=read-only
+ProtectSystem=full
+# Deliberately no ProtectHome= — a checkout under /home needs to stay writable
+# for data/brigid.config.json, and ProtectHome=read-only would break it.
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
