@@ -146,13 +146,6 @@ INSERT INTO templates (category, name, builtin_key, body, format_settings) VALUE
         {"type":"pageBreak"}
       ]}'::jsonb,
     '{"countsTowardWordCount":false,"structural":false,"rendersInDocument":true}'::jsonb
-  ),
-  (
-    'block-format',
-    'Note',
-    'note',
-    '{"nodes":[{"type":"content"}]}'::jsonb,
-    '{"countsTowardWordCount":false,"structural":false,"rendersInDocument":false}'::jsonb
   );
 
 INSERT INTO templates (category, name, builtin_key, body, break_settings) VALUES

@@ -2356,3 +2356,57 @@ input::placeholder {
 .chip-field [data-var] {
   cursor: default;
 }
+
+/* --- Search ----------------------------------------------------------- */
+
+.search-wrap {
+  position: relative;
+}
+
+.search-wrap .btn.ghost.on {
+  background: var(--surface-sunken);
+  color: var(--accent);
+}
+
+.search-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+}
+
+.search-panel input {
+  width: 210px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+.search-count {
+  min-width: 62px;
+  padding: 0 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* Every hit is marked; the one you're on is marked harder. */
+mark.hit {
+  background: color-mix(in srgb, var(--sage) 55%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+mark.hit.active {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}

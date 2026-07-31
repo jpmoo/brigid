@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
@@ -42,18 +43,51 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
   };
 }
 
+/**
+ * Split a paragraph on the search term, tagging each hit with its ordinal
+ * within the block so the active one can be picked out from the rest.
+ */
+function highlight(text: string, needle: string, counter: { n: number }, activeIndex: number | null) {
+  if (!needle) return text;
+  const parts: ReactNode[] = [];
+  const lower = text.toLowerCase();
+  let from = 0;
+  for (;;) {
+    const at = lower.indexOf(needle, from);
+    if (at === -1) break;
+    if (at > from) parts.push(text.slice(from, at));
+    const ordinal = counter.n;
+    counter.n += 1;
+    parts.push(
+      <mark className={ordinal === activeIndex ? "hit active" : "hit"} key={`${at}-${ordinal}`}>
+        {text.slice(at, at + needle.length)}
+      </mark>,
+    );
+    from = at + needle.length;
+  }
+  if (parts.length === 0) return text;
+  if (from < text.length) parts.push(text.slice(from));
+  return parts;
+}
+
 function Nodes({
   nodes,
   prose,
   indentFirst = true,
   mode,
   typography,
+  search,
+  activeIndex,
+  counter,
 }: {
   nodes: ResolvedNode[];
   prose?: string;
   indentFirst?: boolean;
   mode: ViewMode;
   typography: Typography | null;
+  search: string;
+  activeIndex: number | null;
+  counter: { n: number };
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -152,7 +186,7 @@ function Nodes({
                         : undefined
                     }
                   >
-                    {para}
+                    {highlight(para, search, counter, activeIndex)}
                   </p>
                 ))}
               </Fragment>
@@ -181,6 +215,9 @@ export interface DocumentViewProps {
   textScale: number;
   bookmarkedBlockIds: Set<string>;
   onDropBookmark: (blockId: string) => void;
+  /** Lowercased needle, or empty when not searching. */
+  search: string;
+  activeMatch: { blockId: string; indexInBlock: number } | null;
 }
 
 export function DocumentView({
@@ -193,6 +230,8 @@ export function DocumentView({
   textScale,
   bookmarkedBlockIds,
   onDropBookmark,
+  search,
+  activeMatch,
 }: DocumentViewProps) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -227,7 +266,14 @@ export function DocumentView({
             ref={(el) => registerRef(breakRefKey(item.blockId), el)}
           >
             <div className="doc-break-body" style={typographyStyle(item.typography, mode)}>
-              <Nodes nodes={item.nodes} mode={mode} typography={item.typography} />
+              <Nodes
+                nodes={item.nodes}
+                mode={mode}
+                typography={item.typography}
+                search=""
+                activeIndex={null}
+                counter={{ n: 0 }}
+              />
             </div>
             <button
               className="doc-break-edit"
@@ -287,6 +333,11 @@ export function DocumentView({
               indentFirst={item.firstLineIndent}
               mode={mode}
               typography={item.typography}
+              search={search}
+              activeIndex={
+                activeMatch?.blockId === item.block.id ? activeMatch.indexInBlock : null
+              }
+              counter={{ n: 0 }}
             />
           </div>
         ),

@@ -22,6 +22,7 @@ import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
 import { useDialogs } from "../components/Dialogs.js";
+import { SearchBar, findMatches } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -66,6 +67,9 @@ export function WorkPage() {
     return Number.isInteger(stored) && stored >= 0 && stored < SCALE_STEPS.length ? stored : 2;
   });
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [matchIndex, setMatchIndex] = useState(0);
   const [activeBookmark, setActiveBookmark] = useState<string | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
@@ -161,6 +165,23 @@ export function WorkPage() {
       }, 0),
     [blocks, templateMap],
   );
+
+  // Only blocks that actually reach the page are searchable — a note is in the
+  // outline, not in the manuscript.
+  const searchable = useMemo(
+    () =>
+      items
+        .filter((i) => i.kind === "block")
+        .map((i) => (i.kind === "block" ? { id: i.block.id, contentText: i.block.contentText } : null))
+        .filter((b): b is { id: string; contentText: string } => b !== null),
+    [items],
+  );
+  const matches = useMemo(() => findMatches(searchable, query), [searchable, query]);
+  const activeMatch = matches[matchIndex] ?? null;
+
+  useEffect(() => {
+    setMatchIndex(0);
+  }, [query]);
 
   const registerRef = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) blockRefs.current.set(key, el);
@@ -263,6 +284,14 @@ export function WorkPage() {
     });
   }, []);
 
+  const stepMatch = (delta: 1 | -1) => {
+    if (matches.length === 0) return;
+    const next = (matchIndex + delta + matches.length) % matches.length;
+    setMatchIndex(next);
+    const target = matches[next];
+    if (target) selectAndScroll(target.blockId);
+  };
+
   async function addBookmark(blockId: string) {
     try {
       const { bookmark } = await api.createBookmark(id, blockId);
@@ -332,25 +361,6 @@ export function WorkPage() {
           {work.subtitle ? <em>{work.subtitle}</em> : null}
         </div>
         <div className="spacer" />
-
-        <div className="text-size" role="group" aria-label="Text size">
-          <button
-            type="button"
-            title="Smaller text"
-            disabled={scaleIndex === 0}
-            onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
-          >
-            A
-          </button>
-          <button
-            type="button"
-            title="Larger text"
-            disabled={scaleIndex === SCALE_STEPS.length - 1}
-            onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
-          >
-            A
-          </button>
-        </div>
 
         <div className="segmented compact" role="group" aria-label="View mode">
           <button
@@ -472,30 +482,13 @@ export function WorkPage() {
             textScale={SCALE_STEPS[scaleIndex] ?? 1}
             bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
             onDropBookmark={(blockId) => void addBookmark(blockId)}
+            search={query.trim().toLowerCase()}
+            activeMatch={activeMatch}
           />
           {zen ? (
             // Fades in together with the exit control: in zen the only things
             // worth reaching for are the size of the type and the way out.
             <div className="zen-controls">
-              <div className="text-size" role="group" aria-label="Text size">
-                <button
-                  type="button"
-                  title="Smaller text"
-                  disabled={scaleIndex === 0}
-                  onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
-                >
-                  A
-                </button>
-                <button
-                  type="button"
-                  title="Larger text"
-                  disabled={scaleIndex === SCALE_STEPS.length - 1}
-                  onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
-                >
-                  A
-                </button>
-              </div>
-
               <div className="segmented compact" role="group" aria-label="View mode">
                 <button
                   type="button"
@@ -514,6 +507,8 @@ export function WorkPage() {
                   <FileText size={13} /> Manuscript
                 </button>
               </div>
+
+              <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} />
 
               <span className="zen-words">{wordFmt.format(totalWords)} words</span>
 
@@ -565,6 +560,36 @@ export function WorkPage() {
           }}
         />
       ) : null}
+    </div>
+  );
+}
+
+/** The same control in the header and in zen, so they can't drift apart. */
+function TextSize({
+  scaleIndex,
+  setScaleIndex,
+}: {
+  scaleIndex: number;
+  setScaleIndex: (fn: (i: number) => number) => void;
+}) {
+  return (
+    <div className="text-size" role="group" aria-label="Text size">
+      <button
+        type="button"
+        title="Smaller text"
+        disabled={scaleIndex === 0}
+        onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
+      >
+        A
+      </button>
+      <button
+        type="button"
+        title="Larger text"
+        disabled={scaleIndex === SCALE_STEPS.length - 1}
+        onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
+      >
+        A
+      </button>
     </div>
   );
 }
