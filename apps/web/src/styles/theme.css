@@ -2246,6 +2246,13 @@ input::placeholder {
 
 .doc-block {
   position: relative;
+  /* A little air above when scrolled to, so "top of the section" isn't flush
+     against the edge of the pane. */
+  scroll-margin-top: 28px;
+}
+
+.doc-break {
+  scroll-margin-top: 28px;
 }
 
 .doc-bookmark {

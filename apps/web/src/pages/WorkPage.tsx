@@ -171,16 +171,16 @@ export function WorkPage() {
     setSelectedId(blockId);
     blockRefs.current.get(breakRefKey(blockId))?.scrollIntoView({
       behavior: "smooth",
-      block: "center",
+      block: "start",
     });
   }, []);
 
   const selectAndScroll = useCallback((blockId: string) => {
     setSelectedId(blockId);
     scrollingTo.current = blockId;
-    // "center", so the block lands in the middle of the pane rather than
-    // jammed under the header where it's hard to read.
-    blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    // The document goes to the *top* of the section — you want to read it from
+    // its beginning. It's the outline that stays centred, further down.
+    blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
     // Long enough for a smooth scroll to settle before the observer takes over.
     window.setTimeout(() => {
       if (scrollingTo.current === blockId) scrollingTo.current = null;
