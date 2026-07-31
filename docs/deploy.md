@@ -3,9 +3,7 @@
 Target: a headless Ubuntu server, PostgreSQL 13+, Brigid on **port 8090**,
 surviving reboots via systemd.
 
-> **Current limitation.** There is no web UI yet — only the API. First-run setup
-> is therefore driven with `curl` (step 4). Once the web app lands, that step
-> becomes a form in the browser and nothing else here changes.
+Paths below assume the checkout is at `~/brigid`. Adjust if yours differs.
 
 Paths below assume the checkout is at `~/brigid`. Adjust if yours differs.
 
@@ -80,12 +78,16 @@ git reset --hard origin/main
 > `git reset --hard` discards local changes to tracked files. Check `git status`
 > first if you're unsure what's there.
 
-Install dependencies:
+Install dependencies and build the web app:
 
 ```bash
 cd ~/brigid
 pnpm install
+pnpm build:web
 ```
+
+`apps/web/dist` is gitignored, so each server builds its own copy. Skip the build
+and the API still works, but every page in the browser returns a bare 404.
 
 ---
 
@@ -158,28 +160,25 @@ curl -s http://127.0.0.1:8090/api/setup/status
 
 You want `{"ok":true,"database":true}` and `{"needsSetup":true}`.
 
-Create the single account — password must be at least 10 characters:
+Now open `http://your-server-hostname:8090` in a browser. Because no account
+exists yet, Brigid serves the first-run setup screen. Choose **Use existing**,
+paste the same connection string from step 3, and create your account — at least
+10 characters. Submitting it migrates, creates the account, and signs you in, so
+you land straight in the library.
 
-```bash
-curl -sS -X POST http://127.0.0.1:8090/api/setup/complete \
-  -H 'content-type: application/json' \
-  -d '{
-        "database": {
-          "mode": "existing",
-          "url": "postgres://brigid:pick-a-strong-password@localhost:5432/brigid"
-        },
-        "account": { "username": "jpmoo", "password": "your-password-here" }
-      }'
-```
-
-Check that setup has closed behind you:
+Setup closes permanently at that point; `/api/setup/*` refuses every further
+call. Confirm and stop the foreground server with Ctrl-C:
 
 ```bash
 curl -s http://127.0.0.1:8090/api/setup/status   # {"needsSetup":false}
 ```
 
-That endpoint refuses every further call now that an account exists. Stop the
-foreground server with Ctrl-C before moving on.
+> If the browser can't reach the box yet, see "Open the port" in step 5 — or do
+> setup over `curl` instead:
+>
+> ```bash
+> curl -sS -X POST http://127.0.0.1:8090/api/setup/complete -H 'content-type: application/json' -d '{"database":{"mode":"existing","url":"postgres://brigid:pick-a-strong-password@localhost:5432/brigid"},"account":{"username":"jpmoo","password":"your-password-here"}}'
+> ```
 
 ---
 

@@ -15,6 +15,11 @@ git pull --ff-only
 echo "==> Installing dependencies…"
 pnpm install
 
+echo "==> Building the web app…"
+# apps/web/dist is gitignored, so the server builds its own copy. Without this
+# the API comes up fine and every page returns a bare 404.
+pnpm build:web
+
 echo "==> Applying database migrations…"
 # DATABASE_URL usually lives in .env.local rather than the shell environment,
 # and after first-run setup it lives in data/brigid.config.json. Check all three

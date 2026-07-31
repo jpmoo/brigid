@@ -10,15 +10,15 @@ See [docs/brigid-spec.md](docs/brigid-spec.md) for the design.
 
 ## Status
 
-Foundation in place — workspace, domain model, schema, auth, and the first-run
-setup flow. No web app yet.
+You can set up an instance, sign in, and manage a library of works. The editor
+— the outline panel and the stitched document view — is next.
 
 | Piece | State |
 |---|---|
 | `packages/shared` | Template, variable, and word-count model |
 | `packages/db` | Drizzle schema + initial migration, built-in templates seeded |
-| `apps/server` | Fastify app, session auth, first-run setup wizard |
-| `apps/web` | Not started |
+| `apps/server` | Fastify app, session auth, first-run setup, works API |
+| `apps/web` | Setup wizard, login, library |
 
 ## Stack
 
@@ -36,13 +36,21 @@ full server setup — clone, database, systemd, TLS — see
 
 ```bash
 pnpm install
+pnpm build:web
 cp .env.example .env.local   # PORT defaults to 8090
 pnpm start
 ```
 
-With no database configured Brigid starts anyway, in setup mode: first run
-establishes the database, migrates, and creates the single account. Until the
-web app exists that step is a `curl` call — see step 4 of the deploy guide.
+With no database configured Brigid starts anyway, in setup mode: opening it in a
+browser gives you a setup screen that establishes the database, migrates, creates
+the single account, and signs you in.
 
 To configure by hand instead, set `DATABASE_URL` and `SESSION_SECRET` in
 `.env.local`; migrations then run automatically at boot.
+
+For development, run the API and Vite separately — Vite proxies `/api` to 8090,
+so the session cookie behaves exactly as in production:
+
+```bash
+pnpm dev:server   # and, in another shell, pnpm dev:web
+```
