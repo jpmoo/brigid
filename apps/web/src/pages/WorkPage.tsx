@@ -4,6 +4,8 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
+  ChevronsDownUp,
+  ChevronsUpDown,
   FileText,
   LogOut,
   Maximize2,
@@ -226,6 +228,19 @@ export function WorkPage() {
     outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
 
+  // Only blocks with children can be collapsed, so they're the whole question:
+  // if every one is already shut, the control opens them, and otherwise it
+  // shuts them.
+  const collapsible = useMemo(
+    () => entries.filter((e) => e.childCount > 0).map((e) => e.block.id),
+    [entries],
+  );
+  const allCollapsed = collapsible.length > 0 && collapsible.every((id) => collapsed.has(id));
+
+  const toggleAll = useCallback(() => {
+    setCollapsed(allCollapsed ? new Set() : new Set(collapsible));
+  }, [allCollapsed, collapsible]);
+
   const toggleCollapse = useCallback((blockId: string) => {
     setCollapsed((prev) => {
       const next = new Set(prev);
@@ -368,6 +383,17 @@ export function WorkPage() {
 
           <div className="outline-head-bar">
             <span>Outline</span>
+            <button
+              className="outline-toggle-all"
+              type="button"
+              disabled={collapsible.length === 0}
+              title={allCollapsed ? "Expand all" : "Collapse all"}
+              aria-label={allCollapsed ? "Expand all" : "Collapse all"}
+              onClick={toggleAll}
+            >
+              {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
+            </button>
+            <span className="spacer" />
             <span className="muted">{entries.length}</span>
           </div>
           <OutlinePanel

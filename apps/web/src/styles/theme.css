@@ -608,8 +608,9 @@ input::placeholder {
   position: sticky;
   top: 0;
   display: flex;
-  justify-content: space-between;
-  padding: 10px 14px;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px 8px 14px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
@@ -2234,4 +2235,29 @@ input::placeholder {
   top: 2px;
   color: var(--accent);
   opacity: 0.65;
+}
+
+/* --- Expand / collapse all -------------------------------------------- */
+
+.outline-toggle-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 4px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.outline-toggle-all:hover:not(:disabled) {
+  background: var(--surface-sunken);
+  border-color: var(--border);
+  color: var(--accent);
+}
+
+.outline-toggle-all:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
