@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Bookmark as BookmarkIcon, GripVertical, Pencil, Trash2 } from "lucide-react";
+import {
+  Bookmark as BookmarkIcon,
+  ChevronDown,
+  ChevronRight,
+  GripVertical,
+  Pencil,
+  Trash2,
+} from "lucide-react";
 import type { Bookmark } from "../api.js";
 
 export const BOOKMARK_DRAG_TYPE = "application/x-brigid-bookmark";
@@ -25,11 +32,24 @@ export function BookmarkStrip({
   onDelete: (bookmark: Bookmark) => void;
 }) {
   const [dragging, setDragging] = useState(false);
+  // Collapsed by choice, not by count: a long list shouldn't push the outline
+  // off the panel, and a short one shouldn't need a click to see.
+  const [open, setOpen] = useState(true);
 
   return (
     <div className="bm-strip">
       <div className="bm-head">
-        <span>Bookmarks</span>
+        <button
+          className="bm-twisty"
+          type="button"
+          aria-expanded={open}
+          title={open ? "Collapse bookmarks" : "Expand bookmarks"}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          <span>Bookmarks</span>
+          {bookmarks.length > 0 ? <em>{bookmarks.length}</em> : null}
+        </button>
         <span
           className={`bm-source${dragging ? " dragging" : ""}`}
           draggable
@@ -46,7 +66,7 @@ export function BookmarkStrip({
         </span>
       </div>
 
-      {bookmarks.length === 0 ? (
+      {!open ? null : bookmarks.length === 0 ? (
         <p className="bm-empty">Drag the marker onto the manuscript to save a place.</p>
       ) : (
         <ul className="bm-list">

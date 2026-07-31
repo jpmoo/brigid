@@ -2123,12 +2123,33 @@ input::placeholder {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.bm-twisty {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 4px 2px 0;
+  background: none;
+  border: 0;
+  font: inherit;
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
-  margin-bottom: 6px;
+  cursor: pointer;
+}
+
+.bm-twisty:hover {
+  color: var(--accent);
+}
+
+.bm-twisty em {
+  font-style: normal;
+  letter-spacing: 0;
+  opacity: 0.8;
 }
 
 /* The thing you drag onto the manuscript. */

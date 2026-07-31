@@ -495,6 +495,28 @@ export function WorkPage() {
                   A
                 </button>
               </div>
+
+              <div className="segmented compact" role="group" aria-label="View mode">
+                <button
+                  type="button"
+                  aria-pressed={mode === "book"}
+                  onClick={() => setMode("book")}
+                  title="Book — comfortable, book-like typography"
+                >
+                  <BookOpen size={13} /> Book
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === "manuscript"}
+                  onClick={() => setMode("manuscript")}
+                  title="Manuscript — set exactly as your templates specify"
+                >
+                  <FileText size={13} /> Manuscript
+                </button>
+              </div>
+
+              <span className="zen-words">{wordFmt.format(totalWords)} words</span>
+
               <button
                 className="zen-exit"
                 type="button"
