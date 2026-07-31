@@ -30,18 +30,19 @@ setup flow. No web app yet.
 
 ## Running it
 
-Brigid targets a headless Ubuntu server with PostgreSQL 13 or newer.
+Brigid targets a headless Ubuntu server with PostgreSQL 13 or newer. For the
+full server setup — deploy key, database, systemd, TLS — see
+[docs/deploy.md](docs/deploy.md).
 
 ```bash
 pnpm install
-cp .env.example .env.local   # set PORT, HOST, APP_ORIGIN
-pnpm dev:server
+cp .env.example .env.local   # PORT defaults to 8090
+pnpm start
 ```
 
-Then open the app. With no database configured, the first screen is a setup
-wizard that provisions PostgreSQL (or accepts an existing connection string),
-runs migrations, and creates your account. Nothing else needs to be configured
-by hand.
+With no database configured Brigid starts anyway, in setup mode: first run
+establishes the database, migrates, and creates the single account. Until the
+web app exists that step is a `curl` call — see step 5 of the deploy guide.
 
-To skip the wizard, set `DATABASE_URL` and `SESSION_SECRET` in `.env.local` and
-run `pnpm db:migrate`.
+To configure by hand instead, set `DATABASE_URL` and `SESSION_SECRET` in
+`.env.local`; migrations then run automatically at boot.

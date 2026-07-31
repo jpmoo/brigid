@@ -12,7 +12,7 @@ loadEnv({ path: join(repoRoot, ".env") });
 loadEnv({ path: join(repoRoot, ".env.local"), override: true });
 
 export const env = {
-  port: Number(process.env.PORT ?? 8788),
+  port: Number(process.env.PORT ?? 8090),
   host: process.env.HOST ?? "0.0.0.0",
   appOrigin: process.env.APP_ORIGIN ?? null,
   secureCookies: process.env.SECURE_COOKIES === "1",

@@ -1,0 +1,53 @@
+# Brigid systemd unit.
+#
+# Install:
+#   sudo cp deploy/brigid.service /etc/systemd/system/brigid.service
+#   sudo nano /etc/systemd/system/brigid.service     # set User, WorkingDirectory, ExecStart
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now brigid
+#
+# Substitute before enabling:
+#   User=            the account that owns the checkout
+#   WorkingDirectory the checkout path
+#   ExecStart=       output of `which pnpm` (see docs/deploy.md if you use nvm)
+#   ReadWritePaths=  the checkout path again
+
+[Unit]
+Description=Brigid — self-hosted novel writing application
+Documentation=https://github.com/jpmoo/brigid
+# postgresql.service is a no-op if Postgres lives on another host.
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=jpmoore
+WorkingDirectory=/opt/brigid
+ExecStart=/usr/local/bin/pnpm start
+Restart=on-failure
+RestartSec=5s
+
+# PORT/HOST come from .env.local, which the app resolves relative to its own
+# source directory rather than the cwd — so this works regardless of how it is
+# invoked. Set NODE_ENV here because .env.local is application config, not
+# runtime config.
+Environment=NODE_ENV=production
+
+# The manuscript is the whole point of this machine; keep the blast radius small.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# The checkout must stay writable: data/brigid.config.json is written here on
+# first boot and again when the setup wizard establishes the database.
+ReadWritePaths=/opt/brigid
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=brigid
+
+[Install]
+WantedBy=multi-user.target
