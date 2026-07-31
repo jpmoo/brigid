@@ -125,7 +125,7 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
     // The signing secret was minted at boot, so this cookie is valid
     // immediately — no restart, straight into the library.
     const { token } = await createSession(created.id);
-    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies));
+    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies, env.basePath));
 
     return { ok: true, username: created.username };
   });

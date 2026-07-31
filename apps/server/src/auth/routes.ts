@@ -50,7 +50,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     if (!user || !ok) throw unauthorized("incorrect username or password");
 
     const { token } = await createSession(user.id);
-    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies));
+    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies, env.basePath));
     return { username: user.username };
   });
 
@@ -60,7 +60,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const unsigned = req.unsignCookie(raw);
       if (unsigned.valid && unsigned.value) await destroySession(unsigned.value);
     }
-    reply.clearCookie(SESSION_COOKIE, { path: "/" });
+    reply.clearCookie(SESSION_COOKIE, { path: env.basePath });
     return { ok: true };
   });
 

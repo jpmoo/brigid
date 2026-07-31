@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { App } from "./App.js";
+import { ROUTER_BASENAME } from "./base.js";
 import { AuthProvider } from "./auth/AuthContext.js";
 import "./styles/theme.css";
 
@@ -10,7 +11,7 @@ if (!container) throw new Error("#root is missing from index.html");
 
 createRoot(container).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={ROUTER_BASENAME}>
       <AuthProvider>
         <App />
       </AuthProvider>

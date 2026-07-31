@@ -271,9 +271,55 @@ Only if you reach the box directly rather than through a proxy:
 sudo ufw allow 8090/tcp
 ```
 
-Brigid has no TLS of its own. For anything beyond a trusted LAN, put nginx or
-Caddy in front on 443, proxy to `127.0.0.1:8090`, then set `SECURE_COOKIES=1`
-and the `https://` form of `APP_ORIGIN` in `.env.local` and restart.
+Brigid has no TLS of its own. For anything beyond a trusted LAN, put Caddy or
+nginx in front and proxy to `127.0.0.1:8090`.
+
+### Behind a reverse proxy, at the domain root
+
+```bash
+APP_ORIGIN=https://brigid.example.com
+SECURE_COOKIES=1
+```
+
+`SECURE_COOKIES` is about what the *browser* sees, so set it even though the
+proxy reaches Brigid over plain HTTP on localhost. Restart afterwards.
+
+### Behind a reverse proxy, under a subpath
+
+Caddy, serving Brigid at `https://app.example.com/brigid`:
+
+```caddy
+redir /brigid /brigid/
+handle_path /brigid/* {
+  reverse_proxy 127.0.0.1:8090
+}
+```
+
+`handle_path` strips the prefix before forwarding, so Brigid itself only ever
+sees `/`, `/api/…`, and `/assets/…` — it needs no path rewriting. What does need
+to know is the browser-facing side, via `.env.local`:
+
+```bash
+APP_BASE_PATH=/brigid
+APP_ORIGIN=https://app.example.com
+SECURE_COOKIES=1
+```
+
+That one variable is read twice, for two different reasons:
+
+- **At build time** by the web app, so every emitted asset URL carries the
+  prefix. Without it the browser resolves `/assets/index-*.js` against the
+  domain root and the page loads blank.
+- **At run time** by the server, so the session cookie's `Path` is `/brigid`
+  rather than `/`. On a shared hostname the default would send Brigid's cookie
+  to every other app there.
+
+Because the build bakes it in, **re-run `pnpm build:web` after changing it** —
+`./restart.sh` does that for you.
+
+> Prefer `handle_path /brigid/*` with the `redir` over a bare `handle_path
+> /brigid*`: the wildcard form also matches paths like `/brigidsomething`, and
+> the redirect is what makes the bare `/brigid` (no trailing slash) work.
 
 ---
 

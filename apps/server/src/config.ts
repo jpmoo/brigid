@@ -11,11 +11,26 @@ const repoRoot = resolve(here, "..", "..", "..");
 loadEnv({ path: join(repoRoot, ".env") });
 loadEnv({ path: join(repoRoot, ".env.local"), override: true });
 
+/**
+ * Public mount point, e.g. "/brigid". A reverse proxy that strips the prefix
+ * (Caddy's `handle_path`) means the server never sees it in a request URL, but
+ * the browser does — so the session cookie's Path has to be set from this, or
+ * the cookie leaks to every other app on the same hostname.
+ *
+ * Normalized with a leading slash and no trailing one; "/" at the domain root.
+ */
+function normalizeBasePath(value: string | undefined): string {
+  const trimmed = (value ?? "").trim();
+  if (!trimmed || trimmed === "/") return "/";
+  return `/${trimmed.replace(/^\/+|\/+$/g, "")}`;
+}
+
 export const env = {
   port: Number(process.env.PORT ?? 8090),
   host: process.env.HOST ?? "0.0.0.0",
   appOrigin: process.env.APP_ORIGIN ?? null,
   secureCookies: process.env.SECURE_COOKIES === "1",
+  basePath: normalizeBasePath(process.env.APP_BASE_PATH),
 };
 
 export const configPath =

@@ -53,9 +53,9 @@ export async function purgeExpiredSessions(): Promise<number> {
   return removed.length;
 }
 
-export const sessionCookieOptions = (secure: boolean) =>
+export const sessionCookieOptions = (secure: boolean, path: string) =>
   ({
-    path: "/",
+    path,
     httpOnly: true,
     sameSite: "lax" as const,
     secure,

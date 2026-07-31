@@ -1,5 +1,7 @@
 /** Thin fetch wrapper. Same-origin in production, Vite-proxied in dev. */
 
+import { apiUrl } from "./base.js";
+
 export class ApiError extends Error {
   constructor(
     readonly status: number,
@@ -14,7 +16,7 @@ export class ApiError extends Error {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(apiUrl(path), {
       credentials: "same-origin",
       headers: init?.body ? { "content-type": "application/json" } : undefined,
       ...init,
