@@ -159,6 +159,7 @@ function Nodes({
                   ...(mode === "manuscript" ? { textAlign: node.align } : {}),
                   ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
                   ...(node.fontSizePt ? { fontSize: `${node.fontSizePt}pt` } : {}),
+                  ...(node.fontFamily ? { fontFamily: node.fontFamily } : {}),
                 }}
               >
                 {node.spans.map((span, j) =>
@@ -218,6 +219,11 @@ export interface DocumentViewProps {
   onEditBreak: (blockId: string) => void;
   /** Zoom applied to the whole sheet, so manuscript keeps its pt fidelity. */
   textScale: number;
+  /**
+   * The manuscript's body type. Lines that set nothing of their own inherit
+   * this rather than the app's interface font.
+   */
+  baseTypography: Typography | null;
   bookmarkedBlockIds: Set<string>;
   onDropBookmark: (blockId: string) => void;
   /** Lowercased needle, or empty when not searching. */
@@ -233,6 +239,7 @@ export function DocumentView({
   mode,
   onEditBreak,
   textScale,
+  baseTypography,
   bookmarkedBlockIds,
   onDropBookmark,
   search,
@@ -249,6 +256,7 @@ export function DocumentView({
   const sheetStyle: CSSProperties = {
     zoom: textScale,
     ...(mode === "book" ? { maxWidth: `${BOOK_MEASURE_CH}ch` } : {}),
+    ...(mode === "manuscript" ? typographyStyle(baseTypography, mode) : {}),
   };
 
   if (items.length === 0) {

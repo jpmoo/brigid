@@ -76,6 +76,8 @@ export type TemplateNode =
        * than its byline, which the format's single size cannot express.
        */
       fontSizePt?: number;
+      /** Face for this line alone. Falls back to the manuscript's own. */
+      fontFamily?: string;
       content: TemplateInline[];
     }
   /** Vertical whitespace measured in blank lines — the usual scene-break unit. */

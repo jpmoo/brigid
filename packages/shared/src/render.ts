@@ -56,6 +56,7 @@ export type ResolvedNode =
       align: TemplateAlign;
       lineHeight?: number;
       fontSizePt?: number;
+      fontFamily?: string;
       spans: ResolvedSpan[];
     }
   | { type: "spacer"; lines: number }
@@ -233,6 +234,7 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
           align: node.align ?? "left",
           ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
           ...(node.fontSizePt ? { fontSizePt: node.fontSizePt } : {}),
+          ...(node.fontFamily ? { fontFamily: node.fontFamily } : {}),
           spans,
         });
         break;

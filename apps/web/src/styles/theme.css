@@ -2467,13 +2467,24 @@ mark.hit.active {
 }
 
 .pp-sheet {
+  position: relative;
   background: var(--surface);
   border: 1px solid var(--border-strong);
   box-shadow: var(--shadow);
-  padding: 72px;
-  font-family: var(--serif);
-  font-size: 12pt;
+  /* Padding comes from the component, in the sheet's own point-as-pixel units.
+     Type is set the same way — 12 here means 12pt, where a browser would render
+     "12pt" a third larger and break the proportion against the margins. */
+  font-family: "Courier New", Courier, monospace;
+  font-size: 12px;
+  line-height: 2;
   overflow: hidden;
+}
+
+.pp-margin {
+  position: absolute;
+  inset: 72px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 28%, transparent);
+  pointer-events: none;
 }
 
 .pp-content {
@@ -2483,8 +2494,8 @@ mark.hit.active {
 }
 
 .pp-break {
-  border-top: 1px dashed var(--border-strong);
-  margin: 12px -72px;
+  border-top: 1px solid var(--border-strong);
+  margin: 8px -72px;
 }
 
 .pp-table {

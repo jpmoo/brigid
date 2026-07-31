@@ -529,6 +529,10 @@ export function WorkPage() {
               setEditingBreak(blocks.find((b) => b.id === blockId) ?? null)
             }
             textScale={SCALE_STEPS[scaleIndex] ?? 1}
+            baseTypography={
+              templates.find((t) => t.builtinKey === "regular-text")?.formatSettings?.typography ??
+              null
+            }
             bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
             onDropBookmark={(blockId) => void addBookmark(blockId)}
             search={query.trim().toLowerCase()}

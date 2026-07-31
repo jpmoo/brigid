@@ -7,17 +7,27 @@ import type { TemplateBody, WorkMeta } from "@brigid/shared";
  * things sit vertically — a title page especially. Scaled down rather than
  * re-styled, so the proportions are the ones that will print.
  */
+/**
+ * The sheet is sized in CSS pixels standing in for points — 612 x 792 is US
+ * Letter — so one inch is 72 units and a margin is simply 72. Type has to be
+ * given in those same units: a browser renders 12pt as 16px, which on this
+ * sheet would be a third too large against its own margins.
+ */
+const MARGIN = 72;
+
 export function PagePreview({
   body,
   work,
   widthPt = 612,
   heightPt = 792,
+  marginPt = MARGIN,
   scale = 0.34,
 }: {
   body: TemplateBody;
   work: WorkMeta;
   widthPt?: number;
   heightPt?: number;
+  marginPt?: number;
   scale?: number;
 }) {
   const nodes = previewBody(body.nodes, work);
@@ -25,6 +35,7 @@ export function PagePreview({
   const page: CSSProperties = {
     width: widthPt,
     height: heightPt,
+    padding: marginPt,
     // Zoom keeps every size in proportion instead of flattening them, which is
     // the only way a vertical layout preview means anything.
     zoom: scale,
@@ -33,6 +44,8 @@ export function PagePreview({
   return (
     <div className="page-preview">
       <div className="pp-sheet" style={page}>
+        {/* The text block, so the inch of margin is visible rather than implied. */}
+        <div className="pp-margin" aria-hidden="true" />
         {nodes.map((node, i) => {
           switch (node.type) {
             case "pageBreak":
@@ -68,7 +81,9 @@ export function PagePreview({
                   style={{
                     textAlign: node.align,
                     lineHeight: node.lineHeight,
-                    fontSize: node.fontSizePt ? `${node.fontSizePt}pt` : undefined,
+                    // px, not pt: on this sheet a point *is* a pixel.
+                    fontSize: node.fontSizePt ? `${node.fontSizePt}px` : undefined,
+                    fontFamily: node.fontFamily,
                     margin: 0,
                   }}
                 >

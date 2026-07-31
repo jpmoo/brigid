@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { commonMarks } from "@brigid/shared";
+import { FONT_CHOICES, commonMarks } from "@brigid/shared";
 import type { TemplateBody, TemplateNode } from "@brigid/shared";
 import { useRef } from "react";
 import { ChipEditor } from "./ChipEditor.js";
@@ -173,6 +173,25 @@ function ParagraphRow({
           <option value="left">Left</option>
           <option value="center">Center</option>
           <option value="right">Right</option>
+        </select>
+
+        <select
+          className="be-spacing"
+          title="Face for this line"
+          value={node.fontFamily ?? ""}
+          onChange={(e) =>
+            onChange({
+              ...node,
+              ...(e.target.value ? { fontFamily: e.target.value } : { fontFamily: undefined }),
+            })
+          }
+        >
+          <option value="">Font: inherit</option>
+          {FONT_CHOICES.map((f) => (
+            <option key={f.label} value={f.stack}>
+              {f.label}
+            </option>
+          ))}
         </select>
 
         <select

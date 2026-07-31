@@ -281,12 +281,9 @@ function TemplateEditor({
         </div>
       )}
 
-      {isStyleOnly ? null : (
-        <>
-          <h4 className="tpl-section">Manuscript typography</h4>
-          <StyleMenu value={typo} onChange={(t) => setTypo(t)} />
-        </>
-      )}
+      {/* No format-wide type here: a layout format sets its face, size and
+          spacing per line, where the line is. Only a style format — which has
+          no lines of its own — carries type for the whole thing. */}
 
       <div className="modal-actions">
         {template.builtinKey ? (
