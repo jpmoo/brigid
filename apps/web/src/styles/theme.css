@@ -2513,29 +2513,37 @@ mark.hit.active {
 
 /* --- Editor beside its preview ---------------------------------------- */
 
+/* The preview sits under the rows rather than beside them: alongside, it took
+   the width the controls needed and pushed each of them onto its own line. */
 .with-preview {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
+  display: block;
 }
 
 .wp-editor {
-  flex: 1;
   min-width: 0;
 }
 
 .with-preview .page-preview {
-  flex: 0 0 auto;
-  position: sticky;
-  top: 0;
+  margin: 20px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }
 
-@media (max-width: 900px) {
-  .with-preview {
-    flex-direction: column;
-  }
+/* --- Stacked row controls --------------------------------------------- */
 
-  .with-preview .page-preview {
-    align-self: center;
-  }
+.be-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+}
+
+.be-para .chip-editor {
+  margin-bottom: 1px;
+}
+
+/* A little air between the marks and the things they sit beside. */
+.be-gap {
+  width: 6px;
 }

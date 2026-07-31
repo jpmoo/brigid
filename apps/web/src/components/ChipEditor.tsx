@@ -562,3 +562,57 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     </div>
   );
 });
+
+
+/**
+ * The chip and tab controls, separated from the field so a caller can place
+ * them wherever its toolbar wants them. Mousedown is suppressed throughout:
+ * the caret must survive being reached for.
+ */
+export function ChipTools({ editor }: { editor: React.RefObject<ChipEditorHandle | null> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <div className="chip-picker">
+        <button
+          type="button"
+          className="btn secondary chip-tab-btn"
+          aria-expanded={open}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => setOpen((v) => !v)}
+        >
+          Insert chip…
+        </button>
+        {open ? (
+          <>
+            <div className="menu-scrim" role="presentation" onClick={() => setOpen(false)} />
+            <div className="menu chip-menu">
+              {CHIPPABLE.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    setOpen(false);
+                    editor.current?.insertVariable(n);
+                  }}
+                >
+                  {VARIABLES[n].label}
+                </button>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        className="btn secondary chip-tab-btn"
+        title="Advance to the next tab stop — spacing set by the format's tab stop"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => editor.current?.insertTab()}
+      >
+        ⇥ Tab
+      </button>
+    </>
+  );
+}

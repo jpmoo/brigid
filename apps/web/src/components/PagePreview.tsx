@@ -21,7 +21,7 @@ export function PagePreview({
   widthPt = 612,
   heightPt = 792,
   marginPt = MARGIN,
-  scale = 0.34,
+  scale = 0.46,
 }: {
   body: TemplateBody;
   work: WorkMeta;
