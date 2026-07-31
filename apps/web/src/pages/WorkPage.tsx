@@ -200,9 +200,11 @@ export function WorkPage() {
   const selectAndScroll = useCallback((blockId: string) => {
     setSelectedId(blockId);
     scrollingTo.current = blockId;
-    // The document goes to the *top* of the section — you want to read it from
-    // its beginning. It's the outline that stays centred, further down.
-    blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // The top of the section means the top of its break, when it has one — a
+    // chapter starts at "Chapter Nine", not at the first line beneath it.
+    const target =
+      blockRefs.current.get(breakRefKey(blockId)) ?? blockRefs.current.get(blockId);
+    target?.scrollIntoView({ behavior: "smooth", block: "start" });
     // Long enough for a smooth scroll to settle before the observer takes over.
     window.setTimeout(() => {
       if (scrollingTo.current === blockId) scrollingTo.current = null;

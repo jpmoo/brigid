@@ -2416,3 +2416,18 @@ mark.hit.active {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
 }
+
+/* --- Saved flash ------------------------------------------------------ */
+
+/* Confirmation on the button that did the saving, rather than a banner
+   elsewhere that makes you look away from what you just pressed. */
+.btn.saved,
+.btn.saved:hover:not(:disabled) {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.btn.saved:disabled {
+  opacity: 1;
+  cursor: default;
+}

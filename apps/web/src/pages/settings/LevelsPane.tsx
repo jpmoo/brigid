@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { buildOutline } from "@brigid/shared";
 import { ApiError, api } from "../../api.js";
+import { Check } from "lucide-react";
 import { useDialogs } from "../../components/Dialogs.js";
+import { useSavedFlash } from "../../useSavedFlash.js";
 import type { Template, Work } from "../../api.js";
 
 interface LevelRow {
@@ -37,7 +39,7 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
   const [depthCounts, setDepthCounts] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [savedFlash, flashSaved] = useSavedFlash();
   const [busy, setBusy] = useState(false);
 
   const breaks = useMemo(() => templates.filter((t) => t.category === "break"), [templates]);
@@ -91,7 +93,6 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
   }, [workId, load]);
 
   const mutate = (next: LevelRow[]) => {
-    setSaved(false);
     setLevels(next);
   };
   const set = (i: number, patch: Partial<LevelRow>) =>
@@ -136,7 +137,7 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
       }));
       setLevels(next);
       setOriginal(next);
-      setSaved(true);
+      flashSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save levels");
     } finally {
@@ -164,7 +165,7 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
       </p>
 
       {error ? <div className="alert error">{error}</div> : null}
-      {saved && !dirty ? <div className="alert ok">Levels saved.</div> : null}
+
 
       <div className="field">
         <label className="field-label" htmlFor="levelWork">
@@ -291,13 +292,25 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
           disabled={!dirty || busy}
           onClick={() => {
             setLevels(original);
-            setSaved(false);
-          }}
+                  }}
         >
           Revert
         </button>
-        <button className="btn" type="button" onClick={() => void save()} disabled={!dirty || busy}>
-          {busy ? "Saving…" : "Save levels"}
+        <button
+          className={`btn${savedFlash ? " saved" : ""}`}
+          type="button"
+          onClick={() => void save()}
+          disabled={(!dirty && !savedFlash) || busy}
+        >
+          {savedFlash ? (
+            <>
+              <Check size={15} /> Saved!
+            </>
+          ) : busy ? (
+            "Saving…"
+          ) : (
+            "Save levels"
+          )}
         </button>
       </div>
     </>

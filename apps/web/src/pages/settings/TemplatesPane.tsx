@@ -4,7 +4,9 @@ import type { BlockFormatSettings, BreakTemplateSettings, TemplateBody } from "@
 import { ApiError, api } from "../../api.js";
 import type { Template } from "../../api.js";
 import { BodyEditor } from "../../components/BodyEditor.js";
+import { Check } from "lucide-react";
 import { useDialogs } from "../../components/Dialogs.js";
+import { useSavedFlash } from "../../useSavedFlash.js";
 import { StyleMenu } from "../../components/StyleMenu.js";
 
 const EMPTY_BREAK: BreakTemplateSettings = { suppressOnFirstChild: false, indentFirstParagraph: false };
@@ -123,7 +125,7 @@ function TemplateEditor({
   const [brk, setBrk] = useState<BreakTemplateSettings>(template.breakSettings ?? EMPTY_BREAK);
   const [fmt, setFmt] = useState<BlockFormatSettings>(template.formatSettings ?? EMPTY_FORMAT);
   const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [savedFlash, flashSaved] = useSavedFlash();
   const [busy, setBusy] = useState(false);
 
   const isBreak = template.category === "break";
@@ -133,7 +135,6 @@ function TemplateEditor({
     !isBreak && body.nodes.length === 1 && body.nodes[0]?.type === "content";
   const typo = (isBreak ? brk.typography : fmt.typography) ?? {};
   const setTypo = (next: NonNullable<BreakTemplateSettings["typography"]>) => {
-    setSaved(false);
     if (isBreak) setBrk({ ...brk, typography: next });
     else setFmt({ ...fmt, typography: next });
   };
@@ -147,7 +148,7 @@ function TemplateEditor({
         body,
         ...(isBreak ? { breakSettings: brk } : { formatSettings: fmt }),
       });
-      setSaved(true);
+      flashSaved();
       onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save");
@@ -175,7 +176,6 @@ function TemplateEditor({
   return (
     <>
       {error ? <div className="alert error">{error}</div> : null}
-      {saved ? <div className="alert ok">Saved.</div> : null}
 
       <div className="field">
         <label className="field-label" htmlFor="tplName">
@@ -187,7 +187,6 @@ function TemplateEditor({
           value={name}
           onChange={(e) => {
             setName(e.target.value);
-            setSaved(false);
           }}
         />
       </div>
@@ -199,8 +198,7 @@ function TemplateEditor({
             value={typo}
             onChange={(t) => {
               setFmt({ ...fmt, typography: t });
-              setSaved(false);
-            }}
+              }}
           />
         </>
       ) : (
@@ -210,8 +208,7 @@ function TemplateEditor({
             body={body}
             onChange={(b) => {
               setBody(b);
-              setSaved(false);
-            }}
+              }}
           />
         </>
       )}
@@ -291,8 +288,21 @@ function TemplateEditor({
           </button>
         )}
         <div className="spacer" />
-        <button className="btn" type="button" onClick={() => void save()} disabled={busy}>
-          {busy ? "Saving…" : "Save template"}
+        <button
+          className={`btn${savedFlash ? " saved" : ""}`}
+          type="button"
+          onClick={() => void save()}
+          disabled={busy}
+        >
+          {savedFlash ? (
+            <>
+              <Check size={15} /> Saved!
+            </>
+          ) : busy ? (
+            "Saving…"
+          ) : (
+            "Save template"
+          )}
         </button>
       </div>
     </>
