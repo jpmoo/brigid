@@ -214,11 +214,12 @@ ink on cream paper suits a novel writing app almost too well:
 | Paper | `#ECEBE6` | title background (removed) |
 | Paper (bright) | `#FCFDFC` | logo background (removed) |
 
-_OPEN._ Both assets sit on a 1387×756 canvas with the artwork occupying a small
-centered region — the logo's true bounds are 440×481 at offset (475, 58), the
-wordmark's 514×151 at (437, 276). Rendered as-is in a small top panel, the mark
-would appear at roughly a third of its box. Tightening each `viewBox` to the
-artwork bounds would fix that; it changes the aspect ratio, so it's your call.
+_RESOLVED._ Both assets originally sat on a 1387×756 canvas with the artwork in a
+small centered region, so the mark drew at roughly a third of its box — clearly
+wrong once the login screen was rendered. Each `viewBox` is now tightened to the
+artwork bounds (logo `475 58 440 481`, aspect 0.915; wordmark `437 276 514 151`,
+aspect 3.404) and the intrinsic `width`/`height` attributes are removed, so the
+elements scale to whatever CSS gives them.
 
 ### 5.1 Work view
 
@@ -317,4 +318,4 @@ manuscript is wanted — that would add a third model slot and pgvector.
 4. Subtree behavior on drag (§5.4).
 5. Whether "print it in the left margin" means the outline card's margin, as
    read in §5.2, or the document's.
-6. Whether to tighten the logo and wordmark `viewBox` to the artwork bounds (§5.0).
+6. ~~Logo and wordmark viewBox~~ — resolved, see §5.0.
