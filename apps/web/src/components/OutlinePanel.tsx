@@ -136,15 +136,22 @@ function OutlineCard(props: CardProps) {
     <div
       className={`outline-card${selected ? " selected" : ""}${props.rendersInDocument ? "" : " note"}`}
     >
+      {/* Two numbers when a block contains others: the whole of it on top, its
+          own prose beneath. A leaf has only one, so it shows one. */}
       <div
         className="outline-gutter"
         title={
           entry.childCount > 0
-            ? `${wordFmt.format(props.words)} words in this ${props.levelName.toLowerCase()}`
-            : `${wordFmt.format(props.words)} words`
+            ? `${wordFmt.format(props.words)} words in all, ${wordFmt.format(
+                block.wordCount,
+              )} of them here`
+            : `${wordFmt.format(block.wordCount)} words`
         }
       >
-        {wordFmt.format(props.words)}
+        <span className="og-total">{wordFmt.format(props.words)}</span>
+        {entry.childCount > 0 ? (
+          <span className="og-own">{wordFmt.format(block.wordCount)}</span>
+        ) : null}
       </div>
 
       <button
