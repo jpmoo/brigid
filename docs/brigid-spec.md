@@ -373,6 +373,23 @@ manuscript is wanted — that would add a third model slot and pgvector.
 
 ---
 
+## 6.1 Deleting a work
+
+Permanent deletion is reachable **only from the archive**. A work has to be
+archived first, so destroying one is never something that can happen from the
+shelf the writer looks at every day — it takes a deliberate move out of the way,
+and only then can it be destroyed.
+
+Two steps beyond that:
+
+1. A dialog naming exactly what is about to be lost — words, blocks, levels —
+   with a checkbox to acknowledge it.
+2. A button that must be **held down for three seconds**. A click is a reflex; a
+   sustained hold is a decision, and letting go part-way cancels it, so there is
+   no single motion that can destroy a manuscript by accident.
+
+Brigid keeps no copy, and says so.
+
 ## 6.2 Importing a Word document
 
 A new work starts from **Blank or Import**. Import reads a `.docx` and builds

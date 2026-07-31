@@ -59,6 +59,7 @@ export interface Work {
   createdAt: string;
   updatedAt: string;
   wordCount: number;
+  blockCount: number;
 }
 
 export interface WorkLevel {
@@ -140,6 +141,8 @@ export const api = {
   getWork: (id: string) => request<{ work: Work; levels: WorkLevel[] }>(`/works/${id}`),
   archiveWork: (id: string, archived: boolean) =>
     post<{ work: Work }>(`/works/${id}/archive`, { archived }),
+  deleteWork: (id: string) =>
+    request<{ ok: true; title: string }>(`/works/${id}`, { method: "DELETE" }),
 
   listTemplates: () => request<{ templates: Template[] }>("/templates"),
   createTemplate: (input: {

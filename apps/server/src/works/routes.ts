@@ -25,6 +25,14 @@ const workInput = z.object({
   authorLastName: z.string().max(200).nullable().optional(),
 });
 
+/** How many blocks each work holds — what a delete confirmation needs to say. */
+async function blockCountsByWork(): Promise<Map<string, number>> {
+  const rows = await db.execute<{ work_id: string; total: string }>(sql`
+    SELECT work_id, COUNT(*) AS total FROM blocks GROUP BY work_id
+  `);
+  return new Map(rows.map((r) => [r.work_id, Number(r.total)]));
+}
+
 /**
  * Manuscript totals, counted only from blocks whose format opts in — a title
  * page shouldn't inflate the number the writer is watching. Breaks never carry
@@ -56,9 +64,13 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
       .where(archived === "true" ? sql`${works.archivedAt} IS NOT NULL` : isNull(works.archivedAt))
       .orderBy(asc(works.title));
 
-    const counts = await wordCountsByWork();
+    const [counts, blockCounts] = await Promise.all([wordCountsByWork(), blockCountsByWork()]);
     return {
-      works: rows.map((w) => ({ ...w, wordCount: counts.get(w.id) ?? 0 })),
+      works: rows.map((w) => ({
+        ...w,
+        wordCount: counts.get(w.id) ?? 0,
+        blockCount: blockCounts.get(w.id) ?? 0,
+      })),
     };
   });
 
@@ -131,6 +143,32 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
       .returning();
     if (!updated) throw notFound("work");
     return { work: updated };
+  });
+
+  /**
+   * Permanent, and reachable only from the archive.
+   *
+   * Requiring a work to be archived first means deleting is never something
+   * that can happen from the shelf you look at every day — it takes a
+   * deliberate move out of the way, and only then can it be destroyed.
+   */
+  app.delete("/works/:id", async (req) => {
+    requireUser(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+
+    const [work] = await db
+      .select({ id: works.id, title: works.title, archivedAt: works.archivedAt })
+      .from(works)
+      .where(eq(works.id, id))
+      .limit(1);
+    if (!work) throw notFound("work");
+    if (!work.archivedAt) {
+      throw badRequest("archive this work before deleting it");
+    }
+
+    // blocks and work_levels both cascade from works.
+    await db.delete(works).where(eq(works.id, id));
+    return { ok: true, title: work.title };
   });
 
   /** Archive and restore share a route: the library needs both, symmetrically. */

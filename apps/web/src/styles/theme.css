@@ -1700,3 +1700,75 @@ input::placeholder {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+/* --- Hold to confirm -------------------------------------------------- */
+
+.hold-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Never shrink: the fill needs overflow:hidden, which would otherwise clip
+     the label when this sits in a flex row of actions. */
+  flex: 0 0 auto;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 10px 20px;
+  background: transparent;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--danger);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+}
+
+.hold-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fills left to right as the hold proceeds; letting go resets it to nothing,
+   which is the visible half of "you can still change your mind".
+
+   Translucent rather than solid on purpose: a solid fill would need the label
+   to invert, and the label spans the boundary — half of it would land on the
+   fill and half on the background, so either half would be unreadable. */
+.hold-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: color-mix(in srgb, var(--danger) 30%, transparent);
+}
+
+.hold-btn.holding {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+
+.hold-label {
+  position: relative;
+  z-index: 1;
+}
+
+.danger-note {
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.danger-note strong {
+  color: var(--danger);
+}
+
+.danger-note ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+}

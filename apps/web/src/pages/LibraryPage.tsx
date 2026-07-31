@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Archive, BookOpen, FileUp, LogOut, Plus, Settings, SquarePen } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  BookOpen,
+  FileUp,
+  LogOut,
+  Plus,
+  Settings,
+  SquarePen,
+  Trash2,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError, api } from "../api.js";
 import type { Template, Work } from "../api.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
+import { HoldToConfirm } from "../components/HoldToConfirm.js";
 import { ImportWizard } from "../components/ImportWizard.js";
 import { useAuth } from "../auth/AuthContext.js";
 
@@ -26,6 +37,7 @@ export function LibraryPage() {
   const [creating, setCreating] = useState(false);
   const [importing, setImporting] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [deleting, setDeleting] = useState<Work | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -122,11 +134,21 @@ export function LibraryPage() {
                   <button
                     className="btn ghost"
                     type="button"
-                    title={work.archivedAt ? "Restore" : "Archive"}
+                    title={work.archivedAt ? "Restore to the library" : "Archive"}
                     onClick={() => void onArchive(work)}
                   >
-                    <Archive size={13} />
+                    {work.archivedAt ? <ArchiveRestore size={13} /> : <Archive size={13} />}
                   </button>
+                  {work.archivedAt ? (
+                    <button
+                      className="btn ghost"
+                      type="button"
+                      title="Delete permanently"
+                      onClick={() => setDeleting(work)}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -186,6 +208,17 @@ export function LibraryPage() {
         />
       ) : null}
 
+      {deleting ? (
+        <DeleteWorkDialog
+          work={deleting}
+          onClose={() => setDeleting(null)}
+          onDeleted={() => {
+            setDeleting(null);
+            void load();
+          }}
+        />
+      ) : null}
+
       {creating ? (
         <NewWorkModal
           onClose={() => setCreating(false)}
@@ -196,6 +229,85 @@ export function LibraryPage() {
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * Deleting a manuscript is not undoable and there is no backup inside Brigid,
+ * so it takes two deliberate steps: an acknowledgement of exactly what is
+ * about to be lost, and then a sustained hold. Only reachable from the archive.
+ */
+function DeleteWorkDialog({
+  work,
+  onClose,
+  onDeleted,
+}: {
+  work: Work;
+  onClose: () => void;
+  onDeleted: () => void;
+}) {
+  const [understood, setUnderstood] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function remove() {
+    setError(null);
+    setBusy(true);
+    try {
+      await api.deleteWork(work.id);
+      onDeleted();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not delete");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2 className="card-title">Delete &ldquo;{work.title}&rdquo;</h2>
+        <p className="card-subtitle">This cannot be undone, and Brigid keeps no copy.</p>
+
+        {error ? <div className="alert error">{error}</div> : null}
+
+        <div className="danger-note">
+          <strong>You are about to permanently destroy:</strong>
+          <ul>
+            <li>{wordFmt.format(work.wordCount)} words</li>
+            <li>
+              {wordFmt.format(work.blockCount)} block{work.blockCount === 1 ? "" : "s"}, and every
+              break attached to them
+            </li>
+            <li>this work&rsquo;s outline levels</li>
+          </ul>
+        </div>
+
+        <label className="check" style={{ marginBottom: 18 }}>
+          <input
+            type="checkbox"
+            checked={understood}
+            onChange={(e) => setUnderstood(e.target.checked)}
+          />
+          <span>
+            I understand this manuscript will be gone for good.
+          </span>
+        </label>
+
+        <div className="modal-actions">
+          <button className="btn secondary" type="button" onClick={onClose}>
+            Keep it
+          </button>
+          <div className="spacer" />
+          <HoldToConfirm
+            seconds={3}
+            disabled={!understood || busy}
+            label={busy ? "Deleting…" : "Hold to delete"}
+            holdingLabel="Keep holding to delete…"
+            onConfirm={() => void remove()}
+          />
+        </div>
+      </div>
+    </div>
   );
 }
 
