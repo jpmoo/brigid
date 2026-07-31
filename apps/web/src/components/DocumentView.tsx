@@ -117,6 +117,11 @@ export interface DocumentViewProps {
   onSelect: (id: string) => void;
   mode: ViewMode;
   onEditBreak: (blockId: string) => void;
+  /**
+   * Book-mode line length, in characters. Null fills the viewport. Manuscript
+   * ignores it — its whole point is fidelity to the page it will be set on.
+   */
+  measureCh: number | null;
 }
 
 export function DocumentView({
@@ -126,17 +131,21 @@ export function DocumentView({
   onSelect,
   mode,
   onEditBreak,
+  measureCh,
 }: DocumentViewProps) {
+  const sheetStyle: CSSProperties =
+    mode === "book" && measureCh !== null ? { maxWidth: `${measureCh}ch` } : {};
+
   if (items.length === 0) {
     return (
-      <div className={`page-sheet ${mode}`}>
+      <div className={`page-sheet ${mode}`} style={sheetStyle}>
         <p className="prose empty">This manuscript is empty. Add a block in the outline to begin.</p>
       </div>
     );
   }
 
   return (
-    <div className={`page-sheet ${mode}`}>
+    <div className={`page-sheet ${mode}`} style={sheetStyle}>
       {items.map((item, i) =>
         item.kind === "break" ? (
           // A break lives between blocks and belongs to neither, so it carries

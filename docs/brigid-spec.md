@@ -203,7 +203,13 @@ remembered per browser:
 | **Book** | Comfortable and book-like — the app's own serif, justified. Ignores template typography entirely. |
 | **Manuscript** | Set exactly as the templates specify. |
 
-Both fill the viewport, and both are editable: the mode is presentation only.
+Both are editable: the mode is presentation only.
+
+Manuscript always fills the viewport — fidelity to the page it will be set on is
+the point. Book carries a **measure slider**, left of the mode selector, running
+from 50 characters to full width; the setting persists per browser. A long line
+is hard to read and a short one is restful, and which is which depends on the
+monitor, so it is a control rather than a constant.
 
 Manuscript typography is **not hardcoded** — no Courier, no double spacing, no
 assumptions. Each template carries a `typography` block (font stack, size,
@@ -249,7 +255,7 @@ on realistic manuscript sizes rather than designing around a guess.
 
 Two SVG assets live in `assets/`, both with transparent backgrounds:
 
-- `brigid-logo.svg` — a quill inside a Celtic knotwork circle
+- `brigid-logo.svg` — a quill over a triskelion
 - `brigid-title.svg` — the wordmark, "BRIGID" in an uncial face
 
 Placement:

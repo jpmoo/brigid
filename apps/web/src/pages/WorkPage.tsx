@@ -16,6 +16,10 @@ import type { BreakChip } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
 const MODE_KEY = "brigid.view.mode";
+const MEASURE_KEY = "brigid.book.measure";
+/** At the top of the range the sheet fills the viewport rather than capping. */
+const MEASURE_MIN = 50;
+const MEASURE_FULL = 120;
 
 interface AddRequest {
   relativeTo: string | null;
@@ -45,6 +49,12 @@ export function WorkPage() {
     localStorage.getItem(MODE_KEY) === "manuscript" ? "manuscript" : "book",
   );
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
+  const [measure, setMeasure] = useState(() => {
+    const stored = Number(localStorage.getItem(MEASURE_KEY));
+    return Number.isFinite(stored) && stored >= MEASURE_MIN && stored <= MEASURE_FULL
+      ? stored
+      : MEASURE_FULL;
+  });
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
 
@@ -75,6 +85,10 @@ export function WorkPage() {
   useEffect(() => {
     localStorage.setItem(MODE_KEY, mode);
   }, [mode]);
+
+  useEffect(() => {
+    localStorage.setItem(MEASURE_KEY, String(measure));
+  }, [measure]);
 
   // Escape leaves zen, so there's always a way back without hunting for a
   // control that zen itself has hidden.
@@ -188,6 +202,20 @@ export function WorkPage() {
         <span className="muted" style={{ fontSize: 13 }}>
           {wordFmt.format(totalWords)} words
         </span>
+        {mode === "book" ? (
+          <label className="measure-slider" title="Line length">
+            <input
+              type="range"
+              min={MEASURE_MIN}
+              max={MEASURE_FULL}
+              step={1}
+              value={measure}
+              onChange={(e) => setMeasure(Number(e.target.value))}
+              aria-label="Line length in characters"
+            />
+            <span>{measure >= MEASURE_FULL ? "full" : `${measure}ch`}</span>
+          </label>
+        ) : null}
         <div className="segmented compact" role="group" aria-label="View mode">
           <button
             type="button"
@@ -277,6 +305,7 @@ export function WorkPage() {
             onEditBreak={(blockId) =>
               setEditingBreak(blocks.find((b) => b.id === blockId) ?? null)
             }
+            measureCh={measure >= MEASURE_FULL ? null : measure}
           />
           {zen ? (
             <button
