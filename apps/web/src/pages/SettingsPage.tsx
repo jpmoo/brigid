@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
 import type { Template } from "../api.js";
-import { LevelsPane } from "./settings/LevelsPane.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -12,7 +11,6 @@ import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const TABS = [
   { key: "templates", label: "Formats" },
-  { key: "levels", label: "Levels" },
   { key: "account", label: "Account" },
   { key: "ollama", label: "Ollama" },
 ] as const;
@@ -84,8 +82,6 @@ export function SettingsPage() {
         <div className="card tab-panel" role="tabpanel">
           {tab === "templates" ? (
             <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
-          ) : tab === "levels" ? (
-            <LevelsPane templates={templates} />
           ) : tab === "account" ? (
             <PasswordFields />
           ) : (

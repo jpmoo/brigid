@@ -47,6 +47,8 @@ export interface TableColumn {
 export interface TableCell {
   content: TemplateInline[];
   align?: TemplateAlign;
+  /** Multiple of the font size, as elsewhere. 2 is double-spaced. */
+  lineHeight?: number;
 }
 
 export interface TableRow {
@@ -64,7 +66,13 @@ export interface TableBorders {
 }
 
 export type TemplateNode =
-  | { type: "paragraph"; align?: TemplateAlign; content: TemplateInline[] }
+  | {
+      type: "paragraph";
+      align?: TemplateAlign;
+      /** Multiple of the font size; falls back to the format's own spacing. */
+      lineHeight?: number;
+      content: TemplateInline[];
+    }
   /** Vertical whitespace measured in blank lines — the usual scene-break unit. */
   | { type: "spacer"; lines: number }
   | { type: "pageBreak" }

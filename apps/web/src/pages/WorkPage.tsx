@@ -290,11 +290,23 @@ export function WorkPage() {
 
   const stepMatch = (delta: 1 | -1) => {
     if (matches.length === 0) return;
-    const next = (matchIndex + delta + matches.length) % matches.length;
-    setMatchIndex(next);
-    const target = matches[next];
-    if (target) selectAndScroll(target.blockId);
+    setMatchIndex((matchIndex + delta + matches.length) % matches.length);
   };
+
+  /**
+   * Scroll to the hit itself rather than to the block holding it. Several
+   * matches often share a block, and scrolling to the block would leave the
+   * page motionless while the active mark moved somewhere off screen.
+   */
+  useEffect(() => {
+    if (!activeMatch) return;
+    const id = window.requestAnimationFrame(() => {
+      paneRef.current
+        ?.querySelector("mark.hit.active")
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [activeMatch]);
 
   async function addBookmark(blockId: string) {
     try {
@@ -474,7 +486,7 @@ export function WorkPage() {
             <Link className="btn ghost" to="/" title="Back to library">
               <ArrowLeft size={15} />
             </Link>
-            <Link className="btn ghost" to="/settings" title="Settings">
+            <Link className="btn ghost" to={`/settings?work=${id}`} title="Settings">
               <Settings size={15} />
             </Link>
             <div className="spacer" />

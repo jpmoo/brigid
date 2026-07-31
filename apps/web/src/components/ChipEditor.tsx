@@ -55,6 +55,24 @@ function stripGuards(atom: HTMLElement): void {
   }
 }
 
+function markOpen(m: TemplateMarks): string {
+  return (
+    (m.bold ? "<b>" : "") +
+    (m.italic ? "<i>" : "") +
+    (m.smallCaps ? '<span data-sc="1">' : "") +
+    (m.allCaps ? '<span data-caps="1">' : "")
+  );
+}
+
+function markClose(m: TemplateMarks): string {
+  return (
+    (m.allCaps ? "</span>" : "") +
+    (m.smallCaps ? "</span>" : "") +
+    (m.italic ? "</i>" : "") +
+    (m.bold ? "</b>" : "")
+  );
+}
+
 function inlinesToHtml(inlines: readonly TemplateInline[]): string {
   return inlines
     .map((inline) => {
@@ -73,35 +91,50 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
-      return text;
+      return `${markOpen(inline)}${text}${markClose(inline)}`;
     })
     .join("");
 }
 
-function htmlToInlines(
-  root: HTMLElement,
-  marks: TemplateMarks,
-  multiline: boolean,
-): TemplateInline[] {
+const sameMarks = (a: TemplateMarks, b: TemplateMarks) =>
+  !!a.bold === !!b.bold &&
+  !!a.italic === !!b.italic &&
+  !!a.smallCaps === !!b.smallCaps &&
+  !!a.allCaps === !!b.allCaps;
+
+/**
+ * Marks are read from the elements the text actually sits inside, so a line can
+ * hold roman and italic side by side. Previously every span in a paragraph took
+ * the same marks, which made the toggles a property of the line rather than of
+ * what you had selected.
+ */
+function htmlToInlines(root: HTMLElement, multiline: boolean): TemplateInline[] {
   const out: TemplateInline[] = [];
-  const pushText = (raw: string) => {
+  const pushText = (raw: string, marks: TemplateMarks) => {
     const text = raw.replace(/\u200B/g, "");
     if (!text) return;
     const last = out[out.length - 1];
-    if (last?.type === "text") last.text += text;
+    if (last?.type === "text" && sameMarks(last, marks)) last.text += text;
     else out.push({ type: "text", text, ...marks });
   };
 
-  const walk = (node: Node) => {
+  const walk = (node: Node, marks: TemplateMarks) => {
     if (node.nodeType === Node.TEXT_NODE) {
-      pushText(node.textContent ?? "");
+      pushText(node.textContent ?? "", marks);
       return;
     }
     if (!(node instanceof HTMLElement)) return;
 
+    const tag = node.tagName;
+    const here: TemplateMarks = { ...marks };
+    if (tag === "B" || tag === "STRONG") here.bold = true;
+    if (tag === "I" || tag === "EM") here.italic = true;
+    if (node.dataset.sc) here.smallCaps = true;
+    if (node.dataset.caps) here.allCaps = true;
+
     const varName = node.dataset.var;
     if (varName && (CHIPPABLE as readonly string[]).includes(varName)) {
-      const inline: TemplateInline = { type: "variable", name: varName as VariableName, ...marks };
+      const inline: TemplateInline = { type: "variable", name: varName as VariableName, ...here };
       const fmt = node.dataset.format;
       if (fmt) inline.numberFormat = fmt as never;
       out.push(inline);
@@ -109,18 +142,18 @@ function htmlToInlines(
       // character rather than losing it silently.
       const label = chipLabel(varName as VariableName, node.dataset.format);
       const stray = (node.textContent ?? "").replace(/\u200B/g, "").replace(label, "");
-      if (stray) pushText(stray);
+      if (stray) pushText(stray, here);
       return;
     }
     if (node.dataset.tab) {
       out.push({ type: "tab" });
       const stray = (node.textContent ?? "").replace(/\u200B/g, "").replace("⇥", "");
-      if (stray) pushText(stray);
+      if (stray) pushText(stray, here);
       return;
     }
     if (node.tagName === "BR") {
       if (!multiline) {
-        pushText(" ");
+        pushText(" ", here);
         return;
       }
       // Browsers park a bogus <br> in an otherwise-empty field to give the
@@ -132,12 +165,12 @@ function htmlToInlines(
     }
     // A block-level wrapper the browser made when Enter was pressed: its content
     // starts a new line.
-    const isBlock = /^(DIV|P)$/.test(node.tagName);
+    const isBlock = /^(DIV|P)$/.test(tag);
     if (isBlock && multiline && out.length > 0) out.push({ type: "lineBreak" });
-    node.childNodes.forEach(walk);
+    node.childNodes.forEach((child) => walk(child, here));
   };
 
-  root.childNodes.forEach(walk);
+  root.childNodes.forEach((child) => walk(child, {}));
   return out;
 }
 
@@ -159,6 +192,7 @@ export interface ChipEditorProps {
 export interface ChipEditorHandle {
   insertVariable: (name: VariableName) => void;
   insertTab: () => void;
+  toggleMark: (mark: keyof TemplateMarks) => void;
   focus: () => void;
 }
 
@@ -171,6 +205,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
   const [formatFor, setFormatFor] = useState<{ el: HTMLElement; top: number; left: number } | null>(
     null,
   );
+  const [chipMenu, setChipMenu] = useState(false);
   const dirty = useRef(false);
 
   // Only write the DOM when the change came from outside; rewriting it while
@@ -184,16 +219,39 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     if (ref.current.innerHTML !== html) ref.current.innerHTML = html;
   }, [value]);
 
+  // The caret is lost the moment a toolbar control takes focus, so the last
+  // position inside the field is remembered and put back before acting.
+  const savedRange = useRef<Range | null>(null);
+
+  const rememberSelection = () => {
+    const el = ref.current;
+    const selection = window.getSelection();
+    if (!el || !selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (el.contains(range.commonAncestorContainer)) savedRange.current = range.cloneRange();
+  };
+
+  const restoreSelection = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.focus();
+    const range = savedRange.current;
+    if (!range || !el.contains(range.commonAncestorContainer)) return;
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  };
+
   const emit = () => {
     if (!ref.current) return;
     dirty.current = true;
-    onChange(htmlToInlines(ref.current, marks, multiline));
+    onChange(htmlToInlines(ref.current, multiline));
   };
 
   const insert = (html: string) => {
     const el = ref.current;
     if (!el) return;
-    el.focus();
+    restoreSelection();
     const selection = window.getSelection();
     // With no caret inside the field — the usual case when clicking a button in
     // the toolbar — append rather than silently doing nothing.
@@ -273,7 +331,62 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     return false;
   };
 
+  /**
+   * Toggle a mark over the selection, or arm it for whatever is typed next.
+   *
+   * Bold and italic go through execCommand, which is deprecated but is the only
+   * thing that handles the caret case natively — with nothing selected it sets
+   * the typing state, so the next characters come out marked. Small caps and
+   * all caps have no such command, so an empty marked span is planted and the
+   * caret put inside it, which produces the same behaviour.
+   */
+  const toggleMark = (mark: keyof TemplateMarks) => {
+    const el = ref.current;
+    if (!el) return;
+    restoreSelection();
+
+    if (mark === "bold" || mark === "italic") {
+      document.execCommand(mark, false);
+      emit();
+      return;
+    }
+
+    const attr = mark === "smallCaps" ? "data-sc" : "data-caps";
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+
+    if (range.collapsed) {
+      const span = document.createElement("span");
+      span.setAttribute(attr, "1");
+      span.textContent = ZWSP;
+      range.insertNode(span);
+      const inner = document.createRange();
+      inner.setStart(span.firstChild as Node, 1);
+      inner.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(inner);
+    } else {
+      const existing = (range.commonAncestorContainer as HTMLElement).parentElement?.closest?.(
+        `[${attr}]`,
+      );
+      if (existing) {
+        // Already marked: unwrap rather than nest a second one.
+        const parent = existing.parentNode;
+        while (existing.firstChild) parent?.insertBefore(existing.firstChild, existing);
+        parent?.removeChild(existing);
+      } else {
+        const span = document.createElement("span");
+        span.setAttribute(attr, "1");
+        span.appendChild(range.extractContents());
+        range.insertNode(span);
+      }
+    }
+    emit();
+  };
+
   useImperativeHandle(handleRef, () => ({
+    toggleMark,
     insertVariable: (name) =>
       insert(
         `${ZWSP}<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>${ZWSP}`,
@@ -292,7 +405,12 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         role="textbox"
         aria-multiline={multiline}
         data-placeholder={placeholder ?? "Type here, or drop in a chip"}
-        onInput={emit}
+        onInput={() => {
+          rememberSelection();
+          emit();
+        }}
+        onKeyUp={rememberSelection}
+        onMouseUp={rememberSelection}
         onBlur={emit}
         onClick={(e) => {
           // Clicking a numeric chip offers its formats. Non-numeric chips have
@@ -366,28 +484,44 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
 
       {showToolbar ? (
       <div className="chip-bar">
-        <select
-          value=""
-          onChange={(e) => {
-            const name = e.target.value as VariableName;
-            if (!name) return;
-            insert(
-              `${ZWSP}<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>${ZWSP}`,
-            );
-            e.target.value = "";
-          }}
-        >
-          <option value="">Insert chip…</option>
-          {CHIPPABLE.map((n) => (
-            <option key={n} value={n}>
-              {VARIABLES[n].label}
-            </option>
-          ))}
-        </select>
+        <div className="chip-picker">
+          <button
+            type="button"
+            className="btn secondary chip-tab-btn"
+            aria-expanded={chipMenu}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setChipMenu((v) => !v)}
+          >
+            Insert chip…
+          </button>
+          {chipMenu ? (
+            <>
+              <div className="menu-scrim" role="presentation" onClick={() => setChipMenu(false)} />
+              <div className="menu chip-menu">
+                {CHIPPABLE.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      setChipMenu(false);
+                      insert(
+                        `${ZWSP}<span data-var="${n}" contenteditable="false">${VARIABLES[n].label}</span>${ZWSP}`,
+                      );
+                    }}
+                  >
+                    {VARIABLES[n].label}
+                  </button>
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
         <button
           type="button"
           className="btn secondary chip-tab-btn"
           title="Advance to the next tab stop — spacing set by the format's tab stop"
+          onMouseDown={(e) => e.preventDefault()}
           onClick={() => insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`)}
         >
           ⇥ Tab

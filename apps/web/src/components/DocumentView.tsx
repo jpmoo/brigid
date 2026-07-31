@@ -126,6 +126,7 @@ function Nodes({
                           style={{
                             textAlign: cell.align ?? node.columns[ci]?.align ?? "left",
                             borderLeft: b.columns && ci > 0 ? rule : undefined,
+                            lineHeight: cell.lineHeight,
                           }}
                         >
                           {cell.spans.map((span, si) =>
@@ -154,7 +155,10 @@ function Nodes({
               <p
                 className={`tpl-para align-${node.align}`}
                 key={i}
-                style={mode === "manuscript" ? { textAlign: node.align } : undefined}
+                style={{
+                  ...(mode === "manuscript" ? { textAlign: node.align } : {}),
+                  ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
+                }}
               >
                 {node.spans.map((span, j) =>
                   span.lineBreak ? (

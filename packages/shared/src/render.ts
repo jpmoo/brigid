@@ -47,10 +47,11 @@ export interface ResolvedSpan extends TemplateMarks {
 export interface ResolvedCell {
   spans: ResolvedSpan[];
   align?: TemplateAlign;
+  lineHeight?: number;
 }
 
 export type ResolvedNode =
-  | { type: "paragraph"; align: TemplateAlign; spans: ResolvedSpan[] }
+  | { type: "paragraph"; align: TemplateAlign; lineHeight?: number; spans: ResolvedSpan[] }
   | { type: "spacer"; lines: number }
   | { type: "pageBreak" }
   | {
@@ -203,6 +204,7 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
                 .map((inline) => resolveInline(inline, ctx))
                 .filter((s): s is ResolvedSpan => s !== null),
               ...(cell.align ? { align: cell.align } : {}),
+              ...(cell.lineHeight ? { lineHeight: cell.lineHeight } : {}),
             })),
           })),
         });
@@ -214,12 +216,35 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
         // A paragraph whose every span resolved to nothing — an absent subtitle,
         // say — would otherwise render as a stray blank line.
         if (spans.length === 0) break;
-        out.push({ type: "paragraph", align: node.align ?? "left", spans });
+        out.push({
+          type: "paragraph",
+          align: node.align ?? "left",
+          ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
+          spans,
+        });
         break;
       }
     }
   }
   return out;
+}
+
+/**
+ * Resolve a template body on its own, for showing a format as it will look
+ * while it's being edited. Level-scoped variables have no block to resolve
+ * against here, so they take the sample values a preview needs.
+ */
+export function previewBody(
+  nodes: readonly TemplateNode[],
+  work: WorkMeta,
+  options: { counter?: number; levelTitle?: string; totalWordCount?: number } = {},
+): ResolvedNode[] {
+  return resolveBody(nodes, {
+    render: { work, totalWordCount: options.totalWordCount ?? 0 },
+    counter: options.counter ?? 1,
+    levelTitle: options.levelTitle ?? null,
+    blockWordCount: 0,
+  });
 }
 
 export interface DeriveInput<B extends BlockNode> {
