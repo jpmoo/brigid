@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { ArrowRightToLine, Braces } from "lucide-react";
 import { NUMBER_FORMATS, VARIABLES, VARIABLE_NAMES, formatNumber } from "@brigid/shared";
 import type { NumberFormat, TemplateInline, TemplateMarks, VariableName } from "@brigid/shared";
 
@@ -574,14 +575,18 @@ export function ChipTools({ editor }: { editor: React.RefObject<ChipEditorHandle
   return (
     <>
       <div className="chip-picker">
+        {/* Sized like the mark buttons so the whole line reads as one set of
+            controls; the list it opens can be as large as it needs to be. */}
         <button
           type="button"
-          className="btn secondary chip-tab-btn"
+          className="be-mark"
+          title="Insert a chip"
+          aria-label="Insert a chip"
           aria-expanded={open}
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setOpen((v) => !v)}
         >
-          Insert chip…
+          <Braces size={13} />
         </button>
         {open ? (
           <>
@@ -606,12 +611,13 @@ export function ChipTools({ editor }: { editor: React.RefObject<ChipEditorHandle
       </div>
       <button
         type="button"
-        className="btn secondary chip-tab-btn"
+        className="be-mark"
         title="Advance to the next tab stop — spacing set by the format's tab stop"
+        aria-label="Insert a tab stop"
         onMouseDown={(e) => e.preventDefault()}
         onClick={() => editor.current?.insertTab()}
       >
-        ⇥ Tab
+        <ArrowRightToLine size={13} />
       </button>
     </>
   );

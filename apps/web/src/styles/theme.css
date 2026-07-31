@@ -1133,8 +1133,12 @@ input::placeholder {
 }
 
 .be-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 26px;
-  padding: 4px 6px;
+  height: 24px;
+  padding: 0 6px;
   background: transparent;
   border: 1px solid var(--border-strong);
   border-radius: 4px;
@@ -2546,4 +2550,17 @@ mark.hit.active {
 /* A little air between the marks and the things they sit beside. */
 .be-gap {
   width: 6px;
+}
+
+/* The chip list is a menu in its own right, so it can be wider than the button
+   that opens it. */
+.chip-menu {
+  min-width: 190px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.chip-picker {
+  position: relative;
+  display: inline-flex;
 }
