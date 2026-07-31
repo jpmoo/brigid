@@ -1772,3 +1772,58 @@ input::placeholder {
   padding-left: 18px;
   color: var(--text-muted);
 }
+
+/* --- Modals that outgrow the viewport --------------------------------- */
+
+/* A tall modal has to stay on screen and scroll inside itself, or its actions
+   end up below the fold with no way to reach them. */
+.modal {
+  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* Only the middle scrolls, so the title and the actions stay put. */
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+/* Modals without an explicit body wrapper scroll as a whole rather than
+   overflowing the screen. */
+.modal:not(:has(.modal-body)) {
+  overflow-y: auto;
+}
+
+.title-bound {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+  font-size: 13px;
+}
+
+.title-bound .check {
+  gap: 6px;
+}
+
+.title-count {
+  width: 68px;
+}
+
+.alert code {
+  padding: 1px 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+}

@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { planImport } from "@brigid/shared";
+import { planImport, suggestMarkers } from "@brigid/shared";
 import { extractDocxParagraphs } from "../src/import/docx.js";
 
 let failures = 0;
@@ -70,6 +70,70 @@ check(
     firstPageIsTitlePage: false,
   }).blocks.map((b) => b.label),
   ["THREE"],
+);
+
+
+// --- The shape that was failing: no inserted breaks anywhere ----------------
+// Title page ended by a section break, chapters using "page break before" —
+// which is what Word's Heading styles set, so most manuscripts look like this.
+const styled = extractDocxParagraphs(
+  new Uint8Array(readFileSync(join(here, "fixtures", "styled.docx"))),
+);
+
+check(
+  "page-break-before and section breaks are both detected",
+  styled.filter((p) => p.pageBreakBefore).map((p) => p.text.trim()),
+  ["CHAPTER ONE", "CHAPTER TWO", "CHAPTER THREE"],
+);
+
+const styledPlan = planImport({
+  paragraphs: styled,
+  firstPageIsTitlePage: true,
+  markers: [
+    { depth: 0, name: "Chapter", prefix: "CHAPTER " },
+    { depth: 1, name: "Scene", prefix: "***" },
+  ],
+});
+check("a section break bounds the title page", styledPlan.titlePage, [
+  "Cold Harbour",
+  "A novel",
+  "Jeff Moore",
+]);
+
+// --- Detection --------------------------------------------------------------
+const suggestions = suggestMarkers(styled);
+check(
+  "the document's own conventions are detected, with counts",
+  suggestions.map((s) => [s.prefix, s.count, s.kind]),
+  [
+    ["CHAPTER ", 3, "prefix"],
+    ["***", 2, "exact"],
+  ],
+);
+check(
+  "a one-off line is not mistaken for a convention",
+  suggestMarkers([{ text: "***" }, { text: "Some prose here." }]).length,
+  0,
+);
+check(
+  "long paragraphs opening with a capitalised word are not headings",
+  suggestMarkers([
+    { text: `Maren ${"walked on and on ".repeat(8)}` },
+    { text: `Maren ${"thought about it ".repeat(8)}` },
+  ]).length,
+  0,
+);
+
+// --- Manual title-page bound ------------------------------------------------
+check(
+  "an explicit paragraph count overrides page-break detection",
+  planImport({
+    paragraphs: styled,
+    firstPageIsTitlePage: true,
+    titlePageParagraphs: 2,
+    markers: [{ depth: 0, name: "Chapter", prefix: "CHAPTER " }],
+  }).titlePage,
+  ["Cold Harbour", "A novel"],
 );
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

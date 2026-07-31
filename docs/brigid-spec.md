@@ -411,10 +411,41 @@ manuscript uses to open a chapter, and the one that separates scenes.
 - The wizard plans locally as you type and shows how many times each marker
   matched, so a marker that does nothing is visible before anything is written.
 
-_Limitation._ Word does not store where soft page breaks fall — pagination is
-computed at layout time from page size, fonts and printer metrics. "First page"
-is therefore only available when the document has an explicit page break, and
-the option is disabled otherwise rather than guessing.
+### Detecting markers
+
+The wizard proposes markers by reading the document rather than assuming. Two
+shapes cover nearly every manuscript:
+
+- **Separator lines** — a short line with no letters or digits at all: `***`,
+  `#`, `⁂`. Counted by exact match.
+- **Heading prefixes** — the opening word of lines that look like headings,
+  counted across the document: `CHAPTER `, `PART `.
+
+"Looks like a heading" does most of the work, and the load-bearing test is the
+last character: a heading is a label, so it doesn't end in sentence punctuation,
+while prose almost always does. Without that, any word two sentences happen to
+open with — "The", "She" — reads as a chapter marker. Lines must also be under
+60 characters and open with a capitalised word of at least three letters.
+
+Anything proposed must occur **at least twice**: one line reading `***` is a
+typo, three are a convention. Everything is shown with its count so the writer
+confirms rather than trusts, and every row stays editable.
+
+### Page breaks
+
+Word records a page break four ways, and all four are common:
+
+| | |
+|---|---|
+| `w:br w:type="page"` | an inserted break (Ctrl+Enter) |
+| `w:pageBreakBefore` | the paragraph setting, which Word's Heading styles set — so this is what most chapter-per-page manuscripts actually contain |
+| `w:sectPr` | a section break, which starts a new page unless marked continuous |
+| `w:lastRenderedPageBreak` | the hint Word leaves at its last render |
+
+_Limitation._ Soft page breaks are not stored at all — pagination is computed at
+layout from page size, fonts and printer metrics. So the title page can also be
+bounded **manually by paragraph count**, which is offered whenever no break is
+found rather than disabling the option.
 
 ---
 

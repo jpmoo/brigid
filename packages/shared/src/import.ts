@@ -34,10 +34,16 @@ export interface PlanInput {
   paragraphs: readonly ImportedParagraph[];
   markers: readonly LevelMarker[];
   /**
-   * Take everything up to the first page break as a title page, reproduced
-   * literally rather than mapped onto variables.
+   * Take the opening of the document as a title page, reproduced literally
+   * rather than mapped onto variables.
    */
   firstPageIsTitlePage: boolean;
+  /**
+   * How many paragraphs the title page covers. Omit to use the first page
+   * break. Word's page-break fidelity varies, so this is the manual override
+   * for a document whose title page isn't bounded by one.
+   */
+  titlePageParagraphs?: number;
 }
 
 export interface PlannedBlock {
@@ -79,12 +85,16 @@ export function planImport(input: PlanInput): ImportPlan {
 
   if (input.firstPageIsTitlePage) {
     const page: string[] = [];
-    // Everything before the first explicit page break. Word only records those
-    // reliably — soft pagination is layout, computed at render, not stored.
+    const limit = input.titlePageParagraphs;
+    // An explicit count wins; otherwise stop at the first page break.
     while (index < input.paragraphs.length) {
       const para = input.paragraphs[index];
       if (!para) break;
-      if (index > 0 && para.pageBreakBefore) break;
+      if (limit === undefined) {
+        if (index > 0 && para.pageBreakBefore) break;
+      } else if (page.length >= limit) {
+        break;
+      }
       const text = normalizeForMatch(para.text);
       if (text) page.push(text);
       index += 1;
@@ -130,4 +140,92 @@ export function planImport(input: PlanInput): ImportPlan {
       count: counts.get(m.prefix) ?? 0,
     })),
   };
+}
+
+// --- Detecting the writer's own conventions --------------------------------
+
+export interface MarkerSuggestion {
+  prefix: string;
+  count: number;
+  /** "exact" for a standalone separator line, "prefix" for a heading opener. */
+  kind: "exact" | "prefix";
+  /** A few lines it matched, so the writer can check it means what they think. */
+  samples: string[];
+}
+
+/** A separator line: short, and made of punctuation or symbols rather than words. */
+function isSeparatorLine(text: string): boolean {
+  return text.length > 0 && text.length <= 12 && !/[\p{L}\p{N}]/u.test(text);
+}
+
+/**
+ * Whether a line looks like a heading rather than a sentence.
+ *
+ * The load-bearing test is the last character: a heading is a label, so it
+ * doesn't end in sentence punctuation, while prose almost always does. Without
+ * this, any word two sentences happen to open with — "The", "She" — reads as a
+ * chapter marker.
+ */
+function looksLikeHeading(text: string): boolean {
+  if (text.length > 60) return false;
+  if (/[.!?,;:"'\u201d\u2019]$/.test(text)) return false;
+  return true;
+}
+
+/**
+ * Read the document and propose the markers it actually uses, rather than
+ * assuming. Two shapes cover nearly every manuscript:
+ *
+ *  - a standalone separator between scenes — "***", "#", "⁂"
+ *  - a repeated opening word on short lines — "CHAPTER", "PART"
+ *
+ * Both need to occur at least twice: one line reading "***" is a typo, three
+ * are a convention. Everything is reported with counts and samples so the
+ * writer confirms rather than trusts.
+ */
+export function suggestMarkers(paragraphs: readonly ImportedParagraph[]): MarkerSuggestion[] {
+  const exact = new Map<string, string[]>();
+  const prefix = new Map<string, string[]>();
+
+  for (const para of paragraphs) {
+    const text = normalizeForMatch(para.text);
+    if (!text) continue;
+
+    if (isSeparatorLine(text)) {
+      const bucket = exact.get(text) ?? [];
+      bucket.push(text);
+      exact.set(text, bucket);
+      continue;
+    }
+
+    if (!looksLikeHeading(text)) continue;
+    const firstWord = text.split(" ")[0] ?? "";
+    // Require an all-caps or Capitalised word of real length, so "the" and "a"
+    // don't become candidates.
+    if (firstWord.length < 3 || firstWord.length > 20) continue;
+    if (!/^[\p{Lu}][\p{L}]*$/u.test(firstWord)) continue;
+
+    const key = `${firstWord} `;
+    const bucket = prefix.get(key) ?? [];
+    bucket.push(text);
+    prefix.set(key, bucket);
+  }
+
+  const out: MarkerSuggestion[] = [];
+  for (const [text, samples] of exact) {
+    if (samples.length >= 2) {
+      out.push({ prefix: text, count: samples.length, kind: "exact", samples: samples.slice(0, 3) });
+    }
+  }
+  for (const [key, samples] of prefix) {
+    if (samples.length >= 2) {
+      out.push({ prefix: key, count: samples.length, kind: "prefix", samples: samples.slice(0, 3) });
+    }
+  }
+
+  // Headings before separators — the outer level is the more useful default —
+  // then by how often each occurs.
+  return out
+    .sort((a, b) => (a.kind === b.kind ? b.count - a.count : a.kind === "prefix" ? -1 : 1))
+    .slice(0, 8);
 }

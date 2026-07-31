@@ -199,6 +199,7 @@ export const api = {
       counterRestart: "continuous" | "under-parent";
     }[];
     firstPageIsTitlePage: boolean;
+    titlePageParagraphs?: number;
   }) =>
     post<{ work: Work; matches: { depth: number; prefix: string; count: number }[]; blockCount: number }>(
       "/import/create",

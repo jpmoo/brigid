@@ -71,6 +71,7 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
         paragraphs: z.array(paragraphSchema).min(1).max(100_000),
         markers: z.array(markerSchema).min(1).max(12),
         firstPageIsTitlePage: z.boolean(),
+        titlePageParagraphs: z.number().int().min(1).max(200).optional(),
       })
       .parse(req.body);
 
@@ -78,6 +79,9 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
       paragraphs: body.paragraphs,
       markers: body.markers,
       firstPageIsTitlePage: body.firstPageIsTitlePage,
+      ...(body.titlePageParagraphs !== undefined
+        ? { titlePageParagraphs: body.titlePageParagraphs }
+        : {}),
     });
 
     const [regular] = await db

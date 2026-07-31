@@ -7,14 +7,21 @@ import { badRequest } from "../lib/errors.js";
  * Pull the paragraph stream out of a .docx.
  *
  * A .docx is a zip whose `word/document.xml` holds the text. We take paragraphs
- * (`w:p`), their text runs (`w:t`), and page breaks — both the explicit kind a
- * writer inserts (`w:br w:type="page"`) and the hint Word leaves behind at last
- * render (`w:lastRenderedPageBreak`).
+ * (`w:p`), their text runs (`w:t`), and page breaks. Word records a page break
+ * four different ways depending on how the writer made it, and all four are
+ * common:
  *
- * Worth knowing: Word does not store where soft page breaks fall. Pagination is
- * computed at layout time from the page size, fonts and printer metrics, so
- * "the first page" is only knowable when the document contains an explicit
- * break or was last saved by Word with its render hints intact.
+ *  - `w:br w:type="page"` — an inserted break (Ctrl+Enter)
+ *  - `w:pageBreakBefore` in the paragraph's properties — the "page break
+ *    before" paragraph setting, which Word's Heading styles set by default, so
+ *    this is what most chapter-per-page manuscripts actually contain
+ *  - `w:sectPr` — a section break, which starts a new page unless it says
+ *    otherwise; it lives on the *last* paragraph of the outgoing section
+ *  - `w:lastRenderedPageBreak` — the hint Word leaves at its last render
+ *
+ * Only the first three are authored; the last is layout Word happened to save.
+ * Soft page breaks are not stored at all — pagination is computed at layout
+ * from page size, fonts and printer metrics.
  */
 
 const parser = new XMLParser({
@@ -47,10 +54,15 @@ function attrs(entry: unknown): Record<string, string> {
   return (at as Record<string, string>) ?? {};
 }
 
-/** Text of one `w:p`, plus whether it carries a page break. */
-function readParagraph(children: unknown): { text: string; pageBreak: boolean } {
+/** Text of one `w:p`, plus the page breaks it carries and which side they fall on. */
+function readParagraph(children: unknown): {
+  text: string;
+  breakBefore: boolean;
+  breakAfter: boolean;
+} {
   let text = "";
-  let pageBreak = false;
+  let breakBefore = false;
+  let breakAfter = false;
 
   const visit = (nodes: unknown): void => {
     if (!Array.isArray(nodes)) return;
@@ -71,12 +83,30 @@ function readParagraph(children: unknown): { text: string; pageBreak: boolean } 
           continue;
         }
         if (key === "w:br") {
-          if (attrs(entry)["@_w:type"] === "page") pageBreak = true;
+          if (attrs(entry)["@_w:type"] === "page") breakBefore = true;
           else text += " ";
           continue;
         }
         if (key === "w:lastRenderedPageBreak") {
-          pageBreak = true;
+          breakBefore = true;
+          continue;
+        }
+        if (key === "w:pageBreakBefore") {
+          // Absent w:val means true; only an explicit false turns it off.
+          const val = attrs(entry)["@_w:val"];
+          if (val !== "0" && val !== "false") breakBefore = true;
+          continue;
+        }
+        if (key === "w:sectPr") {
+          // A section break sits on the last paragraph of the outgoing section,
+          // so it opens a page for whatever comes next. "continuous" doesn't.
+          let type: string | undefined;
+          for (const child of Array.isArray(value) ? value : []) {
+            if (child && typeof child === "object" && "w:type" in (child as Node)) {
+              type = attrs(child)["@_w:val"];
+            }
+          }
+          if (type !== "continuous") breakAfter = true;
           continue;
         }
         if (key === "#text") continue;
@@ -86,7 +116,7 @@ function readParagraph(children: unknown): { text: string; pageBreak: boolean } 
   };
 
   visit(children);
-  return { text, pageBreak };
+  return { text, breakBefore, breakAfter };
 }
 
 export function extractDocxParagraphs(file: Uint8Array): ImportedParagraph[] {
@@ -113,14 +143,17 @@ export function extractDocxParagraphs(file: Uint8Array): ImportedParagraph[] {
       for (const [key, value] of Object.entries(entry as Node)) {
         if (key === ":@" || key === "#text") continue;
         if (key === "w:p") {
-          const { text, pageBreak } = readParagraph(value);
-          // A break found inside a paragraph belongs to that paragraph; one
-          // found in an empty paragraph carries to the next with content.
+          const { text, breakBefore, breakAfter } = readParagraph(value);
+          // A break on an empty paragraph carries forward to the next paragraph
+          // that actually has content, so a spacer line doesn't swallow it.
           const trimmed = text.trim();
           if (trimmed) {
-            paragraphs.push({ text, ...(pendingBreak || pageBreak ? { pageBreakBefore: true } : {}) });
-            pendingBreak = false;
-          } else if (pageBreak) {
+            paragraphs.push({
+              text,
+              ...(pendingBreak || breakBefore ? { pageBreakBefore: true } : {}),
+            });
+            pendingBreak = breakAfter;
+          } else if (breakBefore || breakAfter) {
             pendingBreak = true;
           }
           continue;

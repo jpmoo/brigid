@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { FileUp, Plus, Trash2 } from "lucide-react";
-import { planImport } from "@brigid/shared";
+import { planImport, suggestMarkers } from "@brigid/shared";
 import type { ImportedParagraph } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Template, Work } from "../api.js";
@@ -41,20 +41,13 @@ export function ImportWizard({
   const [firstPageIsTitlePage, setFirstPageIsTitlePage] = useState(false);
 
   const breaks = useMemo(() => templates.filter((t) => t.category === "break"), [templates]);
-  const [markers, setMarkers] = useState<MarkerRow[]>([
-    {
-      name: "Chapter",
-      prefix: "CHAPTER ",
-      breakTemplateId: breaks.find((b) => b.builtinKey === "chapter-break")?.id ?? null,
-      counterRestart: "continuous",
-    },
-    {
-      name: "Scene",
-      prefix: "***",
-      breakTemplateId: breaks.find((b) => b.builtinKey === "section-break")?.id ?? null,
-      counterRestart: "under-parent",
-    },
-  ]);
+  // Empty until a file is read: the rows come from what the document actually
+  // contains, not from an assumption about how manuscripts are usually written.
+  const [markers, setMarkers] = useState<MarkerRow[]>([]);
+  const [detected, setDetected] = useState<{ prefix: string; count: number; samples: string[] }[]>(
+    [],
+  );
+  const [titleParas, setTitleParas] = useState<number | null>(null);
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,9 +59,10 @@ export function ImportWizard({
     return planImport({
       paragraphs,
       firstPageIsTitlePage,
+      ...(titleParas !== null ? { titlePageParagraphs: titleParas } : {}),
       markers: markers.map((m, i) => ({ depth: i, name: m.name, prefix: m.prefix })),
     });
-  }, [paragraphs, markers, firstPageIsTitlePage]);
+  }, [paragraphs, markers, firstPageIsTitlePage, titleParas]);
 
   async function onFile(file: File) {
     setError(null);
@@ -79,7 +73,21 @@ export function ImportWizard({
       setParagraphs(result.paragraphs);
       setHasPageBreaks(result.hasPageBreaks);
       setFirstPageIsTitlePage(result.hasPageBreaks);
+      setTitleParas(result.hasPageBreaks ? null : 3);
       if (!title) setTitle(result.filename.replace(/\.docx$/i, ""));
+
+      const found = suggestMarkers(result.paragraphs);
+      setDetected(found.map((f) => ({ prefix: f.prefix, count: f.count, samples: f.samples })));
+      const chapterBreak = breaks.find((b) => b.builtinKey === "chapter-break")?.id ?? null;
+      const sectionBreak = breaks.find((b) => b.builtinKey === "section-break")?.id ?? null;
+      setMarkers(
+        found.slice(0, 3).map((f, i) => ({
+          name: f.kind === "exact" ? "Scene" : "Chapter",
+          prefix: f.prefix,
+          breakTemplateId: f.kind === "exact" ? sectionBreak : chapterBreak,
+          counterRestart: f.kind === "exact" ? "under-parent" : "continuous",
+        })),
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not read that file");
     } finally {
@@ -98,6 +106,7 @@ export function ImportWizard({
         authorLastName: last || null,
         paragraphs,
         firstPageIsTitlePage,
+        ...(titleParas !== null ? { titlePageParagraphs: titleParas } : {}),
         markers: markers
           .filter((m) => m.prefix.trim().length > 0)
           .map((m, i) => ({
@@ -128,6 +137,7 @@ export function ImportWizard({
 
         {error ? <div className="alert error">{error}</div> : null}
 
+        <div className="modal-body">
         {paragraphs.length === 0 ? (
           <div className="import-drop">
             <input
@@ -176,24 +186,72 @@ export function ImportWizard({
               </div>
             </div>
 
-            <label className="check" style={{ marginBottom: 16 }}>
+            <label className="check" style={{ marginBottom: 8 }}>
               <input
                 type="checkbox"
                 checked={firstPageIsTitlePage}
-                disabled={!hasPageBreaks}
                 onChange={(e) => setFirstPageIsTitlePage(e.target.checked)}
               />
               <span>
-                Treat the first page as a title page{" "}
-                <em>
-                  {hasPageBreaks
-                    ? "— reproduced word for word, no variables inferred"
-                    : "— unavailable: this document has no explicit page breaks"}
-                </em>
+                Start with a title page{" "}
+                <em>— reproduced word for word, no variables inferred</em>
               </span>
             </label>
 
+            {firstPageIsTitlePage ? (
+              <div className="title-bound">
+                <label className="check">
+                  <input
+                    type="radio"
+                    name="titlebound"
+                    checked={titleParas === null}
+                    disabled={!hasPageBreaks}
+                    onChange={() => setTitleParas(null)}
+                  />
+                  <span>
+                    Up to the first page break{" "}
+                    {hasPageBreaks ? null : <em>— none found in this document</em>}
+                  </span>
+                </label>
+                <label className="check">
+                  <input
+                    type="radio"
+                    name="titlebound"
+                    checked={titleParas !== null}
+                    onChange={() => setTitleParas(titleParas ?? 3)}
+                  />
+                  <span>The first</span>
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={40}
+                  className="title-count"
+                  value={titleParas ?? 3}
+                  disabled={titleParas === null}
+                  onChange={(e) => setTitleParas(Math.max(1, Number(e.target.value) || 1))}
+                />
+                <span className="muted">paragraphs</span>
+              </div>
+            ) : null}
+
             <h4 className="tpl-section">Markers</h4>
+            {detected.length > 0 ? (
+              <div className="alert ok" style={{ marginBottom: 10 }}>
+                Found in your document:{" "}
+                {detected.map((d, i) => (
+                  <span key={d.prefix}>
+                    {i > 0 ? ", " : ""}
+                    <code>{d.prefix}</code> ×{d.count}
+                  </span>
+                ))}
+                . Adjust anything that isn&rsquo;t right.
+              </div>
+            ) : (
+              <div className="alert error" style={{ marginBottom: 10 }}>
+                Nothing repeated often enough to look like a marker. Type your own below.
+              </div>
+            )}
             <p className="field-hint" style={{ marginBottom: 10 }}>
               A paragraph starting with one of these opens a new level.{" "}
               <strong>Case sensitive</strong>, and the marker line itself is replaced by the break.
@@ -243,6 +301,10 @@ export function ImportWizard({
               ))}
             </div>
 
+            {markers.length === 0 ? (
+              <p className="field-hint">No markers yet — add one below.</p>
+            ) : null}
+
             <button
               className="btn secondary"
               type="button"
@@ -284,6 +346,8 @@ export function ImportWizard({
             ) : null}
           </>
         )}
+
+        </div>
 
         <div className="modal-actions">
           <button className="btn secondary" type="button" onClick={onClose}>
