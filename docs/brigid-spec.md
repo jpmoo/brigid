@@ -257,6 +257,35 @@ or detaches. Subtree-moves-with-root is the obvious default.
 
 ## 6. Settings
 
+### 6.0 Configuration and first run
+
+Two layers, split by what has to exist before the database does.
+
+**`.env.local`** (gitignored; `.env.example` is the template). Read after `.env`
+and overriding it, so a shared base can be overridden per host. Holds `PORT`,
+`HOST`, `APP_ORIGIN`, `SECURE_COOKIES`.
+
+**`data/brigid.config.json`** (gitignored, mode 0600). Holds the two values that
+can't live in the database because one of them *is* the database: the connection
+string and the session signing secret. The secret is minted at first boot,
+before and independent of any database, so completing setup never requires a
+restart to pick up a new cookie key.
+
+**First run happens in the app.** With no database configured the server starts
+anyway, in setup mode: `/api/setup/*` is live, everything else answers 503. The
+first screen is the setup wizard, which in one submission either provisions a
+fresh Postgres role and database from admin credentials or accepts an existing
+connection string, then migrates, creates the single account, and signs the
+writer straight in.
+
+Setup closes the instant an account exists. That matters: these endpoints are
+necessarily unauthenticated — there is nobody to authenticate as yet — so leaving
+them reachable afterwards would let anyone repoint the instance at their own
+database.
+
+`DATABASE_URL` and `SESSION_SECRET` remain supported in env for anyone who would
+rather configure by hand and skip the wizard entirely.
+
 ### 6.1 Ollama
 
 Follows the Hermes Notes pattern. The user enters a base URL; Brigid calls

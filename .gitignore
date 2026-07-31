@@ -16,6 +16,9 @@ out/
 *.pem
 *.key
 
+# First-run setup config (persisted DB url + generated session secret)
+data/
+
 # Logs
 *.log
 npm-debug.log*
