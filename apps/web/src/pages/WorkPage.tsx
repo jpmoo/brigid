@@ -266,6 +266,15 @@ export function WorkPage() {
     outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [selectedId]);
 
+  // Something is always current. The observer only speaks when a block crosses
+  // its band, which never happens on first load — so the first block takes the
+  // shade until scrolling says otherwise.
+  useEffect(() => {
+    if (selectedId) return;
+    const first = entries[0]?.block.id;
+    if (first) setSelectedId(first);
+  }, [entries, selectedId]);
+
   // Only blocks with children can be collapsed, so they're the whole question:
   // if every one is already shut, the control opens them, and otherwise it
   // shuts them.
@@ -399,10 +408,6 @@ export function WorkPage() {
 
         <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} />
 
-        <span className="muted" style={{ fontSize: 13 }}>
-          {wordFmt.format(totalWords)} words
-        </span>
-
         <SearchBar
           open={searchOpen}
           query={query}
@@ -460,6 +465,10 @@ export function WorkPage() {
             >
               {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
             </button>
+            <span className="spacer" />
+            {/* Kept clear of the panel's right edge: retracted, that edge is the
+                only strip still on screen, and the count would show through. */}
+            <span className="outline-words">{wordFmt.format(totalWords)} words</span>
           </div>
           <OutlinePanel
             entries={entries}

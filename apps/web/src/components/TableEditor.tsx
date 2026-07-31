@@ -22,6 +22,8 @@ export function TableEditor({
   onChange: (next: TemplateNode) => void;
 }) {
   const gridRef = useRef<HTMLDivElement>(null);
+  const nodeRef = useRef(node);
+  nodeRef.current = node;
   const [dragging, setDragging] = useState<number | null>(null);
   // Controls live in a full-width row beneath the table rather than inside the
   // cell: a narrow column swallows them entirely.
@@ -33,10 +35,16 @@ export function TableEditor({
 
   type Cell = TableNode["rows"][number]["cells"][number];
 
+  /**
+   * Cells hold their identity across edits, so React only re-renders the one
+   * that changed — but the patch itself must come off the node as it is *now*.
+   * Closing over the render's node meant two edits landing before a re-render
+   * would silently drop the earlier one, taking a column's content with it.
+   */
   const patchCell = (r: number, c: number, patch: Partial<Cell>) =>
     onChange({
-      ...node,
-      rows: node.rows.map((row, ri) =>
+      ...nodeRef.current,
+      rows: nodeRef.current.rows.map((row, ri) =>
         ri === r
           ? { cells: row.cells.map((cell, ci) => (ci === c ? { ...cell, ...patch } : cell)) }
           : row,
@@ -180,8 +188,27 @@ export function TableEditor({
               content={focusedCell.content}
               align={focusedCell.align ?? node.columns[focused!.c]?.align ?? "left"}
               onAlign={(align) => patchCell(focused!.r, focused!.c, { align })}
-              onContent={(content) => patchCell(focused!.r, focused!.c, { content })}
+              onToggleMark={(mark) => focusedHandle?.toggleMark(mark)}
             />
+            <select
+              className="be-spacing"
+              title="Line spacing in this cell"
+              value={String(focusedCell.lineHeight ?? "")}
+              onChange={(e) =>
+                patchCell(focused!.r, focused!.c, {
+                  ...(e.target.value
+                    ? { lineHeight: Number(e.target.value) }
+                    : { lineHeight: undefined }),
+                })
+              }
+            >
+              <option value="">Spacing: inherit</option>
+              <option value="1">Single</option>
+              <option value="1.15">1.15</option>
+              <option value="1.5">1½</option>
+              <option value="2">Double</option>
+              <option value="3">Triple</option>
+            </select>
             <select
               value=""
               // Inserting has to reach into the cell's own editor, since that is
@@ -249,15 +276,15 @@ export function TableEditor({
         </select>
       </div>
 
-      <div className="te-bar">
-        <span className="te-bar-label">Rules</span>
+      <div className="te-bar borders">
+        <span className="te-bar-label">Borders</span>
         <label className="check">
           <input
             type="checkbox"
             checked={borders.outer}
             onChange={(e) => setBorders({ outer: e.target.checked })}
           />
-          <span>Around the table</span>
+          <span>Table</span>
         </label>
         <label className="check">
           <input
@@ -265,7 +292,7 @@ export function TableEditor({
             checked={borders.rows}
             onChange={(e) => setBorders({ rows: e.target.checked })}
           />
-          <span>Between rows</span>
+          <span>Rows</span>
         </label>
         <label className="check">
           <input
@@ -273,20 +300,19 @@ export function TableEditor({
             checked={borders.columns}
             onChange={(e) => setBorders({ columns: e.target.checked })}
           />
-          <span>Between columns</span>
+          <span>Columns</span>
         </label>
-        <label className="be-inline">
-          <span className="muted">Weight</span>
-          <input
-            type="number"
-            min={0.25}
-            max={6}
-            step={0.25}
-            value={borders.widthPt ?? 1}
-            onChange={(e) => setBorders({ widthPt: Number(e.target.value) || 1 })}
-          />
-          <span className="muted">pt</span>
-        </label>
+        <select
+          title="Border weight"
+          value={String(borders.widthPt ?? 1)}
+          onChange={(e) => setBorders({ widthPt: Number(e.target.value) })}
+        >
+          {[0.5, 0.75, 1, 1.5, 2, 3].map((pt) => (
+            <option key={pt} value={pt}>
+              {pt} pt
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
@@ -301,18 +327,14 @@ function CellControls({
   content,
   align,
   onAlign,
-  onContent,
+  onToggleMark,
 }: {
   content: TemplateInline[];
   align: TemplateAlign;
   onAlign: (align: TemplateAlign) => void;
-  onContent: (content: TemplateInline[]) => void;
+  onToggleMark: (mark: "bold" | "italic" | "smallCaps" | "allCaps") => void;
 }) {
   const marks = commonMarks(content);
-  const toggle = (key: "bold" | "italic" | "smallCaps" | "allCaps") => {
-    const next = { ...marks, [key]: !marks[key] };
-    onContent(content.map((i) => (i.type === "tab" ? i : { ...i, ...next })));
-  };
 
   return (
     <div className="te-cell-controls">
@@ -327,7 +349,8 @@ function CellControls({
           type="button"
           className={`be-mark${marks[key] ? " on" : ""}`}
           aria-pressed={Boolean(marks[key])}
-          onClick={() => toggle(key)}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => onToggleMark(key)}
           title={key}
         >
           {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}

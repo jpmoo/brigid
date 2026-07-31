@@ -1,7 +1,9 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { commonMarks } from "@brigid/shared";
 import type { TemplateBody, TemplateNode } from "@brigid/shared";
+import { useRef } from "react";
 import { ChipEditor } from "./ChipEditor.js";
+import type { ChipEditorHandle } from "./ChipEditor.js";
 import { useDialogs } from "./Dialogs.js";
 import { NEW_TABLE, TableEditor } from "./TableEditor.js";
 
@@ -55,10 +57,13 @@ export function BodyEditor({
               <label className="be-inline">
                 <input
                   type="number"
-                  min={1}
+                  min={0.25}
                   max={40}
+                  step={0.25}
                   value={node.lines}
-                  onChange={(e) => replace(i, { type: "spacer", lines: Number(e.target.value) || 1 })}
+                  onChange={(e) =>
+                    replace(i, { type: "spacer", lines: Number(e.target.value) || 1 })
+                  }
                 />
                 <span className="muted">blank lines</span>
               </label>
@@ -149,18 +154,12 @@ function ParagraphRow({
   onChange: (next: TemplateNode) => void;
 }) {
   const marks = commonMarks(node.content);
-
-  const toggle = (key: "bold" | "italic" | "smallCaps" | "allCaps") => {
-    const next = { ...marks, [key]: !marks[key] };
-    onChange({
-      ...node,
-      content: node.content.map((i) => (i.type === "tab" ? i : { ...i, ...next })),
-    });
-  };
+  const editor = useRef<ChipEditorHandle>(null);
 
   return (
     <div className="be-para">
       <ChipEditor
+        ref={editor}
         value={node.content}
         marks={marks}
         onChange={(content) => onChange({ ...node, content })}
@@ -176,13 +175,33 @@ function ParagraphRow({
           <option value="right">Right</option>
         </select>
 
+        <select
+          className="be-spacing"
+          title="Line spacing"
+          value={String(node.lineHeight ?? "")}
+          onChange={(e) =>
+            onChange({
+              ...node,
+              ...(e.target.value ? { lineHeight: Number(e.target.value) } : { lineHeight: undefined }),
+            })
+          }
+        >
+          <option value="">Spacing: inherit</option>
+          <option value="1">Single</option>
+          <option value="1.15">1.15</option>
+          <option value="1.5">1½</option>
+          <option value="2">Double</option>
+          <option value="3">Triple</option>
+        </select>
+
         {(["bold", "italic", "smallCaps", "allCaps"] as const).map((key) => (
           <button
             key={key}
             type="button"
             className={`be-mark${marks[key] ? " on" : ""}`}
             aria-pressed={Boolean(marks[key])}
-            onClick={() => toggle(key)}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.current?.toggleMark(key)}
             title={key}
           >
             {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}

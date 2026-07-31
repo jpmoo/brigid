@@ -199,7 +199,13 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
           columns: node.columns,
           borders: node.borders,
           rows: node.rows.map((row) => ({
-            cells: row.cells.map((cell) => ({
+            // Pad to the column count: a row that is short — from older data,
+            // or an edit that raced — would otherwise render missing columns
+            // rather than empty ones, which looks like the table lost them.
+            cells: Array.from(
+              { length: Math.max(node.columns.length, row.cells.length) },
+              (_, i) => row.cells[i] ?? { content: [] },
+            ).map((cell) => ({
               spans: cell.content
                 .map((inline) => resolveInline(inline, ctx))
                 .filter((s): s is ResolvedSpan => s !== null),

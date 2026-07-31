@@ -2266,13 +2266,13 @@ input::placeholder {
 
 .doc-block {
   position: relative;
-  /* A little air above when scrolled to, so "top of the section" isn't flush
-     against the edge of the pane. */
-  scroll-margin-top: 28px;
+  /* Air above when scrolled to, so a section opens with a little space rather
+     than flush against the edge of the pane. */
+  scroll-margin-top: 52px;
 }
 
 .doc-break {
-  scroll-margin-top: 28px;
+  scroll-margin-top: 52px;
 }
 
 .doc-bookmark {
@@ -2430,4 +2430,72 @@ mark.hit.active {
 .btn.saved:disabled {
   opacity: 1;
   cursor: default;
+}
+
+/* --- Outline word count ----------------------------------------------- */
+
+.outline-words {
+  padding-right: 14px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+/* --- Editor selects --------------------------------------------------- */
+
+.be-spacing,
+.te-bar.borders select {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.te-bar.borders {
+  flex-wrap: nowrap;
+}
+
+/* --- Page preview ----------------------------------------------------- */
+
+.page-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pp-sheet {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow);
+  padding: 72px;
+  font-family: var(--serif);
+  font-size: 12pt;
+  overflow: hidden;
+}
+
+.pp-content {
+  margin: 0;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.pp-break {
+  border-top: 1px dashed var(--border-strong);
+  margin: 12px -72px;
+}
+
+.pp-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.pp-caption {
+  margin: 0;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
