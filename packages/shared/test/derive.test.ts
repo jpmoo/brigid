@@ -282,6 +282,17 @@ check(
   1,
 );
 
+// --- subtree word totals ----------------------------------------------------
+// A chapter's own row holds no prose; the scenes beneath it do.
+{
+  const { subtreeWordCounts } = await import("@brigid/shared");
+  const { buildOutline } = await import("@brigid/shared");
+  const totals = subtreeWordCounts(buildOutline(blocks));
+  check("a chapter counts everything beneath it", totals.get("ch1"), 10 + 100 + 200);
+  check("a leaf counts only itself", totals.get("s2"), 200);
+  check("a childless block is unaffected", totals.get("title"), 0);
+}
+
 // --- template text tokens ---------------------------------------------------
 check(
   "variable tokens round-trip through the text editor form",

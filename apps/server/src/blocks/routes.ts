@@ -148,6 +148,20 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
           .limit(1);
         if (!ref || ref.workId !== workId) throw notFound("reference block");
 
+        if (body.placement === "child") {
+          // Front matter sits outside the level structure, so nothing can be
+          // nested beneath it — a chapter under a title page is meaningless.
+          const [refFormat] = await tx
+            .select({ formatSettings: templates.formatSettings })
+            .from(templates)
+            .innerJoin(blocks, eq(blocks.formatId, templates.id))
+            .where(eq(blocks.id, ref.id))
+            .limit(1);
+          if (refFormat && refFormat.formatSettings?.structural === false) {
+            throw badRequest("that block isn't part of the structure, so it can't hold one");
+          }
+        }
+
         if (body.placement === "sibling") {
           parentId = ref.parentId;
           afterId = ref.id;
@@ -389,6 +403,71 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
       .returning();
     if (!updated) throw notFound("block");
     return { block: updated };
+  });
+
+  /**
+   * Copy the block's format body onto the block so it can be edited alone.
+   * Until this happens the block follows its template, and editing that
+   * template reaches every block using it.
+   */
+  app.post("/blocks/:id/format/detach", async (req) => {
+    requireUser(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+
+    const [block] = await db
+      .select({ id: blocks.id, formatId: blocks.formatId, formatBody: blocks.formatBody })
+      .from(blocks)
+      .where(eq(blocks.id, id))
+      .limit(1);
+    if (!block) throw notFound("block");
+    if (block.formatBody) throw badRequest("that format is already detached");
+
+    const [template] = await db
+      .select({ body: templates.body })
+      .from(templates)
+      .where(eq(templates.id, block.formatId))
+      .limit(1);
+    if (!template) throw notFound("format template");
+
+    const [row] = await db
+      .update(blocks)
+      .set({ formatBody: template.body, updatedAt: new Date() })
+      .where(eq(blocks.id, id))
+      .returning();
+    return { block: row };
+  });
+
+  app.patch("/blocks/:id/format", async (req) => {
+    requireUser(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const body = z.object({ body: z.object({ nodes: z.array(z.unknown()) }) }).parse(req.body);
+
+    const [current] = await db
+      .select({ formatBody: blocks.formatBody })
+      .from(blocks)
+      .where(eq(blocks.id, id))
+      .limit(1);
+    if (!current) throw notFound("block");
+    if (!current.formatBody) throw badRequest("detach this format before editing it");
+
+    const [row] = await db
+      .update(blocks)
+      .set({ formatBody: body.body as never, updatedAt: new Date() })
+      .where(eq(blocks.id, id))
+      .returning();
+    return { block: row };
+  });
+
+  app.delete("/blocks/:id/format", async (req) => {
+    requireUser(req);
+    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
+    const [row] = await db
+      .update(blocks)
+      .set({ formatBody: null, updatedAt: new Date() })
+      .where(eq(blocks.id, id))
+      .returning();
+    if (!row) throw notFound("block");
+    return { block: row };
   });
 
   app.delete("/blocks/:id", async (req) => {

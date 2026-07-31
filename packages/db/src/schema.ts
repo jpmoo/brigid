@@ -195,6 +195,12 @@ export const blocks = pgTable(
     }),
     breakBody: jsonb("break_body").$type<TemplateBody>(),
     /**
+     * A detached format instance. Null means the block still renders through
+     * its format template, so editing that template reaches it. Editing this
+     * one block's format copies the body here and it stops following.
+     */
+    formatBody: jsonb("format_body").$type<TemplateBody>(),
+    /**
      * Always maintained, for every block, regardless of whether the block's
      * format contributes to the manuscript total.
      */

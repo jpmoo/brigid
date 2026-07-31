@@ -62,6 +62,7 @@ export function WorkPage() {
     localStorage.getItem(MODE_KEY) === "manuscript" ? "manuscript" : "book",
   );
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
+  const [editingFormat, setEditingFormat] = useState<Block | null>(null);
   const [scaleIndex, setScaleIndex] = useState(() => {
     const stored = Number(localStorage.getItem(SCALE_KEY));
     return Number.isInteger(stored) && stored >= 0 && stored < SCALE_STEPS.length ? stored : 2;
@@ -381,9 +382,25 @@ export function WorkPage() {
           </button>
         </div>
 
+        <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} />
+
         <span className="muted" style={{ fontSize: 13 }}>
           {wordFmt.format(totalWords)} words
         </span>
+
+        <SearchBar
+          open={searchOpen}
+          query={query}
+          matches={matches}
+          activeIndex={matchIndex}
+          onOpen={() => setSearchOpen(true)}
+          onClose={() => {
+            setSearchOpen(false);
+            setQuery("");
+          }}
+          onQuery={setQuery}
+          onStep={stepMatch}
+        />
 
         <ThemeToggle />
 
@@ -441,6 +458,9 @@ export function WorkPage() {
             onSelectBreak={scrollToBreak}
             onAdd={(relativeTo, placement) => setAdding({ relativeTo, placement })}
             onRename={(blockId) => setRenaming(blocks.find((b) => b.id === blockId) ?? null)}
+            onEditFormat={(blockId) =>
+              setEditingFormat(blocks.find((b) => b.id === blockId) ?? null)
+            }
             onDelete={(blockId) => void onDelete(blockId)}
             registerRef={registerOutlineRef}
           />
@@ -512,6 +532,22 @@ export function WorkPage() {
 
               <span className="zen-words">{wordFmt.format(totalWords)} words</span>
 
+              <SearchBar
+                open={searchOpen}
+                query={query}
+                matches={matches}
+                activeIndex={matchIndex}
+                onOpen={() => setSearchOpen(true)}
+                onClose={() => {
+                  setSearchOpen(false);
+                  setQuery("");
+                }}
+                onQuery={setQuery}
+                onStep={stepMatch}
+              />
+
+              <ThemeToggle />
+
               <button
                 className="zen-exit"
                 type="button"
@@ -534,6 +570,18 @@ export function WorkPage() {
           onCreated={(created) => {
             setAdding(null);
             setSelectedId(created.id);
+            void load();
+          }}
+        />
+      ) : null}
+
+      {editingFormat ? (
+        <FormatEditor
+          block={editingFormat}
+          templateName={templateMap.get(editingFormat.formatId)?.name ?? "this format"}
+          onClose={() => setEditingFormat(null)}
+          onSaved={() => {
+            setEditingFormat(null);
             void load();
           }}
         />
@@ -849,6 +897,122 @@ function BreakEditor({
           ) : (
             <button className="btn" type="button" onClick={() => void detach()} disabled={busy}>
               {busy ? "Detaching…" : "Edit just this one"}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Edits the format of one block.
+ *
+ * A format template is shared, so changing it in Settings changes every block
+ * using it — right for a house style, wrong for one particular title page.
+ * Editing here detaches: the body is copied onto the block and from then on it
+ * renders its own, exactly as breaks do.
+ */
+function FormatEditor({
+  block,
+  templateName,
+  onClose,
+  onSaved,
+}: {
+  block: Block;
+  templateName: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const dialogs = useDialogs();
+  const [body, setBody] = useState<TemplateBody | null>(block.formatBody ?? null);
+  const [detached, setDetached] = useState(Boolean(block.formatBody));
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function detach() {
+    setError(null);
+    setBusy(true);
+    try {
+      const { block: updated } = await api.detachFormat(block.id);
+      setBody(updated.formatBody ?? { nodes: [] });
+      setDetached(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not detach this format");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function save() {
+    if (!body) return;
+    setBusy(true);
+    try {
+      await api.updateFormat(block.id, body);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not save");
+      setBusy(false);
+    }
+  }
+
+  async function revert() {
+    const ok = await dialogs.confirm({
+      title: "Follow the template again?",
+      message: `This block's edits will be discarded and it will render through ${templateName} like every other block using it.`,
+      confirmLabel: "Discard edits",
+      danger: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      await api.revertFormat(block.id);
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not revert");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+        <h2 className="card-title">Format for this block</h2>
+        <p className="card-subtitle">
+          {detached
+            ? `Edited for this block alone. Other blocks using ${templateName} are untouched.`
+            : `This block renders through ${templateName}, shared with every other block using it. Edit it to make this one its own.`}
+        </p>
+
+        {error ? <div className="alert error">{error}</div> : null}
+
+        <div className="modal-body">
+          {detached && body ? (
+            <BodyEditor body={body} onChange={setBody} />
+          ) : (
+            <p className="muted" style={{ marginBottom: 18 }}>
+              Nothing here is editable until you detach it.
+            </p>
+          )}
+        </div>
+
+        <div className="modal-actions">
+          {detached ? (
+            <button className="btn secondary" type="button" onClick={() => void revert()} disabled={busy}>
+              Follow the template again
+            </button>
+          ) : null}
+          <div className="spacer" />
+          <button className="btn secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          {detached ? (
+            <button className="btn" type="button" onClick={() => void save()} disabled={busy || !body}>
+              {busy ? "Saving…" : "Save"}
+            </button>
+          ) : (
+            <button className="btn" type="button" onClick={() => void detach()} disabled={busy}>
+              {busy ? "Detaching…" : "Edit just this block"}
             </button>
           )}
         </div>

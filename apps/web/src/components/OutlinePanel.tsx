@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Scissors } from "lucide-react";
+import { subtreeWordCounts } from "@brigid/shared";
 import type { OutlineEntry } from "@brigid/shared";
 import type { Block, Placement, Template } from "../api.js";
 
@@ -34,6 +35,7 @@ export interface OutlinePanelProps {
   onSelect: (id: string) => void;
   onAdd: (relativeTo: string | null, placement: Placement) => void;
   onRename: (id: string) => void;
+  onEditFormat: (id: string) => void;
   onDelete: (id: string) => void;
   /** So the panel can scroll the current block into view as the document moves. */
   registerRef: (blockId: string, el: HTMLDivElement | null) => void;
@@ -41,6 +43,7 @@ export interface OutlinePanelProps {
 
 export function OutlinePanel(props: OutlinePanelProps) {
   const { entries, templates, levels, selectedId, collapsed, breaks } = props;
+  const totals = subtreeWordCounts(entries);
 
   // A collapsed block hides its whole subtree, so hidden-ness is inherited.
   const hidden = new Set<string>();
@@ -75,6 +78,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
           structural={templates.get(entry.block.formatId)?.formatSettings?.structural ?? true}
           {...props}
           breakChip={breaks.get(entry.block.id) ?? null}
+          words={totals.get(entry.block.id) ?? entry.block.wordCount}
           selected={entry.block.id === selectedId}
           isCollapsed={collapsed.has(entry.block.id)}
         />
@@ -97,6 +101,8 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   selected: boolean;
   isCollapsed: boolean;
   breakChip: BreakChip | null;
+  /** This block plus everything under it. */
+  words: number;
 }
 
 function OutlineCard(props: CardProps) {
@@ -130,8 +136,15 @@ function OutlineCard(props: CardProps) {
     <div
       className={`outline-card${selected ? " selected" : ""}${props.rendersInDocument ? "" : " note"}`}
     >
-      <div className="outline-gutter" title={`${wordFmt.format(block.wordCount)} words`}>
-        {wordFmt.format(block.wordCount)}
+      <div
+        className="outline-gutter"
+        title={
+          entry.childCount > 0
+            ? `${wordFmt.format(props.words)} words in this ${props.levelName.toLowerCase()}`
+            : `${wordFmt.format(props.words)} words`
+        }
+      >
+        {wordFmt.format(props.words)}
       </div>
 
       <button
@@ -160,7 +173,7 @@ function OutlineCard(props: CardProps) {
           {/* A non-structural block isn't at a level in any meaningful sense —
               it takes no break and no chapter number — so naming it by depth
               would be a lie. It says what it actually is. */}
-          <span className={`outline-level${props.structural ? "" : " aside"}`}>
+          <span className="outline-level">
             {props.structural ? props.levelName : props.formatName}
           </span>
         </div>
@@ -188,7 +201,16 @@ function OutlineCard(props: CardProps) {
               <button type="button" onClick={() => { setMenuOpen(false); props.onAdd(block.id, "sibling"); }}>
                 Add sibling after
               </button>
-              <button type="button" onClick={() => { setMenuOpen(false); props.onAdd(block.id, "child"); }}>
+              <button
+                type="button"
+                disabled={!props.structural}
+                title={
+                  props.structural
+                    ? undefined
+                    : `A ${props.formatName.toLowerCase()} isn't part of the structure, so it can't hold one`
+                }
+                onClick={() => { setMenuOpen(false); props.onAdd(block.id, "child"); }}
+              >
                 Add child
               </button>
               <button
@@ -201,6 +223,9 @@ function OutlineCard(props: CardProps) {
               <hr />
               <button type="button" onClick={() => { setMenuOpen(false); props.onRename(block.id); }}>
                 Rename…
+              </button>
+              <button type="button" onClick={() => { setMenuOpen(false); props.onEditFormat(block.id); }}>
+                Edit this block&rsquo;s format…
               </button>
               <button
                 type="button"

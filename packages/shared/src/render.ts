@@ -82,6 +82,8 @@ export type DocumentItem<B extends BlockNode = BlockNode> =
       entry: OutlineEntry<B>;
       /** The block's format, already resolved. */
       nodes: ResolvedNode[];
+      /** True when this block's format has been edited away from its template. */
+      formatDetached: boolean;
       /** Manuscript-mode typography, from the block's format template. */
       typography: Typography | null;
       /** Set when this block starts a new numbering / running-head section. */
@@ -325,7 +327,14 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
       kind: "block",
       block: entry.block,
       entry,
-      nodes: format ? resolveBody(format.body.nodes, ctx) : [{ type: "content" }],
+      // A detached format wins over the template it was seeded from, so one
+      // title page can differ without disturbing every other block using it.
+      nodes: entry.block.formatBody
+        ? resolveBody(entry.block.formatBody.nodes, ctx)
+        : format
+          ? resolveBody(format.body.nodes, ctx)
+          : [{ type: "content" }],
+      formatDetached: Boolean(entry.block.formatBody),
       typography: format?.formatSettings?.typography ?? null,
       sectionStart: format?.formatSettings?.sectionStart ?? null,
       firstLineIndent,

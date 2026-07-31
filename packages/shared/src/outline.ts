@@ -26,6 +26,11 @@ export interface BlockNode {
    */
   breakTemplateId?: string | null;
   breakBody?: TemplateBody | null;
+  /**
+   * A detached format instance. Absent or null means the block renders through
+   * its format template; once set it renders its own body instead.
+   */
+  formatBody?: TemplateBody | null;
 }
 
 export interface TemplateLike {
@@ -118,6 +123,32 @@ export function buildOutline<B extends BlockNode>(blocks: readonly B[]): Outline
  * because both are ordinary conventions in print: chapters usually run 1..n
  * across a book with parts, while scenes restart within each chapter.
  */
+/**
+ * Words in each block *and everything under it*.
+ *
+ * A chapter's own row usually holds no prose — the scenes beneath it do — so
+ * showing only its own count would report a chapter of 100,000 words as 0. The
+ * number against a block is the size of what it contains.
+ */
+export function subtreeWordCounts<B extends BlockNode>(
+  entries: readonly OutlineEntry<B>[],
+): Map<string, number> {
+  const totals = new Map<string, number>();
+  // Entries are depth-first pre-order, so walking backwards means every child
+  // has been totalled before its parent is reached.
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    const entry = entries[i];
+    if (!entry) continue;
+    const fromChildren = totals.get(entry.block.id) ?? 0;
+    const total = fromChildren + entry.block.wordCount;
+    totals.set(entry.block.id, total);
+    if (entry.block.parentId) {
+      totals.set(entry.block.parentId, (totals.get(entry.block.parentId) ?? 0) + total);
+    }
+  }
+  return totals;
+}
+
 export function computeCounters<B extends BlockNode>(
   entries: readonly OutlineEntry<B>[],
   levels: readonly LevelLike[],

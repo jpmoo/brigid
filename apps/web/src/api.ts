@@ -83,6 +83,7 @@ export interface Block {
   wordCount: number;
   breakTemplateId: string | null;
   breakBody: TemplateBody | null;
+  formatBody: TemplateBody | null;
 }
 
 export interface Template {
@@ -289,4 +290,13 @@ export const api = {
       body: JSON.stringify({ body }),
     }),
   revertBreak: (id: string) => request<{ block: Block }>(`/blocks/${id}/break`, { method: "DELETE" }),
+
+  detachFormat: (id: string) => post<{ block: Block }>(`/blocks/${id}/format/detach`),
+  updateFormat: (id: string, body: TemplateBody) =>
+    request<{ block: Block }>(`/blocks/${id}/format`, {
+      method: "PATCH",
+      body: JSON.stringify({ body }),
+    }),
+  revertFormat: (id: string) =>
+    request<{ block: Block }>(`/blocks/${id}/format`, { method: "DELETE" }),
 };
