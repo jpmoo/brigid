@@ -76,8 +76,13 @@ export function HoldToConfirm({
       onBlur={stop}
     >
       <span className="hold-fill" style={{ transform: `scaleX(${progress})` }} />
-      <span className="hold-label">
-        {holding ? (holdingLabel ?? "Keep holding…") : label}
+      <span className="hold-labels">
+        <span className="hold-label" data-shown={String(!holding)} aria-hidden={holding}>
+          {label}
+        </span>
+        <span className="hold-label" data-shown={String(holding)} aria-hidden={!holding}>
+          {holdingLabel ?? "Keep holding…"}
+        </span>
       </span>
     </button>
   );

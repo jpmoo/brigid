@@ -15,15 +15,28 @@ import type { TemplateInline, TemplateMarks, VariableName } from "@brigid/shared
 
 const CHIPPABLE = VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline");
 
+/**
+ * A zero-width space either side of every atom.
+ *
+ * Without one, there is no editable text position immediately after a
+ * `contenteditable=false` span, so a character typed there lands *inside* the
+ * chip — which is how a typed ":" after "manuscript title" disappeared. The
+ * caret always has somewhere legitimate to sit now, and these are stripped back
+ * out when serializing.
+ */
+const ZWSP = "\u200B";
+
 function inlinesToHtml(inlines: readonly TemplateInline[]): string {
   return inlines
     .map((inline) => {
-      if (inline.type === "tab") return `<span data-tab="1" contenteditable="false">⇥</span>`;
+      if (inline.type === "tab") {
+        return `${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`;
+      }
       if (inline.type === "variable") {
         const fmt = inline.numberFormat ? ` data-format="${inline.numberFormat}"` : "";
-        return `<span data-var="${inline.name}"${fmt} contenteditable="false">${
+        return `${ZWSP}<span data-var="${inline.name}"${fmt} contenteditable="false">${
           VARIABLES[inline.name].label
-        }</span>`;
+        }</span>${ZWSP}`;
       }
       const text = inline.text
         .replace(/&/g, "&amp;")
@@ -36,7 +49,8 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
 
 function htmlToInlines(root: HTMLElement, marks: TemplateMarks): TemplateInline[] {
   const out: TemplateInline[] = [];
-  const pushText = (text: string) => {
+  const pushText = (raw: string) => {
+    const text = raw.replace(/\u200B/g, "");
     if (!text) return;
     const last = out[out.length - 1];
     if (last?.type === "text") last.text += text;
@@ -56,10 +70,17 @@ function htmlToInlines(root: HTMLElement, marks: TemplateMarks): TemplateInline[
       const fmt = node.dataset.format;
       if (fmt) inline.numberFormat = fmt as never;
       out.push(inline);
+      // A browser that dropped a keystroke inside the chip anyway: recover the
+      // character rather than losing it silently.
+      const label = VARIABLES[varName as VariableName].label;
+      const stray = (node.textContent ?? "").replace(/\u200B/g, "").replace(label, "");
+      if (stray) pushText(stray);
       return;
     }
     if (node.dataset.tab) {
       out.push({ type: "tab" });
+      const stray = (node.textContent ?? "").replace(/\u200B/g, "").replace("⇥", "");
+      if (stray) pushText(stray);
       return;
     }
     // A <br> or a stray wrapper the browser inserted; descend and keep the text.
@@ -145,7 +166,7 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
           if (e.key === "Enter") e.preventDefault();
           if (e.key === "Tab") {
             e.preventDefault();
-            insert('<span data-tab="1" contenteditable="false">⇥</span>');
+            insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`);
           }
         }}
         onPaste={(e) => {
@@ -163,7 +184,7 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
             const name = e.target.value as VariableName;
             if (!name) return;
             insert(
-              `<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>`,
+              `${ZWSP}<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>${ZWSP}`,
             );
             e.target.value = "";
           }}
@@ -179,7 +200,7 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
           type="button"
           className="btn secondary chip-tab-btn"
           title="Insert a tab stop"
-          onClick={() => insert('<span data-tab="1" contenteditable="false">⇥</span>')}
+          onClick={() => insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`)}
         >
           ⇥ Tab
         </button>

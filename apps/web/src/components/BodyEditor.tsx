@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { commonMarks } from "@brigid/shared";
 import type { TemplateBody, TemplateNode } from "@brigid/shared";
 import { ChipEditor } from "./ChipEditor.js";
+import { NEW_TABLE, TableEditor } from "./TableEditor.js";
 
 /**
  * Edits a template body — the shared shape behind break templates, block
@@ -33,7 +34,17 @@ export function BodyEditor({
     <div className="body-editor">
       {nodes.map((node, i) => (
         <div className="be-row" key={i}>
-          <div className="be-kind">{node.type === "paragraph" ? "Text" : node.type === "spacer" ? "Blank" : node.type === "pageBreak" ? "Page break" : "Content"}</div>
+          <div className="be-kind">
+            {node.type === "paragraph"
+              ? "Text"
+              : node.type === "spacer"
+                ? "Blank"
+                : node.type === "pageBreak"
+                  ? "Page break"
+                  : node.type === "table"
+                    ? "Table"
+                    : "Content"}
+          </div>
 
           <div className="be-main">
             {node.type === "paragraph" ? (
@@ -51,6 +62,8 @@ export function BodyEditor({
               </label>
             ) : node.type === "pageBreak" ? (
               <span className="muted">Starts a new page.</span>
+            ) : node.type === "table" ? (
+              <TableEditor node={node} onChange={(n) => replace(i, n)} />
             ) : (
               <span className="muted">The block&rsquo;s own prose goes here.</span>
             )}
@@ -97,6 +110,19 @@ export function BodyEditor({
           onClick={() => set([...nodes, { type: "pageBreak" }])}
         >
           <Plus size={13} /> Page break
+        </button>
+        <button
+          className="btn secondary"
+          type="button"
+          onClick={() => {
+            const rows = Number(prompt("How many rows?", "3"));
+            if (!rows || rows < 1) return;
+            const cols = Number(prompt("How many columns?", "2"));
+            if (!cols || cols < 1) return;
+            set([...nodes, NEW_TABLE(Math.min(rows, 40), Math.min(cols, 12))]);
+          }}
+        >
+          <Plus size={13} /> Table
         </button>
       </div>
     </div>

@@ -338,11 +338,13 @@ input::placeholder {
   gap: 12px;
   padding: 0 20px;
   height: 56px;
+  flex: 0 0 auto;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   position: sticky;
   top: 0;
   z-index: 10;
+  transition: transform 0.22s ease, margin-top 0.22s ease, opacity 0.18s ease;
 }
 
 .app-header .mark {
@@ -577,22 +579,22 @@ input::placeholder {
   opacity: 0.6;
 }
 
+/* The strip left behind when the panel retracts: a plain edge with a single
+   chevron, so it reads as "pull this out" rather than as decoration. */
 .outline-panel.floating::after {
-  content: "";
+  content: "\203A";
   position: absolute;
   top: 0;
   right: 0;
   width: 18px;
   height: 100%;
-  border-left: 1px solid var(--border);
-  background: repeating-linear-gradient(
-    to bottom,
-    var(--border-strong) 0 2px,
-    transparent 2px 7px
-  );
-  background-size: 2px 100%;
-  background-position: center;
-  background-repeat: no-repeat;
+  display: grid;
+  place-items: center;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  color: var(--text-faint);
+  font-size: 14px;
+  line-height: 1;
   opacity: 0;
   transition: opacity 0.16s;
   pointer-events: none;
@@ -824,6 +826,13 @@ input::placeholder {
   background: var(--surface-sunken);
 }
 
+/* The retracted panel floats above the document rather than taking a column, so
+   without this its strip sits over the left margin and the manuscript is no
+   longer centred between equal margins. */
+.work-body.panel-hidden .document-pane {
+  padding-left: 38px;
+}
+
 /* Page-*like*: the right measure and proportions of a 6x9 trim, without real
    page boundaries. Pagination is an export concern. */
 .page-sheet {
@@ -955,18 +964,23 @@ input::placeholder {
 
 /* One control takes away the outline *and* the chrome — nothing left but the
    manuscript. Escape brings it back. */
+/* Slides up and takes its space with it, so entering zen is one motion rather
+   than the header vanishing and the manuscript jumping. The negative margin
+   matches the header's fixed height exactly. */
 .work-shell.zen .app-header {
-  display: none;
+  transform: translateY(-100%);
+  margin-top: -56px;
+  opacity: 0;
+  pointer-events: none;
 }
 
-.work-shell.zen .document-pane {
-  padding-top: 48px;
-}
-
+/* Invisible until the pointer finds it, overlapping the corner of the sheet
+   rather than reserving a row across the top — zen should be nothing but the
+   manuscript. Escape leaves too, so this is a convenience, not the only way. */
 .zen-exit {
   position: fixed;
-  top: 14px;
-  right: 16px;
+  top: 10px;
+  right: 12px;
   z-index: 20;
   display: grid;
   place-items: center;
@@ -976,12 +990,15 @@ input::placeholder {
   color: var(--text-muted);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+  box-shadow: var(--shadow);
   cursor: pointer;
-  opacity: 0.28;
+  opacity: 0;
   transition: opacity 0.15s;
 }
 
-.zen-exit:hover {
+/* Opacity leaves it hit-testable, so hovering the empty corner reveals it. */
+.zen-exit:hover,
+.zen-exit:focus-visible {
   opacity: 1;
 }
 
@@ -1749,9 +1766,21 @@ input::placeholder {
   background: color-mix(in srgb, var(--danger) 8%, transparent);
 }
 
-.hold-label {
+/* Both labels occupy the same grid cell, so the button is as wide as the longer
+   of them and never resizes when the label swaps mid-hold. */
+.hold-labels {
   position: relative;
   z-index: 1;
+  display: grid;
+}
+
+.hold-label {
+  grid-area: 1 / 1;
+  transition: opacity 0.12s;
+}
+
+.hold-label[data-shown="false"] {
+  opacity: 0;
 }
 
 .danger-note {
@@ -1826,4 +1855,110 @@ input::placeholder {
   border-radius: 3px;
   font-family: var(--mono);
   font-size: 11px;
+}
+
+/* --- Table editor ----------------------------------------------------- */
+
+.table-editor {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.te-grid {
+  position: relative;
+  display: grid;
+  background: var(--border);
+  gap: 1px;
+}
+
+.te-cell {
+  background: var(--surface);
+  padding: 5px 6px;
+  min-width: 0;
+}
+
+/* Cells are tight, so the chip field loses its own frame inside one. */
+.te-cell .chip-field {
+  min-height: 26px;
+  padding: 4px 6px;
+  border-color: transparent;
+  background: transparent;
+  font-size: 13px;
+}
+
+.te-cell .chip-field:focus {
+  background: var(--paper);
+  border-color: var(--accent);
+}
+
+.te-cell .chip-bar {
+  display: none;
+}
+
+.te-cell:focus-within .chip-bar {
+  display: flex;
+  margin-top: 4px;
+}
+
+/* Sits on the boundary between two columns; dragging moves width from one to
+   its neighbour, never off the end of the table. */
+.te-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  margin-left: -4px;
+  cursor: col-resize;
+  z-index: 2;
+}
+
+.te-handle::before {
+  content: "";
+  position: absolute;
+  inset: 0 3px;
+  background: transparent;
+  transition: background 0.12s;
+}
+
+.te-handle:hover::before,
+.te-handle.active::before {
+  background: var(--accent);
+}
+
+.te-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border);
+}
+
+.te-bar .btn {
+  padding: 4px 9px;
+  font-size: 12px;
+}
+
+.te-bar select {
+  width: auto;
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.te-bar .check {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.te-bar .be-inline input {
+  width: 58px;
+}
+
+.te-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--border-strong);
+  margin: 0 2px;
 }
