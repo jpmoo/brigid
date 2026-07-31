@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Columns3, Rows3 } from "lucide-react";
 import { commonMarks } from "@brigid/shared";
-import type { TemplateNode } from "@brigid/shared";
+import type { TemplateAlign, TemplateInline, TemplateNode } from "@brigid/shared";
 import { ChipEditor } from "./ChipEditor.js";
 
 type TableNode = Extract<TemplateNode, { type: "table" }>;
 
 /**
- * A plain table: rules, widths and alignment, with no shading or colour.
+ * A plain table: rules, widths and alignment, with no shading or color.
  *
  * Column widths are dragged on the boundary between two columns and only ever
  * move width from one to its neighbour, so the row always sums to the full
@@ -25,12 +25,14 @@ export function TableEditor({
 
   const total = node.columns.reduce((sum, c) => sum + (c.width || 0), 0) || 1;
 
-  const setCell = (r: number, c: number, content: TableNode["rows"][number]["cells"][number]["content"]) =>
+  type Cell = TableNode["rows"][number]["cells"][number];
+
+  const patchCell = (r: number, c: number, patch: Partial<Cell>) =>
     onChange({
       ...node,
       rows: node.rows.map((row, ri) =>
         ri === r
-          ? { cells: row.cells.map((cell, ci) => (ci === c ? { ...cell, content } : cell)) }
+          ? { cells: row.cells.map((cell, ci) => (ci === c ? { ...cell, ...patch } : cell)) }
           : row,
       ),
     });
@@ -122,8 +124,14 @@ export function TableEditor({
               <ChipEditor
                 value={cell.content}
                 marks={commonMarks(cell.content)}
-                onChange={(content) => setCell(r, c, content)}
+                onChange={(content) => patchCell(r, c, { content })}
                 placeholder="—"
+              />
+              <CellControls
+                content={cell.content}
+                align={cell.align ?? node.columns[c]?.align ?? "left"}
+                onAlign={(align) => patchCell(r, c, { align })}
+                onContent={(content) => patchCell(r, c, { content })}
               />
             </div>
           )),
@@ -217,6 +225,51 @@ export function TableEditor({
           <span className="muted">pt</span>
         </label>
       </div>
+    </div>
+  );
+}
+
+/**
+ * The same alignment and mark controls a paragraph gets, per cell — a cell is a
+ * line of template content like any other, and a title page's contact block
+ * needs its columns aligned independently.
+ */
+function CellControls({
+  content,
+  align,
+  onAlign,
+  onContent,
+}: {
+  content: TemplateInline[];
+  align: TemplateAlign;
+  onAlign: (align: TemplateAlign) => void;
+  onContent: (content: TemplateInline[]) => void;
+}) {
+  const marks = commonMarks(content);
+  const toggle = (key: "bold" | "italic" | "smallCaps" | "allCaps") => {
+    const next = { ...marks, [key]: !marks[key] };
+    onContent(content.map((i) => (i.type === "tab" ? i : { ...i, ...next })));
+  };
+
+  return (
+    <div className="te-cell-controls">
+      <select value={align} onChange={(e) => onAlign(e.target.value as TemplateAlign)} title="Alignment">
+        <option value="left">Left</option>
+        <option value="center">Center</option>
+        <option value="right">Right</option>
+      </select>
+      {(["bold", "italic", "smallCaps", "allCaps"] as const).map((key) => (
+        <button
+          key={key}
+          type="button"
+          className={`be-mark${marks[key] ? " on" : ""}`}
+          aria-pressed={Boolean(marks[key])}
+          onClick={() => toggle(key)}
+          title={key}
+        >
+          {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}
+        </button>
+      ))}
     </div>
   );
 }

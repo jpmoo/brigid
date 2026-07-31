@@ -101,7 +101,7 @@ export function StyleMenu({
             onChange={(e) => set({ align: e.target.value as Typography["align"] })}
           >
             <option value="left">Left (ragged right)</option>
-            <option value="center">Centre</option>
+            <option value="center">Center</option>
             <option value="right">Right</option>
             <option value="justify">Justified</option>
           </select>

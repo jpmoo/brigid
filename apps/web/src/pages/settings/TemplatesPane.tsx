@@ -94,7 +94,7 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
             }}
           />
         ) : (
-          <p className="muted">Pick a template on the left.</p>
+          <p className="tpl-empty">Pick a template on the left.</p>
         )}
       </div>
     </div>
@@ -202,7 +202,7 @@ function TemplateEditor({
         </>
       )}
 
-      <h4 className="tpl-section">Behaviour</h4>
+      <h4 className="tpl-section">Behavior</h4>
       {isBreak ? (
         <div className="stack">
           <label className="check">

@@ -828,7 +828,7 @@ input::placeholder {
 
 /* The retracted panel floats above the document rather than taking a column, so
    without this its strip sits over the left margin and the manuscript is no
-   longer centred between equal margins. */
+   longer centered between equal margins. */
 .work-body.panel-hidden .document-pane {
   padding-left: 38px;
 }
@@ -1961,4 +1961,43 @@ input::placeholder {
   align-self: stretch;
   background: var(--border-strong);
   margin: 0 2px;
+}
+
+/* Cell controls appear with the chip bar, only while the cell has focus, so a
+   table of eight cells isn't eight toolbars at rest. */
+.te-cell-controls {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.te-cell:focus-within .te-cell-controls {
+  display: flex;
+}
+
+.te-cell-controls select {
+  width: auto;
+  padding: 3px 5px;
+  font-size: 11px;
+}
+
+.te-cell-controls .be-mark {
+  min-width: 22px;
+  padding: 3px 5px;
+  font-size: 10px;
+}
+
+/* Empty detail pane: the prompt sits in the middle of the space it's waiting
+   to fill, rather than stranded in the top-left corner of it. */
+.tpl-empty {
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  margin: 0;
+  font-family: var(--serif);
+  font-style: italic;
+  color: var(--text-muted);
+  text-align: center;
 }

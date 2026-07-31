@@ -34,7 +34,7 @@ export type TemplateInline =
  * Tables, for the parts of a manuscript that are genuinely tabular — a title
  * page's contact block, a header with the author on the left and a page number
  * on the right. Deliberately plain: rules, widths and alignment, with no
- * shading or colour.
+ * shading or color.
  */
 export interface TableColumn {
   /** Share of the table width, 0–1. The set is normalized when rendered. */

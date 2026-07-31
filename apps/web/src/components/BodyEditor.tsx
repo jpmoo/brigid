@@ -160,7 +160,7 @@ function ParagraphRow({
           title="Alignment"
         >
           <option value="left">Left</option>
-          <option value="center">Centre</option>
+          <option value="center">Center</option>
           <option value="right">Right</option>
         </select>
 
