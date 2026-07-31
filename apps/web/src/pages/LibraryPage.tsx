@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { Archive, BookOpen, LogOut, Plus, Settings } from "lucide-react";
+import { Archive, BookOpen, FileUp, LogOut, Plus, Settings, SquarePen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError, api } from "../api.js";
-import type { Work } from "../api.js";
+import type { Template, Work } from "../api.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
+import { ImportWizard } from "../components/ImportWizard.js";
 import { useAuth } from "../auth/AuthContext.js";
 
 const wordFmt = new Intl.NumberFormat();
@@ -19,7 +20,12 @@ export function LibraryPage() {
   const [works, setWorks] = useState<Work[] | null>(null);
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // "New work" first asks blank or import; the wizard is a different shape of
+  // job from a three-field form, so it gets its own screen rather than a mode.
+  const [choosing, setChoosing] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [templates, setTemplates] = useState<Template[]>([]);
 
   const load = useCallback(async () => {
     try {
@@ -34,6 +40,10 @@ export function LibraryPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    void api.listTemplates().then(({ templates: rows }) => setTemplates(rows));
+  }, []);
 
   async function onArchive(work: Work) {
     setError(null);
@@ -74,7 +84,7 @@ export function LibraryPage() {
             {showArchived ? "Back to library" : "Archived"}
           </button>
           {showArchived ? null : (
-            <button className="btn" type="button" onClick={() => setCreating(true)}>
+            <button className="btn" type="button" onClick={() => setChoosing(true)}>
               <Plus size={16} />
               New work
             </button>
@@ -123,6 +133,58 @@ export function LibraryPage() {
           </div>
         )}
       </main>
+
+      {choosing ? (
+        <div className="modal-backdrop" onClick={() => setChoosing(false)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">New work</h2>
+            <p className="card-subtitle">Start from nothing, or bring in something you&rsquo;ve written.</p>
+            <div className="choice-grid">
+              <button
+                type="button"
+                className="choice"
+                onClick={() => {
+                  setChoosing(false);
+                  setCreating(true);
+                }}
+              >
+                <SquarePen size={22} />
+                <strong>Blank</strong>
+                <span>An empty manuscript with Chapter and Scene levels.</span>
+              </button>
+              <button
+                type="button"
+                className="choice"
+                onClick={() => {
+                  setChoosing(false);
+                  setImporting(true);
+                }}
+              >
+                <FileUp size={22} />
+                <strong>Import</strong>
+                <span>Read a Word document and find its structure.</span>
+              </button>
+            </div>
+            <div className="modal-actions">
+              <div className="spacer" />
+              <button className="btn secondary" type="button" onClick={() => setChoosing(false)}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {importing ? (
+        <ImportWizard
+          templates={templates}
+          onClose={() => setImporting(false)}
+          onCreated={() => {
+            setImporting(false);
+            void load();
+          }}
+        />
+      ) : null}
 
       {creating ? (
         <NewWorkModal

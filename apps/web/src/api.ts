@@ -3,6 +3,7 @@
 import type {
   BlockFormatSettings,
   BreakTemplateSettings,
+  ImportedParagraph,
   TemplateBody,
 } from "@brigid/shared";
 import { apiUrl } from "./base.js";
@@ -158,6 +159,48 @@ export const api = {
     },
   ) => request<{ template: Template }>(`/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteTemplate: (id: string) => request<{ ok: true }>(`/templates/${id}`, { method: "DELETE" }),
+
+  analyzeDocx: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(apiUrl("/import/analyze"), {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    const text = await res.text();
+    const parsed = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        typeof parsed.error === "string" ? parsed.error : "could not read that file",
+      );
+    }
+    return parsed as unknown as {
+      filename: string;
+      paragraphs: ImportedParagraph[];
+      hasPageBreaks: boolean;
+    };
+  },
+  createFromImport: (input: {
+    title: string;
+    subtitle?: string | null;
+    authorFirstName?: string | null;
+    authorLastName?: string | null;
+    paragraphs: ImportedParagraph[];
+    markers: {
+      depth: number;
+      name: string;
+      prefix: string;
+      breakTemplateId: string | null;
+      counterRestart: "continuous" | "under-parent";
+    }[];
+    firstPageIsTitlePage: boolean;
+  }) =>
+    post<{ work: Work; matches: { depth: number; prefix: string; count: number }[]; blockCount: number }>(
+      "/import/create",
+      input,
+    ),
 
   listLevels: (workId: string) => request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`),
   saveLevels: (

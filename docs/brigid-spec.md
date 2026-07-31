@@ -373,6 +373,34 @@ manuscript is wanted — that would add a third model slot and pgvector.
 
 ---
 
+## 6.2 Importing a Word document
+
+A new work starts from **Blank or Import**. Import reads a `.docx` and builds
+the block tree from markers the writer supplies — the literal string their own
+manuscript uses to open a chapter, and the one that separates scenes.
+
+- **Markers are case sensitive**, deliberately. "CHAPTER ONE" is a heading;
+  "chapter" in a sentence is not, and a case-insensitive match would shatter a
+  manuscript into nonsense.
+- Line feeds are stripped and whitespace collapsed before matching, so a heading
+  broken across lines in the source still matches.
+- The marker line is consumed by the break rather than kept as prose, and the
+  remainder becomes the block's label — "ONE" from "CHAPTER ONE".
+- Markers define the work's levels, so the outline mirrors the structure the
+  writer just described rather than a default that ignores it.
+- The first page can be taken as a **title page, reproduced word for word** —
+  it becomes a block-format template of its own holding those exact lines, with
+  no variables inferred.
+- The wizard plans locally as you type and shows how many times each marker
+  matched, so a marker that does nothing is visible before anything is written.
+
+_Limitation._ Word does not store where soft page breaks fall — pagination is
+computed at layout time from page size, fonts and printer metrics. "First page"
+is therefore only available when the document has an explicit page break, and
+the option is disabled otherwise rather than guessing.
+
+---
+
 ## 7. Deferred
 
 - **Export — target is a submission manuscript, not a finished book.** That is a

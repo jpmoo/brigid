@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
+import multipart from "@fastify/multipart";
 import fastifyStatic from "@fastify/static";
 import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { ZodError } from "zod";
@@ -10,6 +11,7 @@ import { authRoutes } from "./auth/routes.js";
 import { blocksRoutes } from "./blocks/routes.js";
 import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
+import { importRoutes } from "./import/routes.js";
 import { HttpError } from "./lib/errors.js";
 import { setupRoutes } from "./setup/routes.js";
 import { templatesRoutes } from "./templates/routes.js";
@@ -22,6 +24,8 @@ export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: true, bodyLimit: 8 * 1024 * 1024 });
 
   await app.register(cookie, { secret: runtimeConfig().sessionSecret });
+  // A novel-length .docx is a few megabytes; the ceiling is generous but finite.
+  await app.register(multipart, { limits: { fileSize: 32 * 1024 * 1024, files: 1 } });
 
   if (env.appOrigin) {
     await app.register(cors, { origin: env.appOrigin, credentials: true });
@@ -61,6 +65,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(worksRoutes);
       await scope.register(blocksRoutes);
       await scope.register(templatesRoutes);
+      await scope.register(importRoutes);
     },
     { prefix: "/api" },
   );

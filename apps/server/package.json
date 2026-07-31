@@ -7,7 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "start": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json --noEmit",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx test/docx.test.ts"
   },
   "dependencies": {
     "@brigid/db": "workspace:*",
@@ -22,7 +23,10 @@
     "fractional-indexing": "^3.2.0",
     "postgres": "^3.4.5",
     "tsx": "^4.19.2",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "@fastify/multipart": "^9.0.1",
+    "fflate": "^0.8.2",
+    "fast-xml-parser": "^4.5.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",
