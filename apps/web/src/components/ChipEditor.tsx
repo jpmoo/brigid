@@ -1,6 +1,6 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
-import { VARIABLES, VARIABLE_NAMES } from "@brigid/shared";
-import type { TemplateInline, TemplateMarks, VariableName } from "@brigid/shared";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { NUMBER_FORMATS, VARIABLES, VARIABLE_NAMES, formatNumber } from "@brigid/shared";
+import type { NumberFormat, TemplateInline, TemplateMarks, VariableName } from "@brigid/shared";
 
 /**
  * A line of template content: static text the writer types, with variables
@@ -26,6 +26,22 @@ const CHIPPABLE = VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline
  */
 const ZWSP = "\u200B";
 
+/** A numeric chip shows its format, using 3 so every option looks different. */
+const SAMPLE = 3;
+const FORMAT_LABEL: Record<NumberFormat, string> = {
+  arabic: "1, 2, 3",
+  "roman-upper": "I, II, III",
+  "roman-lower": "i, ii, iii",
+  "words-title": "One, Two, Three",
+  "words-upper": "ONE, TWO, THREE",
+};
+
+function chipLabel(name: VariableName, format?: string): string {
+  const base = VARIABLES[name].label;
+  if (!VARIABLES[name].numeric) return base;
+  return `${base} · ${formatNumber(SAMPLE, (format as NumberFormat) ?? "arabic")}`;
+}
+
 /** Discard the zero-width guards either side of an atom being removed. */
 function stripGuards(atom: HTMLElement): void {
   for (const sibling of [atom.previousSibling, atom.nextSibling]) {
@@ -48,9 +64,10 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
       }
       if (inline.type === "variable") {
         const fmt = inline.numberFormat ? ` data-format="${inline.numberFormat}"` : "";
-        return `${ZWSP}<span data-var="${inline.name}"${fmt} contenteditable="false">${
-          VARIABLES[inline.name].label
-        }</span>${ZWSP}`;
+        return `${ZWSP}<span data-var="${inline.name}"${fmt} contenteditable="false">${chipLabel(
+          inline.name,
+          inline.numberFormat,
+        )}</span>${ZWSP}`;
       }
       const text = inline.text
         .replace(/&/g, "&amp;")
@@ -90,7 +107,7 @@ function htmlToInlines(
       out.push(inline);
       // A browser that dropped a keystroke inside the chip anyway: recover the
       // character rather than losing it silently.
-      const label = VARIABLES[varName as VariableName].label;
+      const label = chipLabel(varName as VariableName, node.dataset.format);
       const stray = (node.textContent ?? "").replace(/\u200B/g, "").replace(label, "");
       if (stray) pushText(stray);
       return;
@@ -145,6 +162,10 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
   handleRef,
 ) {
   const ref = useRef<HTMLDivElement>(null);
+  // The chip whose number format is being chosen, and where to put the menu.
+  const [formatFor, setFormatFor] = useState<{ el: HTMLElement; top: number; left: number } | null>(
+    null,
+  );
   const dirty = useRef(false);
 
   // Only write the DOM when the change came from outside; rewriting it while
@@ -268,6 +289,23 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         data-placeholder={placeholder ?? "Type here, or drop in a chip"}
         onInput={emit}
         onBlur={emit}
+        onClick={(e) => {
+          // Clicking a numeric chip offers its formats. Non-numeric chips have
+          // nothing to choose, so they stay inert.
+          const target = (e.target as HTMLElement).closest?.("[data-var]") as HTMLElement | null;
+          const name = target?.dataset.var as VariableName | undefined;
+          if (!target || !name || !VARIABLES[name]?.numeric) {
+            setFormatFor(null);
+            return;
+          }
+          const field = ref.current?.getBoundingClientRect();
+          const chip = target.getBoundingClientRect();
+          setFormatFor({
+            el: target,
+            top: chip.bottom - (field?.top ?? 0) + 4,
+            left: chip.left - (field?.left ?? 0),
+          });
+        }}
         onKeyDown={(e) => {
           // A single-line field takes no Enter at all: a template paragraph is
           // one line by definition. A cell can hold several.
@@ -295,6 +333,31 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
           insert(text.replace(/&/g, "&amp;").replace(/</g, "&lt;"));
         }}
       />
+
+      {formatFor ? (
+        <>
+          <div className="menu-scrim" role="presentation" onClick={() => setFormatFor(null)} />
+          <div className="chip-format-menu" style={{ top: formatFor.top, left: formatFor.left }}>
+            <span className="cfm-head">Number as</span>
+            {NUMBER_FORMATS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={(formatFor.el.dataset.format ?? "arabic") === f ? "selected" : ""}
+                onClick={() => {
+                  const name = formatFor.el.dataset.var as VariableName;
+                  formatFor.el.dataset.format = f;
+                  formatFor.el.textContent = chipLabel(name, f);
+                  setFormatFor(null);
+                  emit();
+                }}
+              >
+                {FORMAT_LABEL[f]}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
 
       {showToolbar ? (
       <div className="chip-bar">

@@ -2301,3 +2301,58 @@ input::placeholder {
   opacity: 0.3;
   cursor: default;
 }
+
+/* --- Chip number format ----------------------------------------------- */
+
+.chip-editor {
+  position: relative;
+}
+
+.chip-format-menu {
+  position: absolute;
+  z-index: 41;
+  min-width: 160px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+}
+
+.cfm-head {
+  display: block;
+  padding: 3px 8px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.chip-format-menu button {
+  display: block;
+  width: 100%;
+  padding: 6px 9px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip-format-menu button:hover {
+  background: var(--surface-sunken);
+}
+
+.chip-format-menu button.selected {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-weight: 600;
+}
+
+/* Numeric chips are clickable; the rest are inert. */
+.chip-field [data-var] {
+  cursor: default;
+}
