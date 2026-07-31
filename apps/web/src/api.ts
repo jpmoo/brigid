@@ -95,7 +95,7 @@ export interface Template {
   formatSettings: BlockFormatSettings | null;
 }
 
-export type Placement = "root" | "sibling" | "child" | "parent";
+export type Placement = "root" | "sibling" | "sibling-before" | "child" | "parent";
 
 export interface ProvisionInput {
   admin: {

@@ -232,6 +232,7 @@ export function DocumentView({
           <div
             className={`doc-block${item.block.id === selectedId ? " selected" : ""}`}
             key={item.block.id}
+            data-block-id={item.block.id}
             ref={(el) => registerRef(item.block.id, el)}
             onClick={() => onSelect(item.block.id)}
             role="presentation"

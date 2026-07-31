@@ -15,7 +15,7 @@ import { badRequest, notFound } from "../lib/errors.js";
  * reference's parent, placed just after it. It doesn't reparent anything; the
  * name matches how the outline reads rather than the tree operation.
  */
-const PLACEMENTS = ["root", "sibling", "child", "parent"] as const;
+const PLACEMENTS = ["root", "sibling", "sibling-before", "child", "parent"] as const;
 type Placement = (typeof PLACEMENTS)[number];
 
 const createBody = z.object({
@@ -151,6 +151,31 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
         if (body.placement === "sibling") {
           parentId = ref.parentId;
           afterId = ref.id;
+        } else if (body.placement === "sibling-before") {
+          parentId = ref.parentId;
+          // Whatever currently precedes the reference, or the head of the list.
+          const siblings = await siblingsOf(tx as unknown as typeof db, workId, ref.parentId);
+          const at = siblings.findIndex((sib) => sib.id === ref.id);
+          afterId = at > 0 ? (siblings[at - 1]?.id ?? null) : null;
+          if (at === 0) {
+            // Nothing before it: take a key ahead of the current first.
+            const first = siblings[0];
+            const sortKey = generateKeyBetween(null, first?.sortKey ?? null);
+            const [row] = await tx
+              .insert(blocks)
+              .values({
+                workId,
+                parentId: ref.parentId,
+                sortKey,
+                label: body.label ?? null,
+                formatId: body.formatId,
+                content: null,
+                contentText: "",
+                wordCount: 0,
+              })
+              .returning();
+            return row;
+          }
         } else if (body.placement === "child") {
           parentId = ref.id;
           afterId = null;

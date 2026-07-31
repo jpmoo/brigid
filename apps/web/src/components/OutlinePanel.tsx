@@ -35,6 +35,8 @@ export interface OutlinePanelProps {
   onAdd: (relativeTo: string | null, placement: Placement) => void;
   onRename: (id: string) => void;
   onDelete: (id: string) => void;
+  /** So the panel can scroll the current block into view as the document moves. */
+  registerRef: (blockId: string, el: HTMLDivElement | null) => void;
 }
 
 export function OutlinePanel(props: OutlinePanelProps) {
@@ -104,6 +106,7 @@ function OutlineCard(props: CardProps) {
     <div
       className={`outline-item${props.breakChip ? " has-break" : ""}`}
       style={{ marginLeft: entry.depth * 16 }}
+      ref={(el) => props.registerRef(block.id, el)}
     >
       {props.breakChip ? (
         <button
@@ -171,6 +174,9 @@ function OutlineCard(props: CardProps) {
           <>
             <div className="menu-scrim" role="presentation" onClick={() => setMenuOpen(false)} />
             <div className="menu" role="menu">
+              <button type="button" onClick={() => { setMenuOpen(false); props.onAdd(block.id, "sibling-before"); }}>
+                Add sibling before
+              </button>
               <button type="button" onClick={() => { setMenuOpen(false); props.onAdd(block.id, "sibling"); }}>
                 Add sibling after
               </button>

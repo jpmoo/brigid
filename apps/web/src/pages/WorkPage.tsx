@@ -59,6 +59,10 @@ export function WorkPage() {
   const [renaming, setRenaming] = useState<Block | null>(null);
 
   const blockRefs = useRef(new Map<string, HTMLDivElement>());
+  const outlineRefs = useRef(new Map<string, HTMLDivElement>());
+  // Set while a click is driving the document, so the observer doesn't fight
+  // the smooth scroll it started.
+  const scrollingTo = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -158,8 +162,58 @@ export function WorkPage() {
 
   const selectAndScroll = useCallback((blockId: string) => {
     setSelectedId(blockId);
+    scrollingTo.current = blockId;
     blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Long enough for a smooth scroll to settle before the observer takes over.
+    window.setTimeout(() => {
+      if (scrollingTo.current === blockId) scrollingTo.current = null;
+    }, 700);
   }, []);
+
+  const registerOutlineRef = useCallback((blockId: string, el: HTMLDivElement | null) => {
+    if (el) outlineRefs.current.set(blockId, el);
+    else outlineRefs.current.delete(blockId);
+  }, []);
+
+  /**
+   * Follow the manuscript as it scrolls: whichever block is highest in view is
+   * the current one, and the outline scrolls just enough to keep it visible.
+   * `block: "nearest"` so the panel barely moves unless it has to.
+   */
+  useEffect(() => {
+    const observed = [...blockRefs.current.entries()].filter(([key]) => !key.startsWith("break:"));
+    if (observed.length === 0) return;
+
+    const visible = new Map<string, number>();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          const id = entry.target.getAttribute("data-block-id");
+          if (!id) continue;
+          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect.top);
+          else visible.delete(id);
+        }
+        if (scrollingTo.current || visible.size === 0) return;
+
+        // Highest on screen wins — that's the one being read.
+        const [topmost] = [...visible.entries()].sort((a, b) => a[1] - b[1]);
+        if (!topmost) return;
+        setSelectedId((current) => (current === topmost[0] ? current : topmost[0]));
+      },
+      // A band across the upper part of the pane, so the "current" block is the
+      // one under the reader's eye rather than whatever touches the bottom edge.
+      { rootMargin: "-10% 0px -70% 0px", threshold: 0 },
+    );
+
+    for (const [, el] of observed) observer.observe(el);
+    return () => observer.disconnect();
+  }, [items]);
+
+  // Keep the current block in view in the outline, without yanking the panel.
+  useEffect(() => {
+    if (!selectedId) return;
+    outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
 
   const toggleCollapse = useCallback((blockId: string) => {
     setCollapsed((prev) => {
@@ -269,6 +323,7 @@ export function WorkPage() {
             onAdd={(relativeTo, placement) => setAdding({ relativeTo, placement })}
             onRename={(blockId) => setRenaming(blocks.find((b) => b.id === blockId) ?? null)}
             onDelete={(blockId) => void onDelete(blockId)}
+            registerRef={registerOutlineRef}
           />
 
           {/* Account and navigation live at the foot of the outline, out of the
@@ -361,6 +416,7 @@ export function WorkPage() {
 
 const PLACEMENT_LABEL: Record<Placement, string> = {
   root: "at the top level",
+  "sibling-before": "as a sibling, just before",
   sibling: "as a sibling, just after",
   child: "as a child",
   parent: "one level up",

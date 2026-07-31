@@ -1168,12 +1168,12 @@ input::placeholder {
 }
 
 /* A break belongs to the block it precedes and travels with it, so it is drawn
-   as a shaded layer over the top of that block's entry rather than as a
-   separate row — the tint runs behind the card so the two read as one object
-   with the break capping it. */
-.outline-item.has-break {
-  background: color-mix(in srgb, var(--accent) 7%, transparent);
-  border-radius: var(--radius);
+   as a cap over the top of that block's entry rather than as a separate row.
+   Only the cap is shaded — shading the whole entry made every block with a
+   break look selected. */
+.outline-item.has-break .outline-break {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  border-radius: var(--radius) var(--radius) 0 0;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
@@ -1198,13 +1198,10 @@ input::placeholder {
   color: var(--accent);
 }
 
-.outline-item.has-break .outline-card {
-  /* Sits on the shaded layer rather than beside it. */
-  background: none;
-}
-
-.outline-item.has-break .outline-card:hover {
-  background: color-mix(in srgb, var(--accent) 6%, transparent);
+/* The current block is the one thing that carries a shade of its own. */
+.outline-item.has-break .outline-card.selected {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 .outline-break.detached {
