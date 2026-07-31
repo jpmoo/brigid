@@ -177,6 +177,27 @@ function ParagraphRow({
 
         <select
           className="be-spacing"
+          title="Size for this line"
+          value={String(node.fontSizePt ?? "")}
+          onChange={(e) =>
+            onChange({
+              ...node,
+              ...(e.target.value
+                ? { fontSizePt: Number(e.target.value) }
+                : { fontSizePt: undefined }),
+            })
+          }
+        >
+          <option value="">Size: inherit</option>
+          {[9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36].map((pt) => (
+            <option key={pt} value={pt}>
+              {pt} pt
+            </option>
+          ))}
+        </select>
+
+        <select
+          className="be-spacing"
           title="Line spacing"
           value={String(node.lineHeight ?? "")}
           onChange={(e) =>

@@ -65,7 +65,12 @@ export function PagePreview({
               return (
                 <p
                   key={i}
-                  style={{ textAlign: node.align, lineHeight: node.lineHeight, margin: 0 }}
+                  style={{
+                    textAlign: node.align,
+                    lineHeight: node.lineHeight,
+                    fontSize: node.fontSizePt ? `${node.fontSizePt}pt` : undefined,
+                    margin: 0,
+                  }}
                 >
                   {node.spans.map((span, j) => (
                     <span

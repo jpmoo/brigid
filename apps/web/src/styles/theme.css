@@ -2499,3 +2499,32 @@ mark.hit.active {
   text-transform: uppercase;
   color: var(--text-faint);
 }
+
+/* --- Editor beside its preview ---------------------------------------- */
+
+.with-preview {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.wp-editor {
+  flex: 1;
+  min-width: 0;
+}
+
+.with-preview .page-preview {
+  flex: 0 0 auto;
+  position: sticky;
+  top: 0;
+}
+
+@media (max-width: 900px) {
+  .with-preview {
+    flex-direction: column;
+  }
+
+  .with-preview .page-preview {
+    align-self: center;
+  }
+}

@@ -71,6 +71,11 @@ export type TemplateNode =
       align?: TemplateAlign;
       /** Multiple of the font size; falls back to the format's own spacing. */
       lineHeight?: number;
+      /**
+       * Size for this line alone, in points. A title page sets its title larger
+       * than its byline, which the format's single size cannot express.
+       */
+      fontSizePt?: number;
       content: TemplateInline[];
     }
   /** Vertical whitespace measured in blank lines — the usual scene-break unit. */

@@ -7,7 +7,16 @@ import { BodyEditor } from "../../components/BodyEditor.js";
 import { Check } from "lucide-react";
 import { useDialogs } from "../../components/Dialogs.js";
 import { useSavedFlash } from "../../useSavedFlash.js";
+import { PagePreview } from "../../components/PagePreview.js";
 import { StyleMenu } from "../../components/StyleMenu.js";
+
+/** Stand-ins so a preview in Settings has something to set. */
+const SAMPLE_WORK = {
+  title: "Manuscript Title",
+  subtitle: "A Subtitle",
+  authorFirstName: "First",
+  authorLastName: "Last",
+};
 
 const EMPTY_BREAK: BreakTemplateSettings = { suppressOnFirstChild: false, indentFirstParagraph: false };
 const EMPTY_FORMAT: BlockFormatSettings = {
@@ -204,12 +213,14 @@ function TemplateEditor({
       ) : (
         <>
           <h4 className="tpl-section">Layout</h4>
-          <BodyEditor
-            body={body}
-            onChange={(b) => {
-              setBody(b);
-              }}
-          />
+          <div className="with-preview">
+            <div className="wp-editor">
+              <BodyEditor body={body} onChange={setBody} />
+            </div>
+            {/* Where things sit down the page is most of what a title page or a
+                chapter opening is, and no list of rows shows that. */}
+            <PagePreview body={body} work={SAMPLE_WORK} />
+          </div>
         </>
       )}
 

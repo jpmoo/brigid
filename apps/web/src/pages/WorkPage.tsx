@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
+  Check,
   ChevronsDownUp,
   ChevronsUpDown,
   FileText,
@@ -25,6 +26,7 @@ import { BookmarkStrip } from "../components/BookmarkStrip.js";
 import { useDialogs } from "../components/Dialogs.js";
 import { SearchBar, findMatches } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
+import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { useAuth } from "../auth/AuthContext.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
@@ -841,6 +843,7 @@ function BreakEditor({
   );
   const [detached, setDetached] = useState(Boolean(block.breakBody));
   const [error, setError] = useState<string | null>(null);
+  const [savedFlash, flashSaved] = useSavedFlash(900);
   const [busy, setBusy] = useState(false);
 
   async function detach() {
@@ -862,7 +865,10 @@ function BreakEditor({
     setBusy(true);
     try {
       await api.updateBreak(block.id, body);
-      onSaved();
+      // Let the confirmation land before the window goes: closing instantly
+      // leaves you unsure whether anything happened.
+      flashSaved();
+      window.setTimeout(onSaved, 600);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save");
       setBusy(false);
@@ -918,8 +924,21 @@ function BreakEditor({
             Cancel
           </button>
           {detached ? (
-            <button className="btn" type="button" onClick={() => void save()} disabled={busy}>
-              {busy ? "Saving…" : "Save"}
+            <button
+              className={`btn${savedFlash ? " saved" : ""}`}
+              type="button"
+              onClick={() => void save()}
+              disabled={busy}
+            >
+              {savedFlash ? (
+                <>
+                  <Check size={15} /> Saved!
+                </>
+              ) : busy ? (
+                "Saving…"
+              ) : (
+                "Save"
+              )}
             </button>
           ) : (
             <button className="btn" type="button" onClick={() => void detach()} disabled={busy}>
@@ -964,6 +983,7 @@ function FormatEditor({
     Boolean(block.formatBody || block.formatTypography),
   );
   const [error, setError] = useState<string | null>(null);
+  const [savedFlash, flashSaved] = useSavedFlash(900);
   const [busy, setBusy] = useState(false);
 
   async function detach() {
@@ -984,8 +1004,12 @@ function FormatEditor({
   async function save() {
     setBusy(true);
     try {
-      await api.updateFormat(block.id, styleOnly ? { typography: typo } : { body: body ?? { nodes: [] } });
-      onSaved();
+      await api.updateFormat(
+        block.id,
+        styleOnly ? { typography: typo } : { body: body ?? { nodes: [] } },
+      );
+      flashSaved();
+      window.setTimeout(onSaved, 600);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save");
       setBusy(false);
@@ -1045,8 +1069,21 @@ function FormatEditor({
             Cancel
           </button>
           {detached ? (
-            <button className="btn" type="button" onClick={() => void save()} disabled={busy || !body}>
-              {busy ? "Saving…" : "Save"}
+            <button
+              className={`btn${savedFlash ? " saved" : ""}`}
+              type="button"
+              onClick={() => void save()}
+              disabled={busy || !body}
+            >
+              {savedFlash ? (
+                <>
+                  <Check size={15} /> Saved!
+                </>
+              ) : busy ? (
+                "Saving…"
+              ) : (
+                "Save"
+              )}
             </button>
           ) : (
             <button className="btn" type="button" onClick={() => void detach()} disabled={busy}>

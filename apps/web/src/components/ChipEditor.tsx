@@ -181,6 +181,8 @@ export interface ChipEditorProps {
   placeholder?: string;
   /** Allow Enter to start a new line within the same template line. */
   multiline?: boolean;
+  /** Marks in force at the caret, so a toolbar can show what is on. */
+  onActiveMarks?: (marks: TemplateMarks) => void;
   /**
    * Hide the built-in chip/tab bar. A table cell is the editing surface itself,
    * so its controls live in a row beneath the table where there is room for
@@ -197,7 +199,7 @@ export interface ChipEditorHandle {
 }
 
 export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function ChipEditor(
-  { value, marks, onChange, placeholder, multiline = false, showToolbar = true },
+  { value, marks, onChange, placeholder, multiline = false, showToolbar = true, onActiveMarks },
   handleRef,
 ) {
   const ref = useRef<HTMLDivElement>(null);
@@ -223,12 +225,38 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
   // position inside the field is remembered and put back before acting.
   const savedRange = useRef<Range | null>(null);
 
+  /**
+   * What is marked where the caret is. Walked up from the selection rather than
+   * taken from the stored inlines, because the answer has to reflect the exact
+   * position — a line can hold roman and italic, and the toolbar should say
+   * which one you are standing in.
+   */
+  const reportMarks = () => {
+    const el = ref.current;
+    const selection = window.getSelection();
+    if (!el || !selection || selection.rangeCount === 0) return;
+    let node: Node | null = selection.getRangeAt(0).startContainer;
+    const found: TemplateMarks = {};
+    while (node && node !== el) {
+      if (node instanceof HTMLElement) {
+        const tag = node.tagName;
+        if (tag === "B" || tag === "STRONG") found.bold = true;
+        if (tag === "I" || tag === "EM") found.italic = true;
+        if (node.dataset.sc) found.smallCaps = true;
+        if (node.dataset.caps) found.allCaps = true;
+      }
+      node = node.parentNode;
+    }
+    onActiveMarks?.(found);
+  };
+
   const rememberSelection = () => {
     const el = ref.current;
     const selection = window.getSelection();
     if (!el || !selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
     if (el.contains(range.commonAncestorContainer)) savedRange.current = range.cloneRange();
+    reportMarks();
   };
 
   const restoreSelection = () => {
@@ -348,6 +376,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     if (mark === "bold" || mark === "italic") {
       document.execCommand(mark, false);
       emit();
+      reportMarks();
       return;
     }
 
@@ -383,6 +412,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
       }
     }
     emit();
+    reportMarks();
   };
 
   useImperativeHandle(handleRef, () => ({
@@ -411,6 +441,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         }}
         onKeyUp={rememberSelection}
         onMouseUp={rememberSelection}
+        onFocus={rememberSelection}
         onBlur={emit}
         onClick={(e) => {
           // Clicking a numeric chip offers its formats. Non-numeric chips have

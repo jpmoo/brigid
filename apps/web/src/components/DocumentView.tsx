@@ -158,6 +158,7 @@ function Nodes({
                 style={{
                   ...(mode === "manuscript" ? { textAlign: node.align } : {}),
                   ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
+                  ...(node.fontSizePt ? { fontSize: `${node.fontSizePt}pt` } : {}),
                 }}
               >
                 {node.spans.map((span, j) =>

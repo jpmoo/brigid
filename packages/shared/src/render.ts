@@ -51,7 +51,13 @@ export interface ResolvedCell {
 }
 
 export type ResolvedNode =
-  | { type: "paragraph"; align: TemplateAlign; lineHeight?: number; spans: ResolvedSpan[] }
+  | {
+      type: "paragraph";
+      align: TemplateAlign;
+      lineHeight?: number;
+      fontSizePt?: number;
+      spans: ResolvedSpan[];
+    }
   | { type: "spacer"; lines: number }
   | { type: "pageBreak" }
   | {
@@ -226,6 +232,7 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
           type: "paragraph",
           align: node.align ?? "left",
           ...(node.lineHeight ? { lineHeight: node.lineHeight } : {}),
+          ...(node.fontSizePt ? { fontSizePt: node.fontSizePt } : {}),
           spans,
         });
         break;
