@@ -177,6 +177,24 @@ export interface SectionStart {
   runningHeads: "continue" | "restart" | "suppress";
 }
 
+/**
+ * Decisions about one particular block, as opposed to the format it renders
+ * through. Every field is optional and absent means "carry on": a manuscript
+ * with none of these set behaves exactly as it did before they existed.
+ */
+export interface BlockOptions {
+  /** "restart" begins the running word count again at this block. */
+  wordCount?: "continue" | "restart";
+  /**
+   * Whether the words in the break attached to this block count toward the
+   * manuscript total. Off by default — a chapter heading isn't prose.
+   */
+  countBreakWords?: boolean;
+  /** Page numbering at this block. Overrides the format's own section rule. */
+  pageNumbering?: "continue" | "restart";
+  startPageNumber?: number;
+}
+
 export interface BlockFormatSettings {
   /** Regular text yes, title page no. Breaks never count, unconditionally. */
   countsTowardWordCount: boolean;

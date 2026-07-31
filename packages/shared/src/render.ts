@@ -2,6 +2,7 @@ import { formatNumber } from "./numbering.js";
 import { buildOutline, computeCounters } from "./outline.js";
 import type { BlockNode, LevelLike, OutlineEntry, TemplateLike } from "./outline.js";
 import type {
+  BlockOptions,
   SectionStart,
   TableBorders,
   TableColumn,
@@ -114,6 +115,25 @@ function breakSettingsFor<B extends BlockNode>(
   templates: ReadonlyMap<string, TemplateLike>,
 ) {
   return templates.get(item.templateId)?.breakSettings ?? null;
+}
+
+/**
+ * Words in the break attached to a block, when that block asks for them to be
+ * counted. Only the literal text is counted — a resolved chapter number is not
+ * something a publisher would call a word of the manuscript.
+ */
+function breakWordsFor(block: BlockNode): number {
+  if (!block.options?.countBreakWords || !block.breakBody) return 0;
+  let words = 0;
+  for (const node of block.breakBody.nodes) {
+    if (node.type !== "paragraph") continue;
+    for (const inline of node.content) {
+      if (inline.type === "text") {
+        words += inline.text.trim().split(/\s+/).filter(Boolean).length;
+      }
+    }
+  }
+  return words;
 }
 
 const defaultUnresolved = (name: VariableName): string => `[${VARIABLES[name].label.toLowerCase()}]`;
@@ -262,6 +282,17 @@ export function previewBody(
   });
 }
 
+/** A block's own page rule overrides whatever its format says. */
+function sectionFor(block: BlockNode, fromFormat: SectionStart | null): SectionStart | null {
+  const own: BlockOptions | null | undefined = block.options;
+  if (!own?.pageNumbering) return fromFormat;
+  return {
+    pageNumbering: own.pageNumbering,
+    ...(own.startPageNumber ? { startPageNumber: own.startPageNumber } : {}),
+    runningHeads: fromFormat?.runningHeads ?? "continue",
+  };
+}
+
 export interface DeriveInput<B extends BlockNode> {
   blocks: readonly B[];
   levels: readonly LevelLike[];
@@ -288,9 +319,16 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
   const counters = computeCounters(entries, input.levels, templates);
   const levelByDepth = new Map(input.levels.map((l) => [l.depth, l]));
 
+  // A block asking to restart the count begins a fresh run, and the total is
+  // the run in progress — otherwise "start a new count here" would have nothing
+  // to show for itself.
   const totalWordCount = entries.reduce((sum, entry) => {
+    const restart = entry.block.options?.wordCount === "restart";
     const format = templates.get(entry.block.formatId);
-    return format?.formatSettings?.countsTowardWordCount ? sum + entry.block.wordCount : sum;
+    const counts = format?.formatSettings?.countsTowardWordCount
+      ? entry.block.wordCount + breakWordsFor(entry.block)
+      : 0;
+    return (restart ? 0 : sum) + counts;
   }, 0);
 
   const render: RenderContext = {
@@ -378,7 +416,7 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
       // A block's own type wins over its format's, the same way its own body
       // does — one paragraph can be set differently without disturbing the rest.
       typography: entry.block.formatTypography ?? format?.formatSettings?.typography ?? null,
-      sectionStart: format?.formatSettings?.sectionStart ?? null,
+      sectionStart: sectionFor(entry.block, format?.formatSettings?.sectionStart ?? null),
       firstLineIndent,
     });
   }

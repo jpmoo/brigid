@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
-import type { Template } from "../api.js";
+import type { Block, Template, Work } from "../api.js";
+import { LevelsEditor } from "../components/LevelsEditor.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -15,13 +16,35 @@ const TABS = [
   { key: "ollama", label: "Ollama" },
 ] as const;
 
-type TabKey = (typeof TABS)[number]["key"];
+type TabKey = (typeof TABS)[number]["key"] | "project";
 
 export function SettingsPage() {
   const { username } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("templates");
   const [templates, setTemplates] = useState<Template[]>([]);
+
+  /**
+   * Settings reached from inside a manuscript carries which one, and gains a
+   * tab for the things that belong to it rather than to the app. Opened from
+   * the library there is no such thing, so the tab isn't offered.
+   */
+  const [params] = useSearchParams();
+  const workId = params.get("work");
+  const [work, setWork] = useState<Work | null>(null);
+  const [blocks, setBlocks] = useState<Block[]>([]);
+
+  useEffect(() => {
+    if (!workId) return;
+    void (async () => {
+      const [{ work: w }, { blocks: bs }] = await Promise.all([
+        api.getWork(workId),
+        api.listBlocks(workId),
+      ]);
+      setWork(w);
+      setBlocks(bs);
+    })();
+  }, [workId]);
 
   const loadTemplates = useCallback(async () => {
     const { templates: rows } = await api.listTemplates();
@@ -77,11 +100,29 @@ export function SettingsPage() {
               {t.label}
             </button>
           ))}
+          {workId ? (
+            <>
+              <span className="tab-gap" />
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "project"}
+                className={tab === "project" ? "selected" : ""}
+                onClick={() => setTab("project")}
+              >
+                {work ? work.title : "This manuscript"}
+              </button>
+            </>
+          ) : null}
         </nav>
 
         <div className="card tab-panel" role="tabpanel">
           {tab === "templates" ? (
             <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
+          ) : tab === "project" ? (
+            workId ? (
+              <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
+            ) : null
           ) : tab === "account" ? (
             <PasswordFields />
           ) : (

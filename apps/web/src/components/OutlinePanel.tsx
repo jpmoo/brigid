@@ -36,6 +36,7 @@ export interface OutlinePanelProps {
   onAdd: (relativeTo: string | null, placement: Placement) => void;
   onRename: (id: string) => void;
   onEditFormat: (id: string) => void;
+  onOptions: (id: string) => void;
   onDelete: (id: string) => void;
   /** So the panel can scroll the current block into view as the document moves. */
   registerRef: (blockId: string, el: HTMLDivElement | null) => void;
@@ -233,6 +234,9 @@ function OutlineCard(props: CardProps) {
               </button>
               <button type="button" onClick={() => { setMenuOpen(false); props.onEditFormat(block.id); }}>
                 Edit this block&rsquo;s format…
+              </button>
+              <button type="button" onClick={() => { setMenuOpen(false); props.onOptions(block.id); }}>
+                Block options…
               </button>
               <button
                 type="button"

@@ -239,12 +239,22 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
         label: z.string().max(500).nullable().optional(),
         formatId: z.string().uuid().optional(),
         content: z.record(z.unknown()).nullable().optional(),
+        options: z
+          .object({
+            wordCount: z.enum(["continue", "restart"]).optional(),
+            countBreakWords: z.boolean().optional(),
+            pageNumbering: z.enum(["continue", "restart"]).optional(),
+            startPageNumber: z.number().int().min(1).max(100000).optional(),
+          })
+          .nullable()
+          .optional(),
       })
       .parse(req.body);
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (body.label !== undefined) patch.label = body.label;
     if (body.formatId !== undefined) patch.formatId = body.formatId;
+    if (body.options !== undefined) patch.options = body.options;
     if (body.content !== undefined) {
       // Word count is derived here rather than trusted from the client, so the
       // stored number and the manuscript total can't drift.

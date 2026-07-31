@@ -2564,3 +2564,8 @@ mark.hit.active {
   position: relative;
   display: inline-flex;
 }
+
+/* Sets the manuscript's own settings apart from the app's. */
+.tab-gap {
+  width: 26px;
+}

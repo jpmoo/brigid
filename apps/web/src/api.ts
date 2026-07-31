@@ -4,6 +4,7 @@ import type {
   BlockFormatSettings,
   BreakTemplateSettings,
   ImportedParagraph,
+  BlockOptions,
   TemplateBody,
   Typography,
 } from "@brigid/shared";
@@ -86,6 +87,7 @@ export interface Block {
   breakBody: TemplateBody | null;
   formatBody: TemplateBody | null;
   formatTypography: Typography | null;
+  options: BlockOptions | null;
 }
 
 export interface Template {
@@ -279,7 +281,12 @@ export const api = {
   ) => post<{ block: Block }>(`/works/${workId}/blocks`, input),
   updateBlock: (
     id: string,
-    patch: { label?: string | null; formatId?: string; content?: Record<string, unknown> | null },
+    patch: {
+      label?: string | null;
+      formatId?: string;
+      content?: Record<string, unknown> | null;
+      options?: BlockOptions | null;
+    },
   ) => request<{ block: Block }>(`/blocks/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
     post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),

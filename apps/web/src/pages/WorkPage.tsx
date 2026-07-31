@@ -14,7 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
-import type { TemplateBody, Typography } from "@brigid/shared";
+import type { BlockOptions, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
@@ -66,6 +66,7 @@ export function WorkPage() {
   );
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
   const [editingFormat, setEditingFormat] = useState<Block | null>(null);
+  const [editingOptions, setEditingOptions] = useState<Block | null>(null);
   const [scaleIndex, setScaleIndex] = useState(() => {
     const stored = Number(localStorage.getItem(SCALE_KEY));
     return Number.isInteger(stored) && stored >= 0 && stored < SCALE_STEPS.length ? stored : 2;
@@ -490,6 +491,9 @@ export function WorkPage() {
             onEditFormat={(blockId) =>
               setEditingFormat(blocks.find((b) => b.id === blockId) ?? null)
             }
+            onOptions={(blockId) =>
+              setEditingOptions(blocks.find((b) => b.id === blockId) ?? null)
+            }
             onDelete={(blockId) => void onDelete(blockId)}
             registerRef={registerOutlineRef}
           />
@@ -603,6 +607,18 @@ export function WorkPage() {
           onCreated={(created) => {
             setAdding(null);
             setSelectedId(created.id);
+            void load();
+          }}
+        />
+      ) : null}
+
+      {editingOptions ? (
+        <BlockOptionsEditor
+          block={editingOptions}
+          hasBreak={breaks.has(editingOptions.id)}
+          onClose={() => setEditingOptions(null)}
+          onSaved={() => {
+            setEditingOptions(null);
             void load();
           }}
         />
@@ -1094,6 +1110,137 @@ function FormatEditor({
               {busy ? "Detaching…" : "Edit just this block"}
             </button>
           )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Decisions about one block rather than about the format it renders through.
+ * All three default to carrying on, so a manuscript that sets none of them
+ * behaves as though they didn't exist.
+ */
+function BlockOptionsEditor({
+  block,
+  hasBreak,
+  onClose,
+  onSaved,
+}: {
+  block: Block;
+  hasBreak: boolean;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [options, setOptions] = useState<BlockOptions>(block.options ?? {});
+  const [error, setError] = useState<string | null>(null);
+  const [savedFlash, flashSaved] = useSavedFlash(900);
+  const [busy, setBusy] = useState(false);
+
+  const set = (patch: Partial<BlockOptions>) => setOptions({ ...options, ...patch });
+
+  async function save() {
+    setBusy(true);
+    try {
+      await api.updateBlock(block.id, { options });
+      flashSaved();
+      window.setTimeout(onSaved, 600);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not save");
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={onClose} role="presentation">
+      <div className="modal" onClick={(e) => e.stopPropagation()}>
+        <h2 className="card-title">Block options</h2>
+        <p className="card-subtitle">
+          {block.label ? `“${block.label}”` : "This block"} — settings for this block alone.
+        </p>
+
+        {error ? <div className="alert error">{error}</div> : null}
+
+        <div className="field">
+          <label className="field-label">Word count</label>
+          <select
+            value={options.wordCount ?? "continue"}
+            onChange={(e) => set({ wordCount: e.target.value as "continue" | "restart" })}
+          >
+            <option value="continue">Continue the running count</option>
+            <option value="restart">Start a new count here</option>
+          </select>
+        </div>
+
+        <label className="check" style={{ marginBottom: 16 }}>
+          <input
+            type="checkbox"
+            disabled={!hasBreak}
+            checked={options.countBreakWords ?? false}
+            onChange={(e) => set({ countBreakWords: e.target.checked })}
+          />
+          <span>
+            Count the attached break&rsquo;s words{" "}
+            <em>{hasBreak ? "— off by default; a heading isn't prose" : "— this block has no break"}</em>
+          </span>
+        </label>
+
+        <div className="field">
+          <label className="field-label">Page numbering</label>
+          <select
+            value={options.pageNumbering ?? "continue"}
+            onChange={(e) => set({ pageNumbering: e.target.value as "continue" | "restart" })}
+          >
+            <option value="continue">Continue from the previous page</option>
+            <option value="restart">Restart the page count here</option>
+          </select>
+          {options.pageNumbering === "restart" ? (
+            <>
+              <label className="field-label" style={{ marginTop: 10 }}>
+                Starting at
+              </label>
+              <input
+                type="number"
+                min={1}
+                value={options.startPageNumber ?? 1}
+                onChange={(e) => set({ startPageNumber: Number(e.target.value) || 1 })}
+              />
+            </>
+          ) : null}
+          <p className="field-hint">
+            Page numbers become real at export; the manuscript marks the boundary here.
+          </p>
+        </div>
+
+        <div className="modal-actions">
+          <button
+            className="btn ghost"
+            type="button"
+            onClick={() => setOptions({})}
+            disabled={Object.keys(options).length === 0}
+          >
+            Reset to defaults
+          </button>
+          <div className="spacer" />
+          <button className="btn secondary" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className={`btn${savedFlash ? " saved" : ""}`}
+            type="button"
+            onClick={() => void save()}
+            disabled={busy}
+          >
+            {savedFlash ? (
+              <>
+                <Check size={15} /> Saved!
+              </>
+            ) : busy ? (
+              "Saving…"
+            ) : (
+              "Save"
+            )}
+          </button>
         </div>
       </div>
     </div>

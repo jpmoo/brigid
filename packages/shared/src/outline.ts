@@ -2,6 +2,7 @@ import type {
   BlockFormatSettings,
   BreakTemplateSettings,
   TemplateBody,
+  BlockOptions,
   TemplateCategory,
   Typography,
 } from "./templates.js";
@@ -34,6 +35,8 @@ export interface BlockNode {
   formatBody?: TemplateBody | null;
   /** Type for this block alone, overriding its format template's. */
   formatTypography?: Typography | null;
+  /** Decisions about this block rather than about its format. */
+  options?: BlockOptions | null;
 }
 
 export interface TemplateLike {

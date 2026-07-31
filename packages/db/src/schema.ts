@@ -11,6 +11,7 @@ import {
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type {
   BlockFormatSettings,
+  BlockOptions,
   BreakTemplateSettings,
   CounterRestart,
   PageSetup,
@@ -206,6 +207,8 @@ export const blocks = pgTable(
      * "edit this block's format" means its typography.
      */
     formatTypography: jsonb("format_typography").$type<Typography>(),
+    /** Decisions about this block rather than about its format. */
+    options: jsonb("options").$type<BlockOptions>(),
     /**
      * Always maintained, for every block, regardless of whether the block's
      * format contributes to the manuscript total.
