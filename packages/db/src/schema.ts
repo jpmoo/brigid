@@ -134,6 +134,29 @@ export const templates = pgTable(
 );
 
 /**
+ * Named places to come back to. A bookmark points at a *block*, not an offset
+ * into prose: a block survives editing, an offset doesn't. Deleting the block
+ * takes its bookmarks with it, which is right — the place is gone.
+ */
+export const bookmarks = pgTable(
+  "bookmarks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    blockId: uuid("block_id")
+      .notNull()
+      .references((): AnyPgColumn => blocks.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    sortKey: text("sort_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byWork: index("bookmarks_work_sort_idx").on(t.workId, t.sortKey) }),
+);
+
+/**
  * The manuscript itself: a tree. There is no separate chapter entity — a chapter
  * is a block that has children. What a block renders as comes from its format
  * template; what precedes it comes from its depth.

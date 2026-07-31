@@ -1,25 +1,32 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, BookOpen, FileText, LogOut, Maximize2, Minimize2, Settings } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  FileText,
+  LogOut,
+  Maximize2,
+  Minimize2,
+  Settings,
+} from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
 import type { TemplateBody } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
-import type { Block, Placement, Template, Work, WorkLevel } from "../api.js";
+import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { BodyEditor } from "../components/BodyEditor.js";
 import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
+import { BookmarkStrip } from "../components/BookmarkStrip.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { useAuth } from "../auth/AuthContext.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
 const MODE_KEY = "brigid.view.mode";
-const MEASURE_KEY = "brigid.book.measure";
-/** At the top of the range the sheet fills the viewport rather than capping. */
-const MEASURE_MIN = 50;
-const MEASURE_FULL = 120;
+const SCALE_KEY = "brigid.text.scale";
+const SCALE_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
 
 interface AddRequest {
   relativeTo: string | null;
@@ -49,12 +56,12 @@ export function WorkPage() {
     localStorage.getItem(MODE_KEY) === "manuscript" ? "manuscript" : "book",
   );
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
-  const [measure, setMeasure] = useState(() => {
-    const stored = Number(localStorage.getItem(MEASURE_KEY));
-    return Number.isFinite(stored) && stored >= MEASURE_MIN && stored <= MEASURE_FULL
-      ? stored
-      : MEASURE_FULL;
+  const [scaleIndex, setScaleIndex] = useState(() => {
+    const stored = Number(localStorage.getItem(SCALE_KEY));
+    return Number.isInteger(stored) && stored >= 0 && stored < SCALE_STEPS.length ? stored : 2;
   });
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
+  const [activeBookmark, setActiveBookmark] = useState<string | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
 
@@ -75,6 +82,8 @@ export function WorkPage() {
       setLevels(ls);
       setBlocks(bs);
       setTemplates(ts);
+      const { bookmarks: bm } = await api.listBookmarks(id);
+      setBookmarks(bm);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not open this work");
     } finally {
@@ -91,8 +100,8 @@ export function WorkPage() {
   }, [mode]);
 
   useEffect(() => {
-    localStorage.setItem(MEASURE_KEY, String(measure));
-  }, [measure]);
+    localStorage.setItem(SCALE_KEY, String(scaleIndex));
+  }, [scaleIndex]);
 
   // Escape leaves zen, so there's always a way back without hunting for a
   // control that zen itself has hidden.
@@ -163,7 +172,9 @@ export function WorkPage() {
   const selectAndScroll = useCallback((blockId: string) => {
     setSelectedId(blockId);
     scrollingTo.current = blockId;
-    blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // "center", so the block lands in the middle of the pane rather than
+    // jammed under the header where it's hard to read.
+    blockRefs.current.get(blockId)?.scrollIntoView({ behavior: "smooth", block: "center" });
     // Long enough for a smooth scroll to settle before the observer takes over.
     window.setTimeout(() => {
       if (scrollingTo.current === blockId) scrollingTo.current = null;
@@ -200,9 +211,9 @@ export function WorkPage() {
         if (!topmost) return;
         setSelectedId((current) => (current === topmost[0] ? current : topmost[0]));
       },
-      // A band across the upper part of the pane, so the "current" block is the
-      // one under the reader's eye rather than whatever touches the bottom edge.
-      { rootMargin: "-10% 0px -70% 0px", threshold: 0 },
+      // A band across the middle of the pane: the current block is the one
+      // under the reader's eye, which is neither edge.
+      { rootMargin: "-35% 0px -45% 0px", threshold: 0 },
     );
 
     for (const [, el] of observed) observer.observe(el);
@@ -223,6 +234,36 @@ export function WorkPage() {
       return next;
     });
   }, []);
+
+  async function addBookmark(blockId: string) {
+    try {
+      const { bookmark } = await api.createBookmark(id, blockId);
+      setBookmarks((prev) => [...prev, bookmark]);
+      setActiveBookmark(bookmark.id);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not add the bookmark");
+    }
+  }
+
+  async function renameBookmark(bookmark: Bookmark) {
+    const name = prompt("Name this bookmark", bookmark.name);
+    if (!name?.trim()) return;
+    try {
+      const { bookmark: updated } = await api.renameBookmark(bookmark.id, name.trim());
+      setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not rename the bookmark");
+    }
+  }
+
+  async function removeBookmark(bookmark: Bookmark) {
+    try {
+      await api.deleteBookmark(bookmark.id);
+      setBookmarks((prev) => prev.filter((b) => b.id !== bookmark.id));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not remove the bookmark");
+    }
+  }
 
   async function onDelete(blockId: string) {
     const entry = entries.find((e) => e.block.id === blockId);
@@ -253,23 +294,26 @@ export function WorkPage() {
           {work.subtitle ? <em>{work.subtitle}</em> : null}
         </div>
         <div className="spacer" />
-        <span className="muted" style={{ fontSize: 13 }}>
-          {wordFmt.format(totalWords)} words
-        </span>
-        {mode === "book" ? (
-          <label className="measure-slider" title="Line length">
-            <input
-              type="range"
-              min={MEASURE_MIN}
-              max={MEASURE_FULL}
-              step={1}
-              value={measure}
-              onChange={(e) => setMeasure(Number(e.target.value))}
-              aria-label="Line length in characters"
-            />
-            <span>{measure >= MEASURE_FULL ? "full" : `${measure}ch`}</span>
-          </label>
-        ) : null}
+
+        <div className="text-size" role="group" aria-label="Text size">
+          <button
+            type="button"
+            title="Smaller text"
+            disabled={scaleIndex === 0}
+            onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
+          >
+            A
+          </button>
+          <button
+            type="button"
+            title="Larger text"
+            disabled={scaleIndex === SCALE_STEPS.length - 1}
+            onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
+          >
+            A
+          </button>
+        </div>
+
         <div className="segmented compact" role="group" aria-label="View mode">
           <button
             type="button"
@@ -288,6 +332,11 @@ export function WorkPage() {
             <FileText size={13} /> Manuscript
           </button>
         </div>
+
+        <span className="muted" style={{ fontSize: 13 }}>
+          {wordFmt.format(totalWords)} words
+        </span>
+
         <button
           className="btn ghost"
           type="button"
@@ -306,6 +355,17 @@ export function WorkPage() {
           onMouseEnter={() => zen && setPanelOpen(true)}
           onMouseLeave={() => zen && setPanelOpen(false)}
         >
+          <BookmarkStrip
+            bookmarks={bookmarks}
+            activeId={activeBookmark}
+            onGo={(bookmark) => {
+              setActiveBookmark(bookmark.id);
+              selectAndScroll(bookmark.blockId);
+            }}
+            onRename={(bookmark) => void renameBookmark(bookmark)}
+            onDelete={(bookmark) => void removeBookmark(bookmark)}
+          />
+
           <div className="outline-head-bar">
             <span>Outline</span>
             <span className="muted">{entries.length}</span>
@@ -360,7 +420,9 @@ export function WorkPage() {
             onEditBreak={(blockId) =>
               setEditingBreak(blocks.find((b) => b.id === blockId) ?? null)
             }
-            measureCh={measure >= MEASURE_FULL ? null : measure}
+            textScale={SCALE_STEPS[scaleIndex] ?? 1}
+            bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
+            onDropBookmark={(blockId) => void addBookmark(blockId)}
           />
           {zen ? (
             <button

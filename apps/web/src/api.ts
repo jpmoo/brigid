@@ -95,6 +95,16 @@ export interface Template {
   formatSettings: BlockFormatSettings | null;
 }
 
+export interface Bookmark {
+  id: string;
+  workId: string;
+  blockId: string;
+  name: string;
+  sortKey: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type Placement = "root" | "sibling" | "sibling-before" | "child" | "parent";
 
 export interface ProvisionInput {
@@ -237,6 +247,17 @@ export const api = {
       "/import/create",
       input,
     ),
+
+  listBookmarks: (workId: string) =>
+    request<{ bookmarks: Bookmark[] }>(`/works/${workId}/bookmarks`),
+  createBookmark: (workId: string, blockId: string, name?: string) =>
+    post<{ bookmark: Bookmark }>(`/works/${workId}/bookmarks`, { blockId, ...(name ? { name } : {}) }),
+  renameBookmark: (id: string, name: string) =>
+    request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ name }),
+    }),
+  deleteBookmark: (id: string) => request<{ ok: true }>(`/bookmarks/${id}`, { method: "DELETE" }),
 
   listLevels: (workId: string) => request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`),
   saveLevels: (

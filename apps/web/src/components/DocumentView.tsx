@@ -1,6 +1,7 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import type { CSSProperties } from "react";
-import { Pencil } from "lucide-react";
+import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
+import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import type { DocumentItem, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
@@ -9,6 +10,9 @@ import type { Block } from "../api.js";
  * templates specify. Both are editable — the mode is presentation only.
  */
 export type ViewMode = "book" | "manuscript";
+
+/** Fixed: long enough not to feel cramped, short enough to read comfortably. */
+export const BOOK_MEASURE_CH = 85;
 
 function spanStyle(span: ResolvedSpan): CSSProperties {
   return {
@@ -173,11 +177,10 @@ export interface DocumentViewProps {
   onSelect: (id: string) => void;
   mode: ViewMode;
   onEditBreak: (blockId: string) => void;
-  /**
-   * Book-mode line length, in characters. Null fills the viewport. Manuscript
-   * ignores it — its whole point is fidelity to the page it will be set on.
-   */
-  measureCh: number | null;
+  /** Zoom applied to the whole sheet, so manuscript keeps its pt fidelity. */
+  textScale: number;
+  bookmarkedBlockIds: Set<string>;
+  onDropBookmark: (blockId: string) => void;
 }
 
 export function DocumentView({
@@ -187,10 +190,22 @@ export function DocumentView({
   onSelect,
   mode,
   onEditBreak,
-  measureCh,
+  textScale,
+  bookmarkedBlockIds,
+  onDropBookmark,
 }: DocumentViewProps) {
-  const sheetStyle: CSSProperties =
-    mode === "book" && measureCh !== null ? { maxWidth: `${measureCh}ch` } : {};
+  const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  // Book holds a fixed 85-character measure — long enough not to feel cramped,
+  // short enough to read. Manuscript fills the viewport, since fidelity to the
+  // page it will be set on is the whole point.
+  //
+  // `zoom` rather than a font-size override, so manuscript's point sizes keep
+  // their ratios to each other instead of being flattened.
+  const sheetStyle: CSSProperties = {
+    zoom: textScale,
+    ...(mode === "book" ? { maxWidth: `${BOOK_MEASURE_CH}ch` } : {}),
+  };
 
   if (items.length === 0) {
     return (
@@ -230,14 +245,34 @@ export function DocumentView({
           </div>
         ) : (
           <div
-            className={`doc-block${item.block.id === selectedId ? " selected" : ""}`}
+            className={`doc-block${item.block.id === selectedId ? " selected" : ""}${
+              dropTarget === item.block.id ? " drop-target" : ""
+            }${bookmarkedBlockIds.has(item.block.id) ? " bookmarked" : ""}`}
             key={item.block.id}
             data-block-id={item.block.id}
             ref={(el) => registerRef(item.block.id, el)}
             onClick={() => onSelect(item.block.id)}
             role="presentation"
             style={typographyStyle(item.typography, mode)}
+            onDragOver={(e) => {
+              if (!e.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDropTarget(item.block.id);
+            }}
+            onDragLeave={() => setDropTarget((c) => (c === item.block.id ? null : c))}
+            onDrop={(e) => {
+              if (!e.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
+              e.preventDefault();
+              setDropTarget(null);
+              onDropBookmark(item.block.id);
+            }}
           >
+            {bookmarkedBlockIds.has(item.block.id) ? (
+              <span className="doc-bookmark" title="Bookmarked">
+                <BookmarkIcon size={13} />
+              </span>
+            ) : null}
             {item.sectionStart ? (
               <div className="section-marker" title="Starts a new page-numbering section">
                 {item.sectionStart.pageNumbering === "restart"
