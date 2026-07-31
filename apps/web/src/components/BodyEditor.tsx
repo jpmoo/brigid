@@ -2,6 +2,7 @@ import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { commonMarks } from "@brigid/shared";
 import type { TemplateBody, TemplateNode } from "@brigid/shared";
 import { ChipEditor } from "./ChipEditor.js";
+import { useDialogs } from "./Dialogs.js";
 import { NEW_TABLE, TableEditor } from "./TableEditor.js";
 
 /**
@@ -16,6 +17,7 @@ export function BodyEditor({
   body: TemplateBody;
   onChange: (next: TemplateBody) => void;
 }) {
+  const dialogs = useDialogs();
   const nodes = body.nodes;
   const set = (next: TemplateNode[]) => onChange({ nodes: next });
   const replace = (i: number, node: TemplateNode) =>
@@ -115,11 +117,21 @@ export function BodyEditor({
           className="btn secondary"
           type="button"
           onClick={() => {
-            const rows = Number(prompt("How many rows?", "3"));
-            if (!rows || rows < 1) return;
-            const cols = Number(prompt("How many columns?", "2"));
-            if (!cols || cols < 1) return;
-            set([...nodes, NEW_TABLE(Math.min(rows, 40), Math.min(cols, 12))]);
+            void (async () => {
+              const answer = await dialogs.prompt({
+                title: "New table",
+                fields: [
+                  { label: "Rows", value: "3", type: "number", min: 1, max: 40 },
+                  { label: "Columns", value: "2", type: "number", min: 1, max: 12 },
+                ],
+                confirmLabel: "Add table",
+              });
+              if (!answer) return;
+              const rows = Number(answer[0]);
+              const cols = Number(answer[1]);
+              if (!rows || !cols || rows < 1 || cols < 1) return;
+              set([...nodes, NEW_TABLE(Math.min(rows, 40), Math.min(cols, 12))]);
+            })();
           }}
         >
           <Plus size={13} /> Table

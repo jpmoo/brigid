@@ -18,6 +18,7 @@ import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { HoldToConfirm } from "../components/HoldToConfirm.js";
 import { ImportWizard } from "../components/ImportWizard.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const wordFmt = new Intl.NumberFormat();
 
@@ -76,6 +77,7 @@ export function LibraryPage() {
         <span className="muted" style={{ fontSize: 13 }}>
           {username}
         </span>
+        <ThemeToggle />
         <Link className="btn ghost" to="/settings" title="Settings">
           <Settings size={16} />
         </Link>

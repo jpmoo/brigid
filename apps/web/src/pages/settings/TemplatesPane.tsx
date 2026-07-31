@@ -4,6 +4,7 @@ import type { BlockFormatSettings, BreakTemplateSettings, TemplateBody } from "@
 import { ApiError, api } from "../../api.js";
 import type { Template } from "../../api.js";
 import { BodyEditor } from "../../components/BodyEditor.js";
+import { useDialogs } from "../../components/Dialogs.js";
 import { StyleMenu } from "../../components/StyleMenu.js";
 
 const EMPTY_BREAK: BreakTemplateSettings = { suppressOnFirstChild: false, indentFirstParagraph: false };
@@ -14,6 +15,7 @@ const EMPTY_FORMAT: BlockFormatSettings = {
 };
 
 export function TemplatesPane({ templates, onReload }: { templates: Template[]; onReload: () => void }) {
+  const dialogs = useDialogs();
   const [selectedId, setSelectedId] = useState<string | null>(templates[0]?.id ?? null);
   const selected = templates.find((t) => t.id === selectedId) ?? null;
 
@@ -21,7 +23,12 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
   const formats = templates.filter((t) => t.category === "block-format");
 
   async function create(category: "break" | "block-format") {
-    const name = prompt(category === "break" ? "Name for the new break" : "Name for the new format");
+    const answer = await dialogs.prompt({
+      title: category === "break" ? "New break" : "New block format",
+      fields: [{ label: "Name", placeholder: category === "break" ? "Subsection break" : "Epigraph" }],
+      confirmLabel: "Create",
+    });
+    const name = answer?.[0]?.trim();
     if (!name) return;
     const { template } = await api.createTemplate({
       category,
@@ -110,6 +117,7 @@ function TemplateEditor({
   onSaved: () => void;
   onDeleted: () => void;
 }) {
+  const dialogs = useDialogs();
   const [name, setName] = useState(template.name);
   const [body, setBody] = useState<TemplateBody>(template.body);
   const [brk, setBrk] = useState<BreakTemplateSettings>(template.breakSettings ?? EMPTY_BREAK);
@@ -149,7 +157,13 @@ function TemplateEditor({
   }
 
   async function remove() {
-    if (!confirm(`Delete "${template.name}"? This can't be undone.`)) return;
+    const ok = await dialogs.confirm({
+      title: `Delete “${template.name}”?`,
+      message: "This can't be undone.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteTemplate(template.id);
       onDeleted();

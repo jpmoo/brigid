@@ -31,8 +31,9 @@
   color-scheme: light;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
+/* The app writes data-theme on <html>; "system" resolves to one of these in JS
+   rather than being a third CSS state, so an explicit choice always wins. */
+:root[data-theme="dark"] {
     --paper: #0f1712;
     --surface: #16211a;
     --surface-sunken: #0b110d;
@@ -49,7 +50,6 @@
     --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.45);
 
     color-scheme: dark;
-  }
 }
 
 * {
@@ -130,11 +130,9 @@ a:hover {
 
 /* The wordmark is a single dark-green path; lift it toward the sage in dark
    mode so it doesn't sink into the background. */
-@media (prefers-color-scheme: dark) {
-  .brand-logo,
-  .brand-wordmark {
-    filter: brightness(1.9) saturate(0.75);
-  }
+:root[data-theme="dark"] .brand-logo,
+:root[data-theme="dark"] .brand-wordmark {
+  filter: brightness(1.9) saturate(0.75);
 }
 
 .brand-tagline {
@@ -353,11 +351,9 @@ input::placeholder {
   display: block;
 }
 
-@media (prefers-color-scheme: dark) {
-  .app-header .mark,
-  .app-header .wordmark {
-    filter: brightness(1.9) saturate(0.75);
-  }
+:root[data-theme="dark"] .app-header .mark,
+:root[data-theme="dark"] .app-header .wordmark {
+  filter: brightness(1.9) saturate(0.75);
 }
 
 .app-header h1 {
@@ -653,12 +649,14 @@ input::placeholder {
   margin-left: -1px;
 }
 
+/* Wide enough for a six-figure count — "120,000" clipped at the old 34px. */
 .outline-gutter {
-  flex: 0 0 34px;
-  padding: 8px 0 0;
+  flex: 0 0 52px;
+  padding: 8px 4px 0 6px;
   text-align: right;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
   color: var(--text-faint);
 }
 
@@ -1189,7 +1187,7 @@ input::placeholder {
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 5px 10px 5px 44px;
+  padding: 5px 10px 5px 58px;
   background: none;
   border: 0;
   font: inherit;

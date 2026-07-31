@@ -8,6 +8,7 @@ import { LevelsPane } from "./settings/LevelsPane.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const TABS = [
   { key: "templates", label: "Templates" },
@@ -49,6 +50,7 @@ export function SettingsPage() {
         <BrandMark />
         <BrandHeading />
         <div className="spacer" />
+        <ThemeToggle />
         <span className="muted" style={{ fontSize: 13 }}>
           {username}
         </span>

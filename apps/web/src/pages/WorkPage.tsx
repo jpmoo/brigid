@@ -21,6 +21,8 @@ import { BodyEditor } from "../components/BodyEditor.js";
 import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
+import { useDialogs } from "../components/Dialogs.js";
+import { ThemeToggle } from "../components/ThemeToggle.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { useAuth } from "../auth/AuthContext.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
@@ -38,6 +40,7 @@ interface AddRequest {
 export function WorkPage() {
   const { id = "" } = useParams<{ id: string }>();
   const { username, logout } = useAuth();
+  const dialogs = useDialogs();
 
   const [work, setWork] = useState<Work | null>(null);
   const [levels, setLevels] = useState<WorkLevel[]>([]);
@@ -68,6 +71,7 @@ export function WorkPage() {
   const [renaming, setRenaming] = useState<Block | null>(null);
 
   const blockRefs = useRef(new Map<string, HTMLDivElement>());
+  const paneRef = useRef<HTMLElement>(null);
   const outlineRefs = useRef(new Map<string, HTMLDivElement>());
   // Set while a click is driving the document, so the observer doesn't fight
   // the smooth scroll it started.
@@ -194,8 +198,9 @@ export function WorkPage() {
    * `block: "nearest"` so the panel barely moves unless it has to.
    */
   useEffect(() => {
+    const pane = paneRef.current;
     const observed = [...blockRefs.current.entries()].filter(([key]) => !key.startsWith("break:"));
-    if (observed.length === 0) return;
+    if (!pane || observed.length === 0) return;
 
     const visible = new Map<string, number>();
     const observer = new IntersectionObserver(
@@ -213,19 +218,27 @@ export function WorkPage() {
         if (!topmost) return;
         setSelectedId((current) => (current === topmost[0] ? current : topmost[0]));
       },
-      // A band across the middle of the pane: the current block is the one
-      // under the reader's eye, which is neither edge.
-      { rootMargin: "-35% 0px -45% 0px", threshold: 0 },
+      {
+        // The document pane is the scroller, not the window. Left to default,
+        // the margins below are measured against the viewport instead and the
+        // band lands in the wrong place — or nowhere.
+        root: paneRef.current,
+        // A band across the middle of the pane: the current block is the one
+        // under the reader's eye, which is neither edge.
+        rootMargin: "-35% 0px -45% 0px",
+        threshold: 0,
+      },
     );
 
     for (const [, el] of observed) observer.observe(el);
     return () => observer.disconnect();
   }, [items]);
 
-  // Keep the current block in view in the outline, without yanking the panel.
+  // Centre the current block in the outline, so there is always context above
+  // and below it rather than it sitting against an edge.
   useEffect(() => {
     if (!selectedId) return;
-    outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "nearest" });
+    outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [selectedId]);
 
   // Only blocks with children can be collapsed, so they're the whole question:
@@ -261,10 +274,14 @@ export function WorkPage() {
   }
 
   async function renameBookmark(bookmark: Bookmark) {
-    const name = prompt("Name this bookmark", bookmark.name);
-    if (!name?.trim()) return;
+    const answer = await dialogs.prompt({
+      title: "Name this bookmark",
+      fields: [{ label: "Name", value: bookmark.name }],
+    });
+    const name = answer?.[0]?.trim();
+    if (!name) return;
     try {
-      const { bookmark: updated } = await api.renameBookmark(bookmark.id, name.trim());
+      const { bookmark: updated } = await api.renameBookmark(bookmark.id, name);
       setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not rename the bookmark");
@@ -283,7 +300,13 @@ export function WorkPage() {
   async function onDelete(blockId: string) {
     const entry = entries.find((e) => e.block.id === blockId);
     const extra = entry && entry.childCount > 0 ? " and everything under it" : "";
-    if (!confirm(`Delete this block${extra}? This can't be undone.`)) return;
+    const ok = await dialogs.confirm({
+      title: "Delete this block?",
+      message: `The block${extra} will be removed. This can't be undone.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteBlock(blockId);
       if (selectedId === blockId) setSelectedId(null);
@@ -352,6 +375,8 @@ export function WorkPage() {
           {wordFmt.format(totalWords)} words
         </span>
 
+        <ThemeToggle />
+
         <button
           className="btn ghost"
           type="button"
@@ -393,8 +418,6 @@ export function WorkPage() {
             >
               {allCollapsed ? <ChevronsUpDown size={13} /> : <ChevronsDownUp size={13} />}
             </button>
-            <span className="spacer" />
-            <span className="muted">{entries.length}</span>
           </div>
           <OutlinePanel
             entries={entries}
@@ -436,7 +459,7 @@ export function WorkPage() {
           </div>
         </aside>
 
-        <main className="document-pane">
+        <main className="document-pane" ref={paneRef}>
           <DocumentView
             items={items}
             registerRef={registerRef}
@@ -451,14 +474,36 @@ export function WorkPage() {
             onDropBookmark={(blockId) => void addBookmark(blockId)}
           />
           {zen ? (
-            <button
-              className="zen-exit"
-              type="button"
-              title="Leave zen (Esc)"
-              onClick={() => setZen(false)}
-            >
-              <Minimize2 size={15} />
-            </button>
+            // Fades in together with the exit control: in zen the only things
+            // worth reaching for are the size of the type and the way out.
+            <div className="zen-controls">
+              <div className="text-size" role="group" aria-label="Text size">
+                <button
+                  type="button"
+                  title="Smaller text"
+                  disabled={scaleIndex === 0}
+                  onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
+                >
+                  A
+                </button>
+                <button
+                  type="button"
+                  title="Larger text"
+                  disabled={scaleIndex === SCALE_STEPS.length - 1}
+                  onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
+                >
+                  A
+                </button>
+              </div>
+              <button
+                className="zen-exit"
+                type="button"
+                title="Leave zen (Esc)"
+                onClick={() => setZen(false)}
+              >
+                <Minimize2 size={15} />
+              </button>
+            </div>
           ) : null}
         </main>
       </div>
@@ -668,6 +713,7 @@ function BreakEditor({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const dialogs = useDialogs();
   const [body, setBody] = useState<TemplateBody | null>(
     block.breakBody ?? null,
   );
@@ -702,7 +748,13 @@ function BreakEditor({
   }
 
   async function revert() {
-    if (!confirm("Discard this break's edits and follow the level's template again?")) return;
+    const ok = await dialogs.confirm({
+      title: "Follow the template again?",
+      message: "This break's edits will be discarded and it will follow its level's template.",
+      confirmLabel: "Discard edits",
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true);
     try {
       await api.revertBreak(block.id);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { buildOutline } from "@brigid/shared";
 import { ApiError, api } from "../../api.js";
+import { useDialogs } from "../../components/Dialogs.js";
 import type { Template, Work } from "../../api.js";
 
 interface LevelRow {
@@ -28,6 +29,7 @@ const same = (a: LevelRow[], b: LevelRow[]) =>
  * a level moves every block that sits at it.
  */
 export function LevelsPane({ templates }: { templates: Template[] }) {
+  const dialogs = useDialogs();
   const [works, setWorks] = useState<Work[]>([]);
   const [workId, setWorkId] = useState("");
   const [levels, setLevels] = useState<LevelRow[]>([]);
@@ -104,14 +106,15 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
     mutate(next);
   };
 
-  const remove = (i: number) => {
+  const remove = async (i: number) => {
     const used = depthCounts[i] ?? 0;
     if (used > 0) {
-      const ok = confirm(
-        `${used} block${used === 1 ? "" : "s"} sit at this level.\n\n` +
-          "Removing it doesn't delete them — they keep their indentation, but nothing " +
-          "defines a break there, so the split before them stops rendering.\n\nRemove it anyway?",
-      );
+      const ok = await dialogs.confirm({
+        title: "Remove this level?",
+        message: `${used} block${used === 1 ? "" : "s"} sit at this level. Removing it doesn't delete them — they keep their indentation, but nothing defines a break there, so the split before them stops rendering.`,
+        confirmLabel: "Remove level",
+        danger: true,
+      });
       if (!ok) return;
     }
     mutate(levels.filter((_, j) => j !== i));
@@ -171,8 +174,20 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
           id="levelWork"
           value={workId}
           onChange={(e) => {
-            if (dirty && !confirm("Discard unsaved changes to these levels?")) return;
-            setWorkId(e.target.value);
+            const nextId = e.target.value;
+            if (!dirty) {
+              setWorkId(nextId);
+              return;
+            }
+            void (async () => {
+              const ok = await dialogs.confirm({
+                title: "Discard unsaved changes?",
+                message: "These level changes haven't been saved.",
+                confirmLabel: "Discard",
+                danger: true,
+              });
+              if (ok) setWorkId(nextId);
+            })();
           }}
         >
           {works.map((w) => (
@@ -241,7 +256,7 @@ export function LevelsPane({ templates }: { templates: Template[] }) {
                 type="button"
                 title="Remove level"
                 disabled={levels.length <= 1}
-                onClick={() => remove(i)}
+                onClick={() => void remove(i)}
               >
                 <Trash2 size={13} />
               </button>
