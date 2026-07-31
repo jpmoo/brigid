@@ -4,7 +4,7 @@ Target: a headless Ubuntu server, PostgreSQL 13+, Brigid on **port 8090**,
 surviving reboots via systemd.
 
 > **Current limitation.** There is no web UI yet — only the API. First-run setup
-> is therefore driven with `curl` (step 5). Once the web app lands, that step
+> is therefore driven with `curl` (step 4). Once the web app lands, that step
 > becomes a form in the browser and nothing else here changes.
 
 Substitute your own values for `/opt/brigid` (the checkout) and `jpmoore` (the
@@ -34,7 +34,7 @@ sudo npm install -g pnpm@9.12.0
 
 > Install Node system-wide rather than through nvm. nvm puts Node under your
 > home directory and only initialises in interactive shells, so systemd won't
-> find it. If you're already committed to nvm, see the note in step 6.
+> find it. If you're already committed to nvm, see the note in step 5.
 
 Confirm:
 
@@ -44,43 +44,10 @@ node -v && pnpm -v && psql --version
 
 ---
 
-## 2. Give the server access to the private repo
+## 2. Clone into the existing directory
 
-A read-only deploy key is the right fit: scoped to this one repo, no account
-password on the box, and it survives unattended `git pull`.
-
-```bash
-ssh-keygen -t ed25519 -C "brigid-deploy" -f ~/.ssh/brigid_deploy -N ""
-cat ~/.ssh/brigid_deploy.pub
-```
-
-Add that public key at **github.com/jpmoo/brigid → Settings → Deploy keys → Add
-deploy key**. Leave "Allow write access" unchecked.
-
-Then teach SSH which key to use:
-
-```bash
-cat >> ~/.ssh/config <<'EOF'
-
-Host github.com-brigid
-  HostName github.com
-  User git
-  IdentityFile ~/.ssh/brigid_deploy
-  IdentitiesOnly yes
-EOF
-chmod 600 ~/.ssh/config
-```
-
-Verify — a "successfully authenticated" message is what you want, and the
-message saying GitHub does not provide shell access is expected:
-
-```bash
-ssh -T git@github.com-brigid
-```
-
----
-
-## 3. Clone into the existing directory
+The repo is public, so no credentials, deploy key, or token is needed — plain
+HTTPS works and unattended `git pull` keeps working.
 
 `git clone` refuses to write into a directory that already has files in it, so
 which command you want depends on what's already there.
@@ -89,7 +56,7 @@ which command you want depends on what's already there.
 
 ```bash
 cd /opt/brigid
-git clone git@github.com-brigid:jpmoo/brigid.git .
+git clone https://github.com/jpmoo/brigid.git .
 ```
 
 **If the directory already has files** you want to keep — attach a repo to it
@@ -98,7 +65,7 @@ instead of cloning:
 ```bash
 cd /opt/brigid
 git init -b main
-git remote add origin git@github.com-brigid:jpmoo/brigid.git
+git remote add origin https://github.com/jpmoo/brigid.git
 git fetch origin
 git checkout -t origin/main
 ```
@@ -123,7 +90,7 @@ pnpm install
 
 ---
 
-## 4. Configure
+## 3. Configure
 
 ```bash
 cp .env.example .env.local
@@ -170,9 +137,12 @@ DATABASE_URL=postgres://brigid:pick-a-strong-password@localhost:5432/brigid
 Leave `SESSION_SECRET` unset — Brigid generates one on first boot and persists
 it to `data/brigid.config.json` (mode 0600, gitignored).
 
+Nothing secret ever belongs in the repo: `.env.local` and `data/` are both
+gitignored, which matters more now that the repo is public.
+
 ---
 
-## 5. First start and account creation
+## 4. First start and account creation
 
 ```bash
 cd /opt/brigid
@@ -214,7 +184,7 @@ foreground server with Ctrl-C before moving on.
 
 ---
 
-## 6. systemd
+## 5. systemd
 
 ```bash
 sudo cp deploy/brigid.service /etc/systemd/system/brigid.service
@@ -268,7 +238,7 @@ and the `https://` form of `APP_ORIGIN` in `.env.local` and restart.
 
 ---
 
-## 7. Updating
+## 6. Updating
 
 ```bash
 cd /opt/brigid
@@ -290,4 +260,4 @@ That stops the service, fast-forwards, reinstalls, migrates, and starts it again
 | Service dies immediately, `status=200/CHDIR` | `WorkingDirectory` doesn't exist or isn't readable by `User`. |
 | `password authentication failed for user "brigid"` | Password in `DATABASE_URL` doesn't match the role. Special characters must be percent-encoded. |
 | Login succeeds, next request is 401 | `SECURE_COOKIES=1` while serving plain HTTP — the browser is discarding the cookie. |
-| `permission denied for schema public` | Postgres 15+ tightened default schema grants. Re-run the `GRANT ALL ON SCHEMA public` from step 4. |
+| `permission denied for schema public` | Postgres 15+ tightened default schema grants. Re-run the `GRANT ALL ON SCHEMA public` from step 3. |

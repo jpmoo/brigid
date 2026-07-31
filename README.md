@@ -31,7 +31,7 @@ setup flow. No web app yet.
 ## Running it
 
 Brigid targets a headless Ubuntu server with PostgreSQL 13 or newer. For the
-full server setup — deploy key, database, systemd, TLS — see
+full server setup — clone, database, systemd, TLS — see
 [docs/deploy.md](docs/deploy.md).
 
 ```bash
@@ -42,7 +42,7 @@ pnpm start
 
 With no database configured Brigid starts anyway, in setup mode: first run
 establishes the database, migrates, and creates the single account. Until the
-web app exists that step is a `curl` call — see step 5 of the deploy guide.
+web app exists that step is a `curl` call — see step 4 of the deploy guide.
 
 To configure by hand instead, set `DATABASE_URL` and `SESSION_SECRET` in
 `.env.local`; migrations then run automatically at boot.
