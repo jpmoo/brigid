@@ -72,6 +72,7 @@ export function OutlinePanel(props: OutlinePanelProps) {
           rendersInDocument={
             templates.get(entry.block.formatId)?.formatSettings?.rendersInDocument ?? true
           }
+          structural={templates.get(entry.block.formatId)?.formatSettings?.structural ?? true}
           {...props}
           breakChip={breaks.get(entry.block.id) ?? null}
           selected={entry.block.id === selectedId}
@@ -91,6 +92,8 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   levelName: string;
   formatName: string;
   rendersInDocument: boolean;
+  /** False for a title page or a note: it isn't part of the level structure. */
+  structural: boolean;
   selected: boolean;
   isCollapsed: boolean;
   breakChip: BreakChip | null;
@@ -154,7 +157,12 @@ function OutlineCard(props: CardProps) {
             <span className="outline-twisty spacerless" />
           )}
           <span className="outline-label">{block.label || <em>Untitled</em>}</span>
-          <span className="outline-level">{props.levelName}</span>
+          {/* A non-structural block isn't at a level in any meaningful sense —
+              it takes no break and no chapter number — so naming it by depth
+              would be a lie. It says what it actually is. */}
+          <span className={`outline-level${props.structural ? "" : " aside"}`}>
+            {props.structural ? props.levelName : props.formatName}
+          </span>
         </div>
         {text ? <p className="outline-preview">{text}</p> : null}
       </button>

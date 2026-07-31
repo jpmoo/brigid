@@ -713,6 +713,14 @@ input::placeholder {
   white-space: nowrap;
 }
 
+/* Front matter and notes: named for what they are, set apart from the levels. */
+.outline-level.aside {
+  font-style: italic;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+}
+
 .outline-preview {
   margin: 3px 0 0 18px;
   font-size: 12px;
