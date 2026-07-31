@@ -190,6 +190,36 @@ on realistic manuscript sizes rather than designing around a guess.
 
 ## 5. Interface
 
+### 5.0 Branding
+
+Two SVG assets live in `assets/`, both with transparent backgrounds:
+
+- `brigid-logo.svg` — a quill inside a Celtic knotwork circle
+- `brigid-title.svg` — the wordmark, "BRIGID" in an uncial face
+
+Placement:
+
+- **Login screen** — logo and title, both large
+- **Top panel** — logo only, small
+
+The palette falls out of the artwork and should drive the app theme. Deep green
+ink on cream paper suits a novel writing app almost too well:
+
+| Token | Value | Source |
+|---|---|---|
+| Ink (deepest) | `#134625` | logo primary |
+| Ink | `#245537` | logo secondary |
+| Ink (wordmark) | `#356548` | title |
+| Sage | `#99B6A4` | logo accent |
+| Paper | `#ECEBE6` | title background (removed) |
+| Paper (bright) | `#FCFDFC` | logo background (removed) |
+
+_OPEN._ Both assets sit on a 1387×756 canvas with the artwork occupying a small
+centered region — the logo's true bounds are 440×481 at offset (475, 58), the
+wordmark's 514×151 at (437, 276). Rendered as-is in a small top panel, the mark
+would appear at roughly a third of its box. Tightening each `viewBox` to the
+artwork bounds would fix that; it changes the aspect ratio, so it's your call.
+
 ### 5.1 Work view
 
 Two panes. Left: the outline. Right: the document.
@@ -258,3 +288,4 @@ manuscript is wanted — that would add a third model slot and pgvector.
 4. Subtree behavior on drag (§5.4).
 5. Whether "print it in the left margin" means the outline card's margin, as
    read in §5.2, or the document's.
+6. Whether to tighten the logo and wordmark `viewBox` to the artwork bounds (§5.0).
