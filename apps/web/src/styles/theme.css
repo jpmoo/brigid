@@ -630,13 +630,11 @@ input::placeholder {
   color: var(--text-muted);
 }
 
+/* The enclosing .outline-item carries the border; the card is just the row. */
 .outline-card {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  margin-bottom: 3px;
 }
 
 .outline-card:hover {
@@ -645,13 +643,13 @@ input::placeholder {
 
 .outline-card.selected {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 /* Notes live in the outline but never reach the page; the dashed rule says so
    without needing a legend. */
 .outline-card.note {
   border-left: 2px dashed var(--border-strong);
+  margin-left: -1px;
 }
 
 .outline-gutter {
@@ -1161,8 +1159,19 @@ input::placeholder {
 
 /* --- Breaks in the outline -------------------------------------------- */
 
+/* Every entry is enclosed, so a block reads as one object whether or not a
+   break caps it. The rule runs down the sides of the cap too — the cap is part
+   of the block, not a label floating above it. */
 .outline-item {
-  margin-bottom: 3px;
+  margin-bottom: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
+  border-radius: var(--radius);
+  /* So the cap's tint stops at the rounded corners. */
+  overflow: hidden;
+}
+
+.outline-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
 /* A break belongs to the block it precedes and travels with it, so it is drawn
@@ -1171,8 +1180,7 @@ input::placeholder {
    break look selected. */
 .outline-item.has-break .outline-break {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
-  border-radius: var(--radius) var(--radius) 0 0;
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 22%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
 .outline-break {
@@ -1180,7 +1188,7 @@ input::placeholder {
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 5px 10px 3px 44px;
+  padding: 5px 10px 5px 44px;
   background: none;
   border: 0;
   font: inherit;
@@ -1196,10 +1204,10 @@ input::placeholder {
   color: var(--accent);
 }
 
-/* The current block is the one thing that carries a shade of its own. */
-.outline-item.has-break .outline-card.selected {
-  border-top-left-radius: 0;
-  border-top-right-radius: 0;
+/* The current block is the one thing that carries a shade of its own, and its
+   enclosure firms up to match. */
+.outline-item:has(.outline-card.selected) {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
 .outline-break.detached {
