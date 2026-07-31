@@ -28,7 +28,9 @@ export type TemplateInline =
   | ({ type: "text"; text: string } & TemplateMarks)
   | ({ type: "variable"; name: VariableName; numberFormat?: NumberFormat } & TemplateMarks)
   /** A tab stop. Advances to the next stop rather than inserting fixed space. */
-  | { type: "tab" };
+  | { type: "tab" }
+  /** A soft line break — a new line without starting a new paragraph. */
+  | { type: "lineBreak" };
 
 /**
  * Tables, for the parts of a manuscript that are genuinely tabular — a title

@@ -90,15 +90,19 @@ function Nodes({
                             borderLeft: b.columns && ci > 0 ? rule : undefined,
                           }}
                         >
-                          {cell.spans.map((span, si) => (
-                            <span
-                              key={si}
-                              className={span.placeholder ? "placeholder-var" : undefined}
-                              style={spanStyle(span)}
-                            >
-                              {span.tab ? "\u0009" : span.text}
-                            </span>
-                          ))}
+                          {cell.spans.map((span, si) =>
+                            span.lineBreak ? (
+                              <br key={si} />
+                            ) : (
+                              <span
+                                key={si}
+                                className={span.placeholder ? "placeholder-var" : undefined}
+                                style={spanStyle(span)}
+                              >
+                                {span.tab ? "\u0009" : span.text}
+                              </span>
+                            ),
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -115,7 +119,9 @@ function Nodes({
                 style={mode === "manuscript" ? { textAlign: node.align } : undefined}
               >
                 {node.spans.map((span, j) =>
-                  span.tab ? (
+                  span.lineBreak ? (
+                    <br key={j} />
+                  ) : span.tab ? (
                     <span className="tpl-tab" key={j} />
                   ) : (
                     <span

@@ -1464,13 +1464,48 @@ input::placeholder {
   text-align: center;
 }
 
-.level-row input[type="text"] {
-  flex: 0 0 150px;
+.level-row.head {
+  background: var(--surface-sunken);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
-.level-row select {
+.lv-name {
+  flex: 0 0 140px;
+  min-width: 0;
+}
+
+.lv-break {
+  flex: 1.3;
+  min-width: 0;
+}
+
+.lv-count {
   flex: 1;
   min-width: 0;
+}
+
+.lv-used {
+  flex: 0 0 44px;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.lv-actions {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 1px;
+}
+
+.lv-dirty {
+  font-size: 12px;
+  font-style: italic;
+  padding-right: 4px;
 }
 
 /* --- Template tables and tabs ----------------------------------------- */
@@ -1874,31 +1909,32 @@ input::placeholder {
 
 .te-cell {
   background: var(--surface);
-  padding: 5px 6px;
+  min-width: 0;
+  display: flex;
+}
+
+/* The cell *is* the field. No nested frame, no inner padding of its own — the
+   table's own rules are the only border, and text sits inside them. */
+.te-cell .chip-editor {
+  flex: 1;
   min-width: 0;
 }
 
-/* Cells are tight, so the chip field loses its own frame inside one. */
 .te-cell .chip-field {
-  min-height: 26px;
-  padding: 4px 6px;
-  border-color: transparent;
+  min-height: 34px;
+  height: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   font-size: 13px;
+  box-shadow: none;
 }
 
+.te-cell.focused .chip-field,
 .te-cell .chip-field:focus {
-  background: var(--paper);
-  border-color: var(--accent);
-}
-
-.te-cell .chip-bar {
-  display: none;
-}
-
-.te-cell:focus-within .chip-bar {
-  display: flex;
-  margin-top: 4px;
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  box-shadow: none;
 }
 
 /* Sits on the boundary between two columns; dragging moves width from one to
@@ -2000,4 +2036,86 @@ input::placeholder {
   font-style: italic;
   color: var(--text-muted);
   text-align: center;
+}
+
+/* --- Table toolbars --------------------------------------------------- */
+
+.te-cellbar,
+.te-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 7px 9px;
+  background: var(--surface-sunken);
+  border-top: 1px solid var(--border);
+}
+
+.te-cellbar {
+  min-height: 42px;
+}
+
+/* Names the group so a row of checkboxes isn't left to be guessed at. */
+.te-bar-label {
+  flex: 0 0 auto;
+  min-width: 46px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.te-bar-hint {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+.te-cellbar .te-cell-controls {
+  display: flex;
+  margin-top: 0;
+}
+
+.te-cellbar select,
+.te-cellbar .btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  width: auto;
+}
+
+/* --- Upload progress -------------------------------------------------- */
+
+.progress-btn {
+  position: relative;
+  overflow: hidden;
+  min-width: 168px;
+}
+
+/* Fills left to right with the upload. Lightened rather than a second color,
+   so the button still reads as one object mid-transfer. */
+.progress-fill {
+  position: absolute;
+  inset: 0;
+  transform-origin: left center;
+  transform: scaleX(0);
+  background: color-mix(in srgb, #ffffff 26%, transparent);
+  transition: transform 0.12s linear;
+}
+
+.progress-label {
+  position: relative;
+  z-index: 1;
+}
+
+/* Once the bytes are up the server is parsing, which has no fraction — so the
+   bar sweeps instead of pretending to measure something. */
+.progress-btn.indeterminate .progress-fill {
+  transform: none;
+  animation: sweep 1.1s ease-in-out infinite;
+}
+
+@keyframes sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }

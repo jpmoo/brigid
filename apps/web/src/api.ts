@@ -163,28 +163,60 @@ export const api = {
   ) => request<{ template: Template }>(`/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   deleteTemplate: (id: string) => request<{ ok: true }>(`/templates/${id}`, { method: "DELETE" }),
 
-  analyzeDocx: async (file: File) => {
-    const form = new FormData();
-    form.append("file", file);
-    const res = await fetch(apiUrl("/import/analyze"), {
-      method: "POST",
-      credentials: "same-origin",
-      body: form,
-    });
-    const text = await res.text();
-    const parsed = text ? (JSON.parse(text) as Record<string, unknown>) : {};
-    if (!res.ok) {
-      throw new ApiError(
-        res.status,
-        typeof parsed.error === "string" ? parsed.error : "could not read that file",
-      );
-    }
-    return parsed as unknown as {
-      filename: string;
-      paragraphs: ImportedParagraph[];
-      hasPageBreaks: boolean;
-    };
-  },
+  /**
+   * XHR rather than fetch, because fetch cannot report upload progress and a
+   * novel-sized .docx is worth showing progress for. `onProgress` reports the
+   * upload only — once the bytes are up, the server is parsing, and that part
+   * has no measurable fraction.
+   */
+  analyzeDocx: (file: File, onProgress?: (fraction: number) => void) =>
+    new Promise<{ filename: string; paragraphs: ImportedParagraph[]; hasPageBreaks: boolean }>(
+      (resolve, reject) => {
+        const form = new FormData();
+        form.append("file", file);
+
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", apiUrl("/import/analyze"));
+        xhr.withCredentials = true;
+
+        xhr.upload.addEventListener("progress", (event) => {
+          if (event.lengthComputable && event.total > 0) {
+            onProgress?.(event.loaded / event.total);
+          }
+        });
+
+        xhr.addEventListener("load", () => {
+          let parsed: Record<string, unknown> = {};
+          try {
+            parsed = xhr.responseText ? (JSON.parse(xhr.responseText) as Record<string, unknown>) : {};
+          } catch {
+            reject(new ApiError(xhr.status, "the server sent something unreadable"));
+            return;
+          }
+          if (xhr.status < 200 || xhr.status >= 300) {
+            reject(
+              new ApiError(
+                xhr.status,
+                typeof parsed.error === "string" ? parsed.error : "could not read that file",
+              ),
+            );
+            return;
+          }
+          onProgress?.(1);
+          resolve(
+            parsed as unknown as {
+              filename: string;
+              paragraphs: ImportedParagraph[];
+              hasPageBreaks: boolean;
+            },
+          );
+        });
+
+        xhr.addEventListener("error", () => reject(new ApiError(0, "could not reach the server")));
+        xhr.addEventListener("abort", () => reject(new ApiError(0, "upload cancelled")));
+        xhr.send(form);
+      },
+    ),
   createFromImport: (input: {
     title: string;
     subtitle?: string | null;

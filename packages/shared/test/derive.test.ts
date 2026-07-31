@@ -291,14 +291,14 @@ check(
 check(
   "an unknown token stays literal instead of vanishing",
   parseInlines("keep {{notAVariable}} intact").map((i) =>
-    i.type === "text" ? i.text : i.type === "tab" ? "\\t" : i.name,
+    i.type === "text" ? i.text : i.type === "variable" ? i.name : i.type,
   ),
   ["keep {{notAVariable}} intact"],
 );
 check(
   "marks apply to every span parsed from one paragraph",
   parseInlines("Chapter {{levelCounter}}", { smallCaps: true }).every(
-    (i) => i.type !== "tab" && i.smallCaps === true,
+    (i) => (i.type === "text" || i.type === "variable") && i.smallCaps === true,
   ),
   true,
 );

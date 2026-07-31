@@ -50,6 +50,8 @@ export function serializeInlines(inlines: readonly TemplateInline[]): string {
         ? inline.text
         : inline.type === "tab"
           ? "\t"
+          : inline.type === "lineBreak"
+            ? "\n"
           : `{{${inline.name}${inline.numberFormat ? `:${inline.numberFormat}` : ""}}}`,
     )
     .join("");
@@ -61,8 +63,9 @@ export function commonMarks(inlines: readonly TemplateInline[]): TemplateMarks {
   const keys: (keyof TemplateMarks)[] = ["bold", "italic", "smallCaps", "allCaps"];
   const out: TemplateMarks = {};
   for (const key of keys) {
-    // Tabs carry no marks; ignoring them keeps one from clearing every toggle.
-    const marked = inlines.filter((i) => i.type !== "tab");
+    // Tabs and line breaks carry no marks; ignoring them keeps one from
+    // clearing every toggle.
+    const marked = inlines.filter((i) => i.type === "text" || i.type === "variable");
     if (marked.length > 0 && marked.every((i) => i[key])) out[key] = true;
   }
   return out;

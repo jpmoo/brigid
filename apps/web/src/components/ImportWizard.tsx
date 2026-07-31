@@ -51,6 +51,8 @@ export function ImportWizard({
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [parsing, setParsing] = useState(false);
 
   // Planned locally as the writer types, so the effect of a marker is visible
   // before anything is written to the database.
@@ -67,8 +69,15 @@ export function ImportWizard({
   async function onFile(file: File) {
     setError(null);
     setBusy(true);
+    setProgress(0);
+    setParsing(false);
     try {
-      const result = await api.analyzeDocx(file);
+      const result = await api.analyzeDocx(file, (fraction) => {
+        setProgress(fraction);
+        // Bytes are up; what follows is the server reading the document, which
+        // has no fraction to report.
+        if (fraction >= 1) setParsing(true);
+      });
       setFilename(result.filename);
       setParagraphs(result.paragraphs);
       setHasPageBreaks(result.hasPageBreaks);
@@ -92,6 +101,8 @@ export function ImportWizard({
       setError(err instanceof ApiError ? err.message : "could not read that file");
     } finally {
       setBusy(false);
+      setParsing(false);
+      setProgress(0);
     }
   }
 
@@ -152,8 +163,16 @@ export function ImportWizard({
             />
             <FileUp size={26} />
             <p>Choose a .docx file.</p>
-            <button className="btn" type="button" disabled={busy} onClick={() => fileRef.current?.click()}>
-              {busy ? "Reading…" : "Choose file"}
+            <button
+              className={`btn progress-btn${parsing ? " indeterminate" : ""}`}
+              type="button"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
+              <span className="progress-fill" style={{ transform: `scaleX(${progress})` }} />
+              <span className="progress-label">
+                {parsing ? "Reading…" : busy ? `Uploading ${Math.round(progress * 100)}%` : "Choose file"}
+              </span>
             </button>
             <p className="field-hint">
               Only Word&rsquo;s .docx format. Old .doc files need saving as .docx first.

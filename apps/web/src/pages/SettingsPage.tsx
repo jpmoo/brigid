@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
 import type { Template } from "../api.js";
-import { LevelsPane, TemplatesPane } from "./settings/TemplatesPane.js";
+import { LevelsPane } from "./settings/LevelsPane.js";
+import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 

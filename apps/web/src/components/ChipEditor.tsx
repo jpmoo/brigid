@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { VARIABLES, VARIABLE_NAMES } from "@brigid/shared";
 import type { TemplateInline, TemplateMarks, VariableName } from "@brigid/shared";
 
@@ -26,9 +26,23 @@ const CHIPPABLE = VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline
  */
 const ZWSP = "\u200B";
 
+/** Discard the zero-width guards either side of an atom being removed. */
+function stripGuards(atom: HTMLElement): void {
+  for (const sibling of [atom.previousSibling, atom.nextSibling]) {
+    if (
+      sibling &&
+      sibling.nodeType === Node.TEXT_NODE &&
+      (sibling.textContent ?? "").replace(/\u200B/g, "") === ""
+    ) {
+      sibling.parentNode?.removeChild(sibling);
+    }
+  }
+}
+
 function inlinesToHtml(inlines: readonly TemplateInline[]): string {
   return inlines
     .map((inline) => {
+      if (inline.type === "lineBreak") return "<br>";
       if (inline.type === "tab") {
         return `${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`;
       }
@@ -47,7 +61,11 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
     .join("");
 }
 
-function htmlToInlines(root: HTMLElement, marks: TemplateMarks): TemplateInline[] {
+function htmlToInlines(
+  root: HTMLElement,
+  marks: TemplateMarks,
+  multiline: boolean,
+): TemplateInline[] {
   const out: TemplateInline[] = [];
   const pushText = (raw: string) => {
     const text = raw.replace(/\u200B/g, "");
@@ -83,11 +101,17 @@ function htmlToInlines(root: HTMLElement, marks: TemplateMarks): TemplateInline[
       if (stray) pushText(stray);
       return;
     }
-    // A <br> or a stray wrapper the browser inserted; descend and keep the text.
     if (node.tagName === "BR") {
-      pushText(" ");
+      // Trailing <br> is the filler browsers keep at the end of a contenteditable
+      // block; it isn't a line the writer typed.
+      if (multiline && node.nextSibling) out.push({ type: "lineBreak" });
+      else if (!multiline) pushText(" ");
       return;
     }
+    // A block-level wrapper the browser made when Enter was pressed: its content
+    // starts a new line.
+    const isBlock = /^(DIV|P)$/.test(node.tagName);
+    if (isBlock && multiline && out.length > 0) out.push({ type: "lineBreak" });
     node.childNodes.forEach(walk);
   };
 
@@ -100,9 +124,26 @@ export interface ChipEditorProps {
   marks: TemplateMarks;
   onChange: (next: TemplateInline[]) => void;
   placeholder?: string;
+  /** Allow Enter to start a new line within the same template line. */
+  multiline?: boolean;
+  /**
+   * Hide the built-in chip/tab bar. A table cell is the editing surface itself,
+   * so its controls live in a row beneath the table where there is room for
+   * them — reached through the imperative handle below.
+   */
+  showToolbar?: boolean;
 }
 
-export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorProps) {
+export interface ChipEditorHandle {
+  insertVariable: (name: VariableName) => void;
+  insertTab: () => void;
+  focus: () => void;
+}
+
+export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function ChipEditor(
+  { value, marks, onChange, placeholder, multiline = false, showToolbar = true },
+  handleRef,
+) {
   const ref = useRef<HTMLDivElement>(null);
   const dirty = useRef(false);
 
@@ -120,7 +161,7 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
   const emit = () => {
     if (!ref.current) return;
     dirty.current = true;
-    onChange(htmlToInlines(ref.current, marks));
+    onChange(htmlToInlines(ref.current, marks, multiline));
   };
 
   const insert = (html: string) => {
@@ -148,6 +189,73 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
     emit();
   };
 
+  /**
+   * Delete a chip or tab as one keystroke.
+   *
+   * Left to itself the browser makes this a two- or three-press affair: the
+   * zero-width guards go first, then the atom needs selecting before it will
+   * go. That reads as "it won't delete". Backspace and Delete now take the
+   * whole atom, guards included, when the caret is beside one.
+   */
+  const removeAtomBeside = (dir: -1 | 1): boolean => {
+    const el = ref.current;
+    const selection = window.getSelection();
+    if (!el || !selection || selection.rangeCount === 0 || !selection.isCollapsed) return false;
+
+    const range = selection.getRangeAt(0);
+    if (!el.contains(range.startContainer)) return false;
+
+    let node: Node | null = range.startContainer;
+    // Real text on the side we're deleting toward: let the browser handle it.
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent ?? "";
+      const side = dir === -1 ? text.slice(0, range.startOffset) : text.slice(range.startOffset);
+      if (side.replace(/\u200B/g, "").length > 0) return false;
+    } else if (node === el) {
+      const index = range.startOffset + (dir === -1 ? -1 : 0);
+      node = el.childNodes[index] ?? null;
+      if (node instanceof HTMLElement && (node.dataset.var || node.dataset.tab)) {
+        stripGuards(node);
+        node.remove();
+        return true;
+      }
+      return false;
+    }
+
+    // Step sideways, discarding the zero-width guards on the way.
+    let cursor: Node | null = node;
+    while (cursor && cursor !== el) {
+      const sibling: Node | null = dir === -1 ? cursor.previousSibling : cursor.nextSibling;
+      if (!sibling) {
+        cursor = cursor.parentNode;
+        continue;
+      }
+      if (
+        sibling.nodeType === Node.TEXT_NODE &&
+        (sibling.textContent ?? "").replace(/\u200B/g, "") === ""
+      ) {
+        cursor = sibling;
+        continue;
+      }
+      if (sibling instanceof HTMLElement && (sibling.dataset.var || sibling.dataset.tab)) {
+        stripGuards(sibling);
+        sibling.remove();
+        return true;
+      }
+      return false;
+    }
+    return false;
+  };
+
+  useImperativeHandle(handleRef, () => ({
+    insertVariable: (name) =>
+      insert(
+        `${ZWSP}<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>${ZWSP}`,
+      ),
+    insertTab: () => insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`),
+    focus: () => ref.current?.focus(),
+  }));
+
   return (
     <div className="chip-editor">
       <div
@@ -156,17 +264,28 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
         contentEditable
         suppressContentEditableWarning
         role="textbox"
-        aria-multiline="false"
+        aria-multiline={multiline}
         data-placeholder={placeholder ?? "Type here, or drop in a chip"}
         onInput={emit}
         onBlur={emit}
         onKeyDown={(e) => {
-          // Single line: Enter would create a <div> the serializer would have to
-          // guess at, and a template paragraph is one line by definition.
-          if (e.key === "Enter") e.preventDefault();
+          // A single-line field takes no Enter at all: a template paragraph is
+          // one line by definition. A cell can hold several.
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (multiline) insert("<br>");
+          }
           if (e.key === "Tab") {
             e.preventDefault();
             insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`);
+          }
+          if (e.key === "Backspace" && removeAtomBeside(-1)) {
+            e.preventDefault();
+            emit();
+          }
+          if (e.key === "Delete" && removeAtomBeside(1)) {
+            e.preventDefault();
+            emit();
           }
         }}
         onPaste={(e) => {
@@ -177,6 +296,7 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
         }}
       />
 
+      {showToolbar ? (
       <div className="chip-bar">
         <select
           value=""
@@ -199,12 +319,13 @@ export function ChipEditor({ value, marks, onChange, placeholder }: ChipEditorPr
         <button
           type="button"
           className="btn secondary chip-tab-btn"
-          title="Insert a tab stop"
+          title="Advance to the next tab stop — spacing set by the format's tab stop"
           onClick={() => insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`)}
         >
           ⇥ Tab
         </button>
       </div>
+      ) : null}
     </div>
   );
-}
+});

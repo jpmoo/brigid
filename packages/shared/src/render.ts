@@ -40,6 +40,8 @@ export interface ResolvedSpan extends TemplateMarks {
   placeholder?: boolean;
   /** A tab stop rather than literal text. */
   tab?: boolean;
+  /** A soft line break rather than literal text. */
+  lineBreak?: boolean;
 }
 
 export interface ResolvedCell {
@@ -114,8 +116,9 @@ interface SpanContext {
 }
 
 function resolveInline(inline: TemplateInline, ctx: SpanContext): ResolvedSpan | null {
-  // A tab carries no marks, so narrow it away before reading any.
+  // Neither carries marks, so narrow them away before reading any.
   if (inline.type === "tab") return { text: "\t", tab: true };
+  if (inline.type === "lineBreak") return { text: "\n", lineBreak: true };
 
   const marks: TemplateMarks = {};
   if (inline.bold) marks.bold = true;
