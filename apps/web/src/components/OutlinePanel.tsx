@@ -101,7 +101,10 @@ function OutlineCard(props: CardProps) {
   const text = preview(block);
 
   return (
-    <div className="outline-item" style={{ marginLeft: entry.depth * 16 }}>
+    <div
+      className={`outline-item${props.breakChip ? " has-break" : ""}`}
+      style={{ marginLeft: entry.depth * 16 }}
+    >
       {props.breakChip ? (
         <button
           className={`outline-break${props.breakChip.detached ? " detached" : ""}`}

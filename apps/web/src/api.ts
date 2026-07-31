@@ -141,6 +141,33 @@ export const api = {
     post<{ work: Work }>(`/works/${id}/archive`, { archived }),
 
   listTemplates: () => request<{ templates: Template[] }>("/templates"),
+  createTemplate: (input: {
+    category: "break" | "block-format";
+    name: string;
+    body: TemplateBody;
+    breakSettings?: BreakTemplateSettings;
+    formatSettings?: BlockFormatSettings;
+  }) => post<{ template: Template }>("/templates", input),
+  updateTemplate: (
+    id: string,
+    patch: {
+      name?: string;
+      body?: TemplateBody;
+      breakSettings?: BreakTemplateSettings;
+      formatSettings?: BlockFormatSettings;
+    },
+  ) => request<{ template: Template }>(`/templates/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  deleteTemplate: (id: string) => request<{ ok: true }>(`/templates/${id}`, { method: "DELETE" }),
+
+  listLevels: (workId: string) => request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`),
+  saveLevels: (
+    workId: string,
+    levels: { name: string; breakTemplateId: string | null; counterRestart: "continuous" | "under-parent" }[],
+  ) =>
+    request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`, {
+      method: "PUT",
+      body: JSON.stringify({ levels }),
+    }),
 
   listBlocks: (workId: string) => request<{ blocks: Block[] }>(`/works/${workId}/blocks`),
   createBlock: (

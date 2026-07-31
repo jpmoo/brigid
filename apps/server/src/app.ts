@@ -12,6 +12,7 @@ import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
 import { HttpError } from "./lib/errors.js";
 import { setupRoutes } from "./setup/routes.js";
+import { templatesRoutes } from "./templates/routes.js";
 import { worksRoutes } from "./works/routes.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -59,6 +60,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(authRoutes);
       await scope.register(worksRoutes);
       await scope.register(blocksRoutes);
+      await scope.register(templatesRoutes);
     },
     { prefix: "/api" },
   );

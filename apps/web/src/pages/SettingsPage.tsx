@@ -1,14 +1,36 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
+import type { Template } from "../api.js";
+import { LevelsPane, TemplatesPane } from "./settings/TemplatesPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
+
+const TABS = [
+  { key: "templates", label: "Templates" },
+  { key: "levels", label: "Levels" },
+  { key: "account", label: "Account" },
+  { key: "ollama", label: "Ollama" },
+] as const;
+
+type TabKey = (typeof TABS)[number]["key"];
 
 export function SettingsPage() {
   const { username } = useAuth();
   const navigate = useNavigate();
+  const [tab, setTab] = useState<TabKey>("templates");
+  const [templates, setTemplates] = useState<Template[]>([]);
+
+  const loadTemplates = useCallback(async () => {
+    const { templates: rows } = await api.listTemplates();
+    setTemplates(rows);
+  }, []);
+
+  useEffect(() => {
+    void loadTemplates();
+  }, [loadTemplates]);
 
   // Back to wherever the writer came from — usually the work they were in the
   // middle of, not the library. react-router records its position in history
@@ -41,22 +63,45 @@ export function SettingsPage() {
           <h2>Settings</h2>
         </div>
 
-        <PasswordCard />
+        <nav className="tabs" role="tablist">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={tab === t.key}
+              className={tab === t.key ? "selected" : ""}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </nav>
 
-        <div className="card" style={{ marginTop: 18 }}>
-          <h3 className="card-title">Ollama</h3>
-          <p className="card-subtitle" style={{ marginBottom: 0 }}>
-            Brigid will connect to an Ollama host and let you pick a model for inference and
-            another for summarization. Not built yet — the settings row is in the database waiting
-            for it.
-          </p>
+        <div className="card tab-panel" role="tabpanel">
+          {tab === "templates" ? (
+            <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
+          ) : tab === "levels" ? (
+            <LevelsPane templates={templates} />
+          ) : tab === "account" ? (
+            <PasswordFields />
+          ) : (
+            <>
+              <h3 className="card-title">Ollama</h3>
+              <p className="card-subtitle" style={{ marginBottom: 0 }}>
+                Brigid will connect to an Ollama host and let you pick a model for inference and
+                another for summarization. Not built yet — the settings row is in the database
+                waiting for it.
+              </p>
+            </>
+          )}
         </div>
       </main>
     </>
   );
 }
 
-function PasswordCard() {
+function PasswordFields() {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -87,7 +132,7 @@ function PasswordCard() {
   }
 
   return (
-    <form className="card" onSubmit={onSubmit}>
+    <form onSubmit={onSubmit}>
       <h3 className="card-title">Password</h3>
       <p className="card-subtitle">Brigid has one account, and this is its password.</p>
 

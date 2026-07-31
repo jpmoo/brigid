@@ -1150,36 +1150,49 @@ input::placeholder {
   margin-bottom: 3px;
 }
 
-/* A break is attached to the top of the block it precedes and travels with it,
-   so it reads as part of that block's entry and is never separately draggable. */
+/* A break belongs to the block it precedes and travels with it, so it is drawn
+   as a shaded layer over the top of that block's entry rather than as a
+   separate row — the tint runs behind the card so the two read as one object
+   with the break capping it. */
+.outline-item.has-break {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border-radius: var(--radius);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 .outline-break {
   display: flex;
   align-items: center;
   gap: 5px;
   width: 100%;
-  padding: 3px 8px 3px 40px;
+  padding: 5px 10px 3px 44px;
   background: none;
   border: 0;
-  border-left: 2px solid var(--border-strong);
-  margin-left: 34px;
   font: inherit;
   font-size: 10px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  color: var(--text-faint);
+  color: var(--text-muted);
   cursor: pointer;
   text-align: left;
 }
 
 .outline-break:hover {
   color: var(--accent);
-  border-left-color: var(--accent);
+}
+
+.outline-item.has-break .outline-card {
+  /* Sits on the shaded layer rather than beside it. */
+  background: none;
+}
+
+.outline-item.has-break .outline-card:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
 }
 
 .outline-break.detached {
   color: var(--accent);
-  border-left-style: double;
-  border-left-width: 4px;
+  font-weight: 700;
 }
 
 .outline-break span {
@@ -1272,4 +1285,173 @@ input::placeholder {
   margin-bottom: 18px;
   padding: 6px 12px;
   font-size: 13px;
+}
+
+/* --- Settings tabs ---------------------------------------------------- */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: -1px;
+}
+
+.tabs button {
+  padding: 8px 15px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tabs button:hover {
+  color: var(--text);
+}
+
+.tabs button.selected {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.tab-panel {
+  border-top-left-radius: 0;
+}
+
+/* --- Template library ------------------------------------------------- */
+
+.tpl-layout {
+  display: flex;
+  gap: 22px;
+  align-items: flex-start;
+}
+
+.tpl-list {
+  flex: 0 0 210px;
+}
+
+.tpl-group + .tpl-group {
+  margin-top: 18px;
+}
+
+.tpl-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 5px;
+}
+
+.tpl-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  background: none;
+  border: 0;
+  border-radius: var(--radius);
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.tpl-item:hover {
+  background: var(--surface-sunken);
+}
+
+.tpl-item.selected {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+  font-weight: 600;
+}
+
+.tpl-item em {
+  font-size: 10px;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+
+.tpl-detail {
+  flex: 1;
+  min-width: 0;
+}
+
+.tpl-section {
+  margin: 22px 0 10px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.check input {
+  width: auto;
+  margin-top: 2px;
+}
+
+.check em {
+  font-style: normal;
+  color: var(--text-faint);
+}
+
+/* --- Levels ----------------------------------------------------------- */
+
+.level-rows {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.level-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.level-row:last-child {
+  border-bottom: 0;
+}
+
+.level-depth {
+  flex: 0 0 20px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.level-row input[type="text"] {
+  flex: 0 0 150px;
+}
+
+.level-row select {
+  flex: 1;
+  min-width: 0;
 }
