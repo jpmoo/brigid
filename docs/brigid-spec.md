@@ -100,6 +100,22 @@ Two categories, as you framed them:
 editable as prose, never counted toward word count. Built-in: chapter break,
 section break. The user can define others (subsection break, part break, …).
 
+Breaks are **instantiable**. A break renders from the template bound to its
+level until the writer edits that specific one, at which point the body is
+copied onto the block (`blocks.break_body`) and that break becomes its own
+thing — so one chapter break can read "CHAPTER TWO — THE CROSSING" while every
+other still follows the template.
+
+Copy-on-edit rather than copy-on-create, because the two requirements pull
+against each other: eagerly instantiating every break would mean dragging a
+block to a new indentation could no longer change the break before it (§5.4).
+Unedited breaks follow their level and change on a move; edited ones keep what
+was written.
+
+_OPEN._ What should happen to an *edited* break when its block moves to a
+different level. Currently the edit wins and survives the move, on the grounds
+that it was explicit. The alternative is to re-derive and discard it, or to ask.
+
 **Block-format templates** — "block format." Wrap a block's own content.
 Built-in: regular text, title page. Each carries:
 

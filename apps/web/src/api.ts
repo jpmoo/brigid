@@ -64,6 +64,34 @@ export interface WorkLevel {
   counterRestart: "continuous" | "under-parent";
 }
 
+export interface Block {
+  id: string;
+  workId: string;
+  parentId: string | null;
+  sortKey: string;
+  label: string | null;
+  formatId: string;
+  content: Record<string, unknown> | null;
+  contentText: string;
+  wordCount: number;
+}
+
+export interface Template {
+  id: string;
+  category: "break" | "block-format";
+  name: string;
+  builtinKey: string | null;
+  body: { nodes: unknown[] };
+  breakSettings: { suppressOnFirstChild: boolean } | null;
+  formatSettings: {
+    countsTowardWordCount: boolean;
+    structural: boolean;
+    rendersInDocument: boolean;
+  } | null;
+}
+
+export type Placement = "root" | "sibling" | "child" | "parent";
+
 export interface ProvisionInput {
   admin: {
     host: string;
@@ -106,4 +134,19 @@ export const api = {
   getWork: (id: string) => request<{ work: Work; levels: WorkLevel[] }>(`/works/${id}`),
   archiveWork: (id: string, archived: boolean) =>
     post<{ work: Work }>(`/works/${id}/archive`, { archived }),
+
+  listTemplates: () => request<{ templates: Template[] }>("/templates"),
+
+  listBlocks: (workId: string) => request<{ blocks: Block[] }>(`/works/${workId}/blocks`),
+  createBlock: (
+    workId: string,
+    input: { formatId: string; placement: Placement; relativeTo?: string | null; label?: string | null },
+  ) => post<{ block: Block }>(`/works/${workId}/blocks`, input),
+  updateBlock: (
+    id: string,
+    patch: { label?: string | null; formatId?: string; content?: Record<string, unknown> | null },
+  ) => request<{ block: Block }>(`/blocks/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
+    post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),
+  deleteBlock: (id: string) => request<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
 };

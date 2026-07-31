@@ -2,7 +2,7 @@
   "name": "brigid",
   "version": "0.1.0",
   "private": true,
-  "description": "Brigid — a self-hosted novel writing application",
+  "description": "Brigid \u2014 a self-hosted novel writing application",
   "type": "module",
   "packageManager": "pnpm@9.12.0",
   "engines": {
@@ -12,6 +12,7 @@
     "build": "pnpm -r build",
     "start": "pnpm --filter @brigid/server start",
     "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
     "dev:server": "pnpm --filter @brigid/server dev",
     "dev:web": "pnpm --filter @brigid/web dev",
     "build:web": "pnpm --filter @brigid/web build",

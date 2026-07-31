@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
 import { Archive, BookOpen, LogOut, Plus } from "lucide-react";
+import { Link } from "react-router-dom";
 import { ApiError, api } from "../api.js";
 import type { Work } from "../api.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
@@ -94,8 +95,10 @@ export function LibraryPage() {
           <div className="work-grid">
             {works.map((work) => (
               <div className="work-card" key={work.id}>
-                <h3>{work.title}</h3>
-                {work.subtitle ? <p className="sub">{work.subtitle}</p> : null}
+                <Link className="work-card-open" to={`/works/${work.id}`}>
+                  <h3>{work.title}</h3>
+                  {work.subtitle ? <p className="sub">{work.subtitle}</p> : null}
+                </Link>
                 <div className="meta">
                   <span>
                     <BookOpen size={12} style={{ verticalAlign: -1 }} />{" "}

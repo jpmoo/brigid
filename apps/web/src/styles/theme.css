@@ -510,3 +510,376 @@ input::placeholder {
   font-family: var(--serif);
   font-style: italic;
 }
+
+/* --- Work view: outline beside the manuscript ------------------------- */
+
+.work-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.work-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.work-title strong {
+  font-family: var(--serif);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.work-title em {
+  font-family: var(--serif);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.work-error {
+  margin: 10px 20px 0;
+}
+
+.work-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  position: relative;
+}
+
+.outline-panel {
+  width: 336px;
+  flex: 0 0 336px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+  transition: transform 0.16s ease, opacity 0.16s ease;
+}
+
+/* Unpinned, the panel floats over the manuscript instead of taking a column
+   from it, and retracts to a thin edge until the pointer comes back. */
+.outline-panel.floating {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 8;
+  box-shadow: var(--shadow-lift);
+}
+
+.panel-hidden .outline-panel.floating {
+  transform: translateX(calc(-100% + 10px));
+  opacity: 0.5;
+}
+
+.outline-head-bar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  z-index: 2;
+}
+
+.outline-list {
+  padding: 10px;
+}
+
+.outline-empty {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.outline-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  margin-bottom: 3px;
+}
+
+.outline-card:hover {
+  background: var(--surface-sunken);
+}
+
+.outline-card.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 32%, transparent);
+}
+
+/* Notes live in the outline but never reach the page; the dashed rule says so
+   without needing a legend. */
+.outline-card.note {
+  border-left: 2px dashed var(--border-strong);
+}
+
+.outline-gutter {
+  flex: 0 0 34px;
+  padding: 8px 0 0;
+  text-align: right;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.outline-body {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  padding: 6px 2px 7px;
+  cursor: pointer;
+}
+
+.outline-head {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.outline-twisty {
+  display: inline-flex;
+  width: 15px;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.outline-twisty.spacerless {
+  cursor: default;
+}
+
+.outline-label {
+  font-family: var(--serif);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.outline-label em {
+  color: var(--text-faint);
+  font-weight: 400;
+}
+
+.outline-level {
+  margin-left: auto;
+  padding-left: 6px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.outline-preview {
+  margin: 3px 0 0 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.outline-menu-wrap {
+  position: relative;
+  padding-top: 4px;
+}
+
+.outline-kebab {
+  opacity: 0;
+}
+
+.outline-card:hover .outline-kebab,
+.outline-card.selected .outline-kebab,
+.outline-kebab[aria-expanded="true"] {
+  opacity: 1;
+}
+
+.outline-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: none;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.outline-add:hover {
+  color: var(--text);
+  background: var(--surface-sunken);
+}
+
+/* --- Kebab menu ------------------------------------------------------- */
+
+.menu-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  z-index: 41;
+  min-width: 180px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lift);
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 9px;
+  background: none;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.menu button:hover:not(:disabled) {
+  background: var(--surface-sunken);
+}
+
+.menu button:disabled {
+  color: var(--text-faint);
+  cursor: not-allowed;
+}
+
+.menu button.danger {
+  color: var(--danger);
+}
+
+.menu hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+/* --- The manuscript --------------------------------------------------- */
+
+.document-pane {
+  flex: 1;
+  overflow-y: auto;
+  padding: 32px 20px 200px;
+  background: var(--surface-sunken);
+}
+
+/* Page-*like*: the right measure and proportions of a 6x9 trim, without real
+   page boundaries. Pagination is an export concern. */
+.page-sheet {
+  max-width: 34em;
+  margin: 0 auto;
+  padding: 56px 60px 80px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  box-shadow: var(--shadow);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.62;
+}
+
+.doc-block {
+  border-radius: 3px;
+  transition: background 0.15s;
+}
+
+.doc-block.selected {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.doc-break {
+  user-select: none;
+}
+
+.prose {
+  margin: 0;
+  text-indent: 1.4em;
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* Only an opening paragraph runs flush, as in print — the one after a break, or
+   the very first in the manuscript. A block that merely continues a scene is
+   still mid-prose, so its first paragraph indents like any other. */
+.doc-break + .doc-block .prose:first-child,
+.page-sheet > .doc-block:first-child .prose:first-child {
+  text-indent: 0;
+}
+
+.prose.empty {
+  color: var(--text-faint);
+  font-style: italic;
+  text-indent: 0;
+  text-align: left;
+}
+
+.tpl-para {
+  margin: 0;
+}
+
+.align-left { text-align: left; }
+.align-center { text-align: center; }
+.align-right { text-align: right; }
+
+.spacer-lines {
+  width: 100%;
+}
+
+.page-break {
+  margin: 28px -60px;
+  border-top: 1px dashed var(--border-strong);
+}
+
+/* A variable that can't resolve until export renders as a visible token rather
+   than a plausible-looking number. */
+.placeholder-var {
+  padding: 0 3px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--text-muted);
+  font-family: var(--sans);
+  font-size: 0.8em;
+}
+
+.work-card-open {
+  display: block;
+  color: inherit;
+}
+
+.work-card-open:hover {
+  text-decoration: none;
+}

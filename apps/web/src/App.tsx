@@ -3,6 +3,7 @@ import { useAuth } from "./auth/AuthContext.js";
 import { LibraryPage } from "./pages/LibraryPage.js";
 import { LoginPage } from "./pages/LoginPage.js";
 import { SetupPage } from "./pages/SetupPage.js";
+import { WorkPage } from "./pages/WorkPage.js";
 
 export function App() {
   const { loading, needsSetup, username } = useAuth();
@@ -18,6 +19,7 @@ export function App() {
   return (
     <Routes>
       <Route path="/" element={<LibraryPage />} />
+      <Route path="/works/:id" element={<WorkPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

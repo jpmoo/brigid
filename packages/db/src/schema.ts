@@ -162,6 +162,16 @@ export const blocks = pgTable(
     /** Plain-text projection of `content`, for word counting and search. */
     contentText: text("content_text").notNull().default(""),
     /**
+     * A detached break instance. Null means the block's break still renders from
+     * whatever template its level binds — which is what makes a drag between
+     * indentations change the break. Editing one break copies the body here, and
+     * from then on that break belongs to this block alone.
+     */
+    breakTemplateId: uuid("break_template_id").references(() => templates.id, {
+      onDelete: "set null",
+    }),
+    breakBody: jsonb("break_body").$type<TemplateBody>(),
+    /**
      * Always maintained, for every block, regardless of whether the block's
      * format contributes to the manuscript total.
      */
