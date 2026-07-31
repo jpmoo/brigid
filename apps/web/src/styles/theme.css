@@ -773,6 +773,9 @@ input::placeholder {
   right: 0;
   top: 100%;
   z-index: 41;
+  /* Flips above the button when there isn't room below, so an entry near the
+     foot of the panel doesn't open a menu into the scroll edge. */
+  max-height: none;
   min-width: 180px;
   padding: 5px;
   background: var(--surface);
@@ -1162,11 +1165,10 @@ input::placeholder {
    break caps it. The rule runs down the sides of the cap too — the cap is part
    of the block, not a label floating above it. */
 .outline-item {
+  position: relative;
   margin-bottom: 4px;
   border: 1px solid color-mix(in srgb, var(--accent) 20%, transparent);
   border-radius: var(--radius);
-  /* So the cap's tint stops at the rounded corners. */
-  overflow: hidden;
 }
 
 .outline-item:hover {
@@ -1177,9 +1179,13 @@ input::placeholder {
    as a cap over the top of that block's entry rather than as a separate row.
    Only the cap is shaded — shading the whole entry made every block with a
    break look selected. */
+/* The cap rounds its own top corners rather than the entry clipping them:
+   `overflow: hidden` here would cut off the block menu, which escapes the
+   entry's box. Inset by the 1px border so no sliver of tint shows outside it. */
 .outline-item.has-break .outline-break {
   background: color-mix(in srgb, var(--accent) 9%, transparent);
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
+  border-radius: calc(var(--radius) - 1px) calc(var(--radius) - 1px) 0 0;
 }
 
 .outline-break {
