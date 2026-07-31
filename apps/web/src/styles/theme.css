@@ -117,13 +117,13 @@ a:hover {
 }
 
 .brand-logo {
-  width: 88px;
+  width: 116px;
   height: auto;
   display: block;
 }
 
 .brand-wordmark {
-  width: 176px;
+  width: 212px;
   height: auto;
   display: block;
 }
@@ -346,20 +346,30 @@ input::placeholder {
 }
 
 .app-header .mark {
-  width: 27px;
+  width: 34px;
   height: auto;
   display: block;
 }
 
 @media (prefers-color-scheme: dark) {
-  .app-header .mark {
+  .app-header .mark,
+  .app-header .wordmark {
     filter: brightness(1.9) saturate(0.75);
   }
 }
 
 .app-header h1 {
-  font-size: 17px;
-  letter-spacing: 0.02em;
+  margin: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* Sized by height so it sits on the same optical baseline as the mark beside
+   it, regardless of the wordmark's 3.4:1 aspect. */
+.app-header .wordmark {
+  height: 19px;
+  width: auto;
+  display: block;
 }
 
 .spacer {

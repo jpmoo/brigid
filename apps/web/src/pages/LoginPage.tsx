@@ -26,7 +26,7 @@ export function LoginPage() {
   return (
     <div className="screen">
       <div className="screen-inner">
-        <Brand tagline="Every story starts somewhere." />
+        <Brand />
         <form className="card" onSubmit={onSubmit}>
           {error ? <div className="alert error">{error}</div> : null}
 

@@ -18,3 +18,15 @@ export function Brand({ tagline }: { tagline?: string }) {
 export function BrandMark() {
   return <img className="mark" src={asset("brigid-logo.svg")} alt="" />;
 }
+
+/**
+ * The wordmark as the app's heading. It stays wrapped in an h1 so the page keeps
+ * a real top-level heading — the alt text is what a screen reader announces.
+ */
+export function BrandHeading() {
+  return (
+    <h1>
+      <img className="wordmark" src={asset("brigid-title.svg")} alt="Brigid" />
+    </h1>
+  );
+}

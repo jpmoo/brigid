@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Archive, BookOpen, LogOut, Plus } from "lucide-react";
 import { ApiError, api } from "../api.js";
 import type { Work } from "../api.js";
-import { BrandMark } from "../components/Brand.js";
+import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 
 const wordFmt = new Intl.NumberFormat();
@@ -48,7 +48,7 @@ export function LibraryPage() {
     <>
       <header className="app-header">
         <BrandMark />
-        <h1>Brigid</h1>
+        <BrandHeading />
         <div className="spacer" />
         <span className="muted" style={{ fontSize: 13 }}>
           {username}
