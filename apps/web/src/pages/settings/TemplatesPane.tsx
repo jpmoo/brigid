@@ -4,6 +4,7 @@ import type { BlockFormatSettings, BreakTemplateSettings, TemplateBody } from "@
 import { ApiError, api } from "../../api.js";
 import type { Template } from "../../api.js";
 import { BodyEditor } from "../../components/BodyEditor.js";
+import { StyleMenu } from "../../components/StyleMenu.js";
 
 const EMPTY_BREAK: BreakTemplateSettings = { suppressOnFirstChild: false, indentFirstParagraph: false };
 const EMPTY_FORMAT: BlockFormatSettings = {
@@ -118,9 +119,13 @@ function TemplateEditor({
   const [busy, setBusy] = useState(false);
 
   const isBreak = template.category === "break";
+  // A format whose body is just the content slot has no layout to arrange —
+  // only type. It edits as a style menu over a sample instead.
+  const isStyleOnly =
+    !isBreak && body.nodes.length === 1 && body.nodes[0]?.type === "content";
   const typo = (isBreak ? brk.typography : fmt.typography) ?? {};
-  const setTypo = (patch: Partial<NonNullable<BreakTemplateSettings["typography"]>>) => {
-    const next = { ...typo, ...patch };
+  const setTypo = (next: NonNullable<BreakTemplateSettings["typography"]>) => {
+    setSaved(false);
     if (isBreak) setBrk({ ...brk, typography: next });
     else setFmt({ ...fmt, typography: next });
   };
@@ -173,14 +178,29 @@ function TemplateEditor({
         />
       </div>
 
-      <h4 className="tpl-section">Body</h4>
-      <BodyEditor
-        body={body}
-        onChange={(b) => {
-          setBody(b);
-          setSaved(false);
-        }}
-      />
+      {isStyleOnly ? (
+        <>
+          <h4 className="tpl-section">Style</h4>
+          <StyleMenu
+            value={typo}
+            onChange={(t) => {
+              setFmt({ ...fmt, typography: t });
+              setSaved(false);
+            }}
+          />
+        </>
+      ) : (
+        <>
+          <h4 className="tpl-section">Layout</h4>
+          <BodyEditor
+            body={body}
+            onChange={(b) => {
+              setBody(b);
+              setSaved(false);
+            }}
+          />
+        </>
+      )}
 
       <h4 className="tpl-section">Behaviour</h4>
       {isBreak ? (
@@ -239,67 +259,12 @@ function TemplateEditor({
         </div>
       )}
 
-      <h4 className="tpl-section">Manuscript typography</h4>
-      <p className="field-hint" style={{ marginBottom: 12 }}>
-        Used in Manuscript mode only. Book mode keeps its own type.
-      </p>
-      <div className="row">
-        <div className="field">
-          <label className="field-label">Font</label>
-          <input
-            type="text"
-            value={typo.fontFamily ?? ""}
-            placeholder='"Courier New", monospace'
-            onChange={(e) => setTypo({ fontFamily: e.target.value || undefined })}
-          />
-        </div>
-        <div className="field" style={{ maxWidth: 90 }}>
-          <label className="field-label">Size (pt)</label>
-          <input
-            type="number"
-            min={4}
-            max={96}
-            value={typo.fontSizePt ?? ""}
-            onChange={(e) => setTypo({ fontSizePt: Number(e.target.value) || undefined })}
-          />
-        </div>
-        <div className="field" style={{ maxWidth: 90 }}>
-          <label className="field-label">Line height</label>
-          <input
-            type="number"
-            min={0.8}
-            max={4}
-            step={0.1}
-            value={typo.lineHeight ?? ""}
-            onChange={(e) => setTypo({ lineHeight: Number(e.target.value) || undefined })}
-          />
-        </div>
-      </div>
-      <div className="row">
-        <div className="field">
-          <label className="field-label">Alignment</label>
-          <select
-            value={typo.align ?? "left"}
-            onChange={(e) => setTypo({ align: e.target.value as "left" })}
-          >
-            <option value="left">Left (ragged)</option>
-            <option value="justify">Justified</option>
-            <option value="center">Centre</option>
-            <option value="right">Right</option>
-          </select>
-        </div>
-        <div className="field">
-          <label className="field-label">First-line indent (in)</label>
-          <input
-            type="number"
-            min={0}
-            max={3}
-            step={0.05}
-            value={typo.firstLineIndentIn ?? ""}
-            onChange={(e) => setTypo({ firstLineIndentIn: Number(e.target.value) || undefined })}
-          />
-        </div>
-      </div>
+      {isStyleOnly ? null : (
+        <>
+          <h4 className="tpl-section">Manuscript typography</h4>
+          <StyleMenu value={typo} onChange={(t) => setTypo(t)} />
+        </>
+      )}
 
       <div className="modal-actions">
         {template.builtinKey ? (

@@ -26,13 +26,47 @@ export interface TemplateMarks {
 
 export type TemplateInline =
   | ({ type: "text"; text: string } & TemplateMarks)
-  | ({ type: "variable"; name: VariableName; numberFormat?: NumberFormat } & TemplateMarks);
+  | ({ type: "variable"; name: VariableName; numberFormat?: NumberFormat } & TemplateMarks)
+  /** A tab stop. Advances to the next stop rather than inserting fixed space. */
+  | { type: "tab" };
+
+/**
+ * Tables, for the parts of a manuscript that are genuinely tabular — a title
+ * page's contact block, a header with the author on the left and a page number
+ * on the right. Deliberately plain: rules, widths and alignment, with no
+ * shading or colour.
+ */
+export interface TableColumn {
+  /** Share of the table width, 0–1. The set is normalized when rendered. */
+  width: number;
+  align?: TemplateAlign;
+}
+
+export interface TableCell {
+  content: TemplateInline[];
+  align?: TemplateAlign;
+}
+
+export interface TableRow {
+  cells: TableCell[];
+}
+
+export interface TableBorders {
+  /** Rule around the outside of the table. */
+  outer: boolean;
+  /** Rules between rows. */
+  rows: boolean;
+  /** Rules between columns. */
+  columns: boolean;
+  widthPt?: number;
+}
 
 export type TemplateNode =
   | { type: "paragraph"; align?: TemplateAlign; content: TemplateInline[] }
   /** Vertical whitespace measured in blank lines — the usual scene-break unit. */
   | { type: "spacer"; lines: number }
   | { type: "pageBreak" }
+  | { type: "table"; columns: TableColumn[]; rows: TableRow[]; borders: TableBorders }
   /** Where the block's own prose lands. Meaningful in `block-format` only. */
   | { type: "content" };
 
@@ -74,6 +108,8 @@ export interface Typography {
   /** CSS font stack, exactly as the writer specifies it. */
   fontFamily?: string;
   fontSizePt?: number;
+  fontWeight?: number;
+  italic?: boolean;
   /** Multiple of the font size. 2 is double-spaced. */
   lineHeight?: number;
   align?: "left" | "justify" | "center" | "right";
@@ -81,7 +117,30 @@ export interface Typography {
   firstLineIndentIn?: number;
   /** Blank space between paragraphs, as a multiple of the line height. */
   paragraphSpacingEm?: number;
+  /** Distance between tab stops, in inches. */
+  tabStopIn?: number;
 }
+
+/**
+ * Fonts that are actually available without shipping webfonts — the stacks
+ * below all resolve on a stock Mac, Windows or Linux box. A manuscript that
+ * renders differently on the reader's machine than on the writer's is worse
+ * than a plain one.
+ */
+export const FONT_CHOICES: { label: string; stack: string }[] = [
+  { label: "System sans", stack: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" },
+  { label: "System serif", stack: "ui-serif, Georgia, Cambria, Times New Roman, serif" },
+  { label: "Courier", stack: '"Courier New", Courier, monospace' },
+  { label: "Georgia", stack: "Georgia, 'Times New Roman', serif" },
+  { label: "Times New Roman", stack: "'Times New Roman', Times, serif" },
+  { label: "Palatino", stack: "'Palatino Linotype', Palatino, 'Book Antiqua', serif" },
+  { label: "Garamond", stack: "Garamond, 'EB Garamond', Georgia, serif" },
+  { label: "Baskerville", stack: "Baskerville, 'Libre Baskerville', Georgia, serif" },
+  { label: "Helvetica", stack: "Helvetica, Arial, sans-serif" },
+  { label: "Arial", stack: "Arial, Helvetica, sans-serif" },
+  { label: "Verdana", stack: "Verdana, Geneva, sans-serif" },
+  { label: "Monospace", stack: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" },
+];
 
 /**
  * Where a block begins a new *section* of the document, in the sense Word and

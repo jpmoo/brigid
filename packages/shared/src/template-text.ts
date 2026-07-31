@@ -48,7 +48,9 @@ export function serializeInlines(inlines: readonly TemplateInline[]): string {
     .map((inline) =>
       inline.type === "text"
         ? inline.text
-        : `{{${inline.name}${inline.numberFormat ? `:${inline.numberFormat}` : ""}}}`,
+        : inline.type === "tab"
+          ? "\t"
+          : `{{${inline.name}${inline.numberFormat ? `:${inline.numberFormat}` : ""}}}`,
     )
     .join("");
 }
@@ -59,7 +61,9 @@ export function commonMarks(inlines: readonly TemplateInline[]): TemplateMarks {
   const keys: (keyof TemplateMarks)[] = ["bold", "italic", "smallCaps", "allCaps"];
   const out: TemplateMarks = {};
   for (const key of keys) {
-    if (inlines.every((i) => i[key])) out[key] = true;
+    // Tabs carry no marks; ignoring them keeps one from clearing every toggle.
+    const marked = inlines.filter((i) => i.type !== "tab");
+    if (marked.length > 0 && marked.every((i) => i[key])) out[key] = true;
   }
   return out;
 }

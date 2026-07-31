@@ -30,8 +30,11 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
   return {
     fontFamily: t.fontFamily,
     fontSize: t.fontSizePt ? `${t.fontSizePt}pt` : undefined,
+    fontWeight: t.fontWeight,
+    fontStyle: t.italic ? "italic" : undefined,
     lineHeight: t.lineHeight,
     textAlign: t.align,
+    tabSize: t.tabStopIn ? `${t.tabStopIn}in` : undefined,
   };
 }
 
@@ -61,6 +64,49 @@ function Nodes({
             return <div className="page-break" key={i} aria-label="Page break" />;
           case "spacer":
             return <div className="spacer-lines" key={i} style={{ height: `${node.lines * 1.5}em` }} />;
+          case "table": {
+            const total = node.columns.reduce((sum, c) => sum + (c.width || 0), 0) || 1;
+            const b = node.borders;
+            const rule = `${b.widthPt ?? 1}pt solid currentColor`;
+            return (
+              <table
+                className="tpl-table"
+                key={i}
+                style={{ border: b.outer ? rule : undefined }}
+              >
+                <colgroup>
+                  {node.columns.map((c, ci) => (
+                    <col key={ci} style={{ width: `${((c.width || 0) / total) * 100}%` }} />
+                  ))}
+                </colgroup>
+                <tbody>
+                  {node.rows.map((row, ri) => (
+                    <tr key={ri} style={{ borderTop: b.rows && ri > 0 ? rule : undefined }}>
+                      {row.cells.map((cell, ci) => (
+                        <td
+                          key={ci}
+                          style={{
+                            textAlign: cell.align ?? node.columns[ci]?.align ?? "left",
+                            borderLeft: b.columns && ci > 0 ? rule : undefined,
+                          }}
+                        >
+                          {cell.spans.map((span, si) => (
+                            <span
+                              key={si}
+                              className={span.placeholder ? "placeholder-var" : undefined}
+                              style={spanStyle(span)}
+                            >
+                              {span.tab ? "\u0009" : span.text}
+                            </span>
+                          ))}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            );
+          }
           case "paragraph":
             return (
               <p
@@ -68,15 +114,19 @@ function Nodes({
                 key={i}
                 style={mode === "manuscript" ? { textAlign: node.align } : undefined}
               >
-                {node.spans.map((span, j) => (
-                  <span
-                    key={j}
-                    className={span.placeholder ? "placeholder-var" : undefined}
-                    style={spanStyle(span)}
-                  >
-                    {span.text}
-                  </span>
-                ))}
+                {node.spans.map((span, j) =>
+                  span.tab ? (
+                    <span className="tpl-tab" key={j} />
+                  ) : (
+                    <span
+                      key={j}
+                      className={span.placeholder ? "placeholder-var" : undefined}
+                      style={spanStyle(span)}
+                    >
+                      {span.text}
+                    </span>
+                  ),
+                )}
               </p>
             );
           case "content":

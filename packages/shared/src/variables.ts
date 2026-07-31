@@ -17,6 +17,7 @@ export const VARIABLE_NAMES = [
   "manuscriptSubtitle",
   "authorFirstName",
   "authorLastName",
+  "authorFullName",
   "levelCounter",
   "levelTitle",
   "runningChapterTitle",
@@ -108,6 +109,16 @@ export const VARIABLES: Record<VariableName, VariableDef> = {
   authorLastName: {
     name: "authorLastName",
     label: "Author last name",
+    scope: "work",
+    insertAs: "inline",
+    resolvesWhileDrafting: true,
+    numeric: false,
+  },
+  // First and last together, because asking for two chips and a space is the
+  // commonest case and the silliest thing to make someone assemble by hand.
+  authorFullName: {
+    name: "authorFullName",
+    label: "Author full name",
     scope: "work",
     insertAs: "inline",
     resolvesWhileDrafting: true,

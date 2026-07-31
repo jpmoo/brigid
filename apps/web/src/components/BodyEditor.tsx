@@ -1,12 +1,12 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { VARIABLES, VARIABLE_NAMES, commonMarks, parseInlines, serializeInlines } from "@brigid/shared";
-import type { TemplateBody, TemplateNode, VariableName } from "@brigid/shared";
+import { commonMarks } from "@brigid/shared";
+import type { TemplateBody, TemplateNode } from "@brigid/shared";
+import { ChipEditor } from "./ChipEditor.js";
 
 /**
  * Edits a template body — the shared shape behind break templates, block
- * formats, and running heads. Paragraph text is plain, with `{{variable}}`
- * tokens for anything resolved at render, so a chapter break can be typed
- * rather than assembled node by node.
+ * formats, and running heads. Text lines are typed directly, with variables
+ * dropped in as chips and tabs as visible stops.
  */
 export function BodyEditor({
   body,
@@ -110,24 +110,22 @@ function ParagraphRow({
   node: Extract<TemplateNode, { type: "paragraph" }>;
   onChange: (next: TemplateNode) => void;
 }) {
-  const text = serializeInlines(node.content);
   const marks = commonMarks(node.content);
 
-  const rewrite = (nextText: string, nextMarks = marks) =>
-    onChange({ ...node, content: parseInlines(nextText, nextMarks) });
-
-  const insert = (name: VariableName) => rewrite(`${text}{{${name}}}`);
-
-  const toggle = (key: "bold" | "italic" | "smallCaps" | "allCaps") =>
-    rewrite(text, { ...marks, [key]: !marks[key] });
+  const toggle = (key: "bold" | "italic" | "smallCaps" | "allCaps") => {
+    const next = { ...marks, [key]: !marks[key] };
+    onChange({
+      ...node,
+      content: node.content.map((i) => (i.type === "tab" ? i : { ...i, ...next })),
+    });
+  };
 
   return (
     <div className="be-para">
-      <input
-        type="text"
-        value={text}
-        placeholder="Chapter {{levelCounter}}"
-        onChange={(e) => rewrite(e.target.value)}
+      <ChipEditor
+        value={node.content}
+        marks={marks}
+        onChange={(content) => onChange({ ...node, content })}
       />
       <div className="be-controls">
         <select
@@ -153,18 +151,6 @@ function ParagraphRow({
           </button>
         ))}
 
-        <select
-          value=""
-          onChange={(e) => e.target.value && insert(e.target.value as VariableName)}
-          title="Insert a variable"
-        >
-          <option value="">Insert variable…</option>
-          {VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline").map((n) => (
-            <option key={n} value={n}>
-              {VARIABLES[n].label}
-            </option>
-          ))}
-        </select>
       </div>
     </div>
   );

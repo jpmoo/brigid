@@ -2,10 +2,12 @@ import { formatNumber } from "./numbering.js";
 import { buildOutline, computeCounters } from "./outline.js";
 import type { BlockNode, LevelLike, OutlineEntry, TemplateLike } from "./outline.js";
 import type {
+  SectionStart,
+  TableBorders,
+  TableColumn,
   TemplateAlign,
   TemplateInline,
   TemplateMarks,
-  SectionStart,
   TemplateNode,
   Typography,
 } from "./templates.js";
@@ -36,12 +38,25 @@ export interface ResolvedSpan extends TemplateMarks {
   text: string;
   /** Set when the span came from a variable that couldn't be resolved yet. */
   placeholder?: boolean;
+  /** A tab stop rather than literal text. */
+  tab?: boolean;
+}
+
+export interface ResolvedCell {
+  spans: ResolvedSpan[];
+  align?: TemplateAlign;
 }
 
 export type ResolvedNode =
   | { type: "paragraph"; align: TemplateAlign; spans: ResolvedSpan[] }
   | { type: "spacer"; lines: number }
   | { type: "pageBreak" }
+  | {
+      type: "table";
+      columns: TableColumn[];
+      borders: TableBorders;
+      rows: { cells: ResolvedCell[] }[];
+    }
   | { type: "content" };
 
 /** One item in the stitched document, in reading order. */
@@ -99,6 +114,9 @@ interface SpanContext {
 }
 
 function resolveInline(inline: TemplateInline, ctx: SpanContext): ResolvedSpan | null {
+  // A tab carries no marks, so narrow it away before reading any.
+  if (inline.type === "tab") return { text: "\t", tab: true };
+
   const marks: TemplateMarks = {};
   if (inline.bold) marks.bold = true;
   if (inline.italic) marks.italic = true;
@@ -127,6 +145,12 @@ function resolveInline(inline: TemplateInline, ctx: SpanContext): ResolvedSpan |
       break;
     case "authorLastName":
       text = ctx.render.work.authorLastName;
+      break;
+    case "authorFullName":
+      text =
+        [ctx.render.work.authorFirstName, ctx.render.work.authorLastName]
+          .filter(Boolean)
+          .join(" ") || null;
       break;
     case "totalWordCount":
       text = formatNumber(ctx.render.totalWordCount, inline.numberFormat);
@@ -162,6 +186,21 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
         break;
       case "content":
         out.push({ type: "content" });
+        break;
+      case "table":
+        out.push({
+          type: "table",
+          columns: node.columns,
+          borders: node.borders,
+          rows: node.rows.map((row) => ({
+            cells: row.cells.map((cell) => ({
+              spans: cell.content
+                .map((inline) => resolveInline(inline, ctx))
+                .filter((s): s is ResolvedSpan => s !== null),
+              ...(cell.align ? { align: cell.align } : {}),
+            })),
+          })),
+        });
         break;
       case "paragraph": {
         const spans = node.content
