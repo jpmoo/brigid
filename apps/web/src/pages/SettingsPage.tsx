@@ -11,7 +11,7 @@ import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const TABS = [
-  { key: "templates", label: "Templates" },
+  { key: "templates", label: "Formats" },
   { key: "levels", label: "Levels" },
   { key: "account", label: "Account" },
   { key: "ollama", label: "Ollama" },

@@ -26,7 +26,7 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
 
   async function create(category: "break" | "block-format") {
     const answer = await dialogs.prompt({
-      title: category === "break" ? "New break" : "New block format",
+      title: category === "break" ? "New break format" : "New block format",
       fields: [{ label: "Name", placeholder: category === "break" ? "Subsection break" : "Epigraph" }],
       confirmLabel: "Create",
     });
@@ -47,8 +47,8 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
       <div className="tpl-list">
         <div className="tpl-group">
           <div className="tpl-group-head">
-            <span>Breaks</span>
-            <button className="btn ghost" type="button" title="New break" onClick={() => void create("break")}>
+            <span>Break formats</span>
+            <button className="btn ghost" type="button" title="New break format" onClick={() => void create("break")}>
               <Plus size={14} />
             </button>
           </div>
@@ -71,7 +71,7 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
             <button
               className="btn ghost"
               type="button"
-              title="New format"
+              title="New block format"
               onClick={() => void create("block-format")}
             >
               <Plus size={14} />
@@ -103,7 +103,7 @@ export function TemplatesPane({ templates, onReload }: { templates: Template[]; 
             }}
           />
         ) : (
-          <p className="tpl-empty">Pick a template on the left.</p>
+          <p className="tpl-empty">Pick a format on the left.</p>
         )}
       </div>
     </div>
@@ -301,7 +301,7 @@ function TemplateEditor({
           ) : busy ? (
             "Saving…"
           ) : (
-            "Save template"
+            "Save format"
           )}
         </button>
       </div>

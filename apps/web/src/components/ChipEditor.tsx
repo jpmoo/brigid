@@ -58,7 +58,7 @@ function stripGuards(atom: HTMLElement): void {
 function inlinesToHtml(inlines: readonly TemplateInline[]): string {
   return inlines
     .map((inline) => {
-      if (inline.type === "lineBreak") return "<br>";
+      if (inline.type === "lineBreak") return `<br>${ZWSP}`;
       if (inline.type === "tab") {
         return `${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`;
       }
@@ -119,10 +119,15 @@ function htmlToInlines(
       return;
     }
     if (node.tagName === "BR") {
-      // Trailing <br> is the filler browsers keep at the end of a contenteditable
-      // block; it isn't a line the writer typed.
-      if (multiline && node.nextSibling) out.push({ type: "lineBreak" });
-      else if (!multiline) pushText(" ");
+      if (!multiline) {
+        pushText(" ");
+        return;
+      }
+      // Browsers park a bogus <br> in an otherwise-empty field to give the
+      // caret somewhere to sit. That one isn't a line the writer typed; every
+      // other one is, including a trailing break.
+      const isOnlyChild = node.parentElement === root && root.childNodes.length === 1;
+      if (!isOnlyChild) out.push({ type: "lineBreak" });
       return;
     }
     // A block-level wrapper the browser made when Enter was pressed: its content
@@ -311,7 +316,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
           // one line by definition. A cell can hold several.
           if (e.key === "Enter") {
             e.preventDefault();
-            if (multiline) insert("<br>");
+            if (multiline) insert(`<br>${ZWSP}`);
           }
           if (e.key === "Tab") {
             e.preventDefault();

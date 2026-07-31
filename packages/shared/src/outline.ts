@@ -3,6 +3,7 @@ import type {
   BreakTemplateSettings,
   TemplateBody,
   TemplateCategory,
+  Typography,
 } from "./templates.js";
 import type { CounterRestart } from "./variables.js";
 
@@ -31,6 +32,8 @@ export interface BlockNode {
    * its format template; once set it renders its own body instead.
    */
   formatBody?: TemplateBody | null;
+  /** Type for this block alone, overriding its format template's. */
+  formatTypography?: Typography | null;
 }
 
 export interface TemplateLike {

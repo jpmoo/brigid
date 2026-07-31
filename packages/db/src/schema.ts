@@ -16,6 +16,7 @@ import type {
   PageSetup,
   TemplateBody,
   TemplateCategory,
+  Typography,
 } from "@brigid/shared";
 
 /**
@@ -200,6 +201,11 @@ export const blocks = pgTable(
      * one block's format copies the body here and it stops following.
      */
     formatBody: jsonb("format_body").$type<TemplateBody>(),
+    /**
+     * Type for this block alone. A style-only format has no body to detach, so
+     * "edit this block's format" means its typography.
+     */
+    formatTypography: jsonb("format_typography").$type<Typography>(),
     /**
      * Always maintained, for every block, regardless of whether the block's
      * format contributes to the manuscript total.

@@ -5,6 +5,7 @@ import type {
   BreakTemplateSettings,
   ImportedParagraph,
   TemplateBody,
+  Typography,
 } from "@brigid/shared";
 import { apiUrl } from "./base.js";
 
@@ -84,6 +85,7 @@ export interface Block {
   breakTemplateId: string | null;
   breakBody: TemplateBody | null;
   formatBody: TemplateBody | null;
+  formatTypography: Typography | null;
 }
 
 export interface Template {
@@ -292,10 +294,10 @@ export const api = {
   revertBreak: (id: string) => request<{ block: Block }>(`/blocks/${id}/break`, { method: "DELETE" }),
 
   detachFormat: (id: string) => post<{ block: Block }>(`/blocks/${id}/format/detach`),
-  updateFormat: (id: string, body: TemplateBody) =>
+  updateFormat: (id: string, patch: { body?: TemplateBody; typography?: Typography | null }) =>
     request<{ block: Block }>(`/blocks/${id}/format`, {
       method: "PATCH",
-      body: JSON.stringify({ body }),
+      body: JSON.stringify(patch),
     }),
   revertFormat: (id: string) =>
     request<{ block: Block }>(`/blocks/${id}/format`, { method: "DELETE" }),

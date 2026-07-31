@@ -13,11 +13,12 @@ import {
   Settings,
 } from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
-import type { TemplateBody } from "@brigid/shared";
+import type { TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { BodyEditor } from "../components/BodyEditor.js";
+import { StyleMenu } from "../components/StyleMenu.js";
 import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
@@ -580,7 +581,7 @@ export function WorkPage() {
       {editingFormat ? (
         <FormatEditor
           block={editingFormat}
-          templateName={templateMap.get(editingFormat.formatId)?.name ?? "this format"}
+          template={templateMap.get(editingFormat.formatId) ?? null}
           onClose={() => setEditingFormat(null)}
           onSaved={() => {
             setEditingFormat(null);
@@ -893,7 +894,7 @@ function BreakEditor({
             Cancel
           </button>
           {detached ? (
-            <button className="btn" type="button" onClick={() => void save()} disabled={busy || !body}>
+            <button className="btn" type="button" onClick={() => void save()} disabled={busy}>
               {busy ? "Saving…" : "Save"}
             </button>
           ) : (
@@ -917,18 +918,27 @@ function BreakEditor({
  */
 function FormatEditor({
   block,
-  templateName,
+  template,
   onClose,
   onSaved,
 }: {
   block: Block;
-  templateName: string;
+  template: Template | null;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const dialogs = useDialogs();
+  const templateName = template?.name ?? "this format";
+  // The same split Settings makes: a format whose body is only the content slot
+  // has no arrangement, so it edits as type rather than as layout.
+  const nodes = template?.body.nodes ?? [];
+  const styleOnly = nodes.length === 1 && nodes[0]?.type === "content";
+
   const [body, setBody] = useState<TemplateBody | null>(block.formatBody ?? null);
-  const [detached, setDetached] = useState(Boolean(block.formatBody));
+  const [typo, setTypo] = useState<Typography>(block.formatTypography ?? {});
+  const [detached, setDetached] = useState(
+    Boolean(block.formatBody || block.formatTypography),
+  );
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -938,6 +948,7 @@ function FormatEditor({
     try {
       const { block: updated } = await api.detachFormat(block.id);
       setBody(updated.formatBody ?? { nodes: [] });
+      setTypo(updated.formatTypography ?? {});
       setDetached(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not detach this format");
@@ -947,10 +958,9 @@ function FormatEditor({
   }
 
   async function save() {
-    if (!body) return;
     setBusy(true);
     try {
-      await api.updateFormat(block.id, body);
+      await api.updateFormat(block.id, styleOnly ? { typography: typo } : { body: body ?? { nodes: [] } });
       onSaved();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save");
@@ -989,7 +999,9 @@ function FormatEditor({
         {error ? <div className="alert error">{error}</div> : null}
 
         <div className="modal-body">
-          {detached && body ? (
+          {detached && styleOnly ? (
+            <StyleMenu value={typo} onChange={setTypo} />
+          ) : detached && body ? (
             <BodyEditor body={body} onChange={setBody} />
           ) : (
             <p className="muted" style={{ marginBottom: 18 }}>

@@ -334,8 +334,10 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
         : format
           ? resolveBody(format.body.nodes, ctx)
           : [{ type: "content" }],
-      formatDetached: Boolean(entry.block.formatBody),
-      typography: format?.formatSettings?.typography ?? null,
+      formatDetached: Boolean(entry.block.formatBody || entry.block.formatTypography),
+      // A block's own type wins over its format's, the same way its own body
+      // does — one paragraph can be set differently without disturbing the rest.
+      typography: entry.block.formatTypography ?? format?.formatSettings?.typography ?? null,
       sectionStart: format?.formatSettings?.sectionStart ?? null,
       firstLineIndent,
     });

@@ -415,23 +415,40 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
 
     const [block] = await db
-      .select({ id: blocks.id, formatId: blocks.formatId, formatBody: blocks.formatBody })
+      .select({
+        id: blocks.id,
+        formatId: blocks.formatId,
+        formatBody: blocks.formatBody,
+        formatTypography: blocks.formatTypography,
+      })
       .from(blocks)
       .where(eq(blocks.id, id))
       .limit(1);
     if (!block) throw notFound("block");
-    if (block.formatBody) throw badRequest("that format is already detached");
+    if (block.formatBody || block.formatTypography) {
+      throw badRequest("that format is already detached");
+    }
 
     const [template] = await db
-      .select({ body: templates.body })
+      .select({ body: templates.body, formatSettings: templates.formatSettings })
       .from(templates)
       .where(eq(templates.id, block.formatId))
       .limit(1);
     if (!template) throw notFound("format template");
 
+    // A body of just the content slot has no arrangement to detach — for that
+    // format, "its own" means its own type.
+    const nodes = template.body?.nodes ?? [];
+    const styleOnly = nodes.length === 1 && (nodes[0] as { type?: string })?.type === "content";
+
     const [row] = await db
       .update(blocks)
-      .set({ formatBody: template.body, updatedAt: new Date() })
+      .set({
+        ...(styleOnly
+          ? { formatTypography: template.formatSettings?.typography ?? {} }
+          : { formatBody: template.body }),
+        updatedAt: new Date(),
+      })
       .where(eq(blocks.id, id))
       .returning();
     return { block: row };
@@ -440,21 +457,28 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/blocks/:id/format", async (req) => {
     requireUser(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = z.object({ body: z.object({ nodes: z.array(z.unknown()) }) }).parse(req.body);
+    const body = z
+      .object({
+        body: z.object({ nodes: z.array(z.unknown()) }).optional(),
+        typography: z.record(z.unknown()).nullable().optional(),
+      })
+      .parse(req.body);
 
     const [current] = await db
-      .select({ formatBody: blocks.formatBody })
+      .select({ formatBody: blocks.formatBody, formatTypography: blocks.formatTypography })
       .from(blocks)
       .where(eq(blocks.id, id))
       .limit(1);
     if (!current) throw notFound("block");
-    if (!current.formatBody) throw badRequest("detach this format before editing it");
+    if (!current.formatBody && !current.formatTypography) {
+      throw badRequest("detach this format before editing it");
+    }
 
-    const [row] = await db
-      .update(blocks)
-      .set({ formatBody: body.body as never, updatedAt: new Date() })
-      .where(eq(blocks.id, id))
-      .returning();
+    const patch: Record<string, unknown> = { updatedAt: new Date() };
+    if (body.body !== undefined) patch.formatBody = body.body;
+    if (body.typography !== undefined) patch.formatTypography = body.typography;
+
+    const [row] = await db.update(blocks).set(patch).where(eq(blocks.id, id)).returning();
     return { block: row };
   });
 
@@ -463,7 +487,7 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
     const [row] = await db
       .update(blocks)
-      .set({ formatBody: null, updatedAt: new Date() })
+      .set({ formatBody: null, formatTypography: null, updatedAt: new Date() })
       .where(eq(blocks.id, id))
       .returning();
     if (!row) throw notFound("block");
