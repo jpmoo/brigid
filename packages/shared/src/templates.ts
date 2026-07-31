@@ -49,6 +49,15 @@ export interface BreakTemplateSettings {
    * Heading breaks don't: "Part One" should still be followed by "Chapter 1".
    */
   suppressOnFirstChild: boolean;
+  /**
+   * Whether the paragraph that opens after this break is indented.
+   *
+   * The usual convention is flush — an opening paragraph has nothing to be
+   * separated from — but indenting throughout is a real house style, so it's a
+   * per-break choice. Absent means flush, which is what every existing break
+   * already did.
+   */
+  indentFirstParagraph?: boolean;
 }
 
 export interface BlockFormatSettings {

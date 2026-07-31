@@ -832,11 +832,10 @@ input::placeholder {
   hyphens: auto;
 }
 
-/* Only an opening paragraph runs flush, as in print — the one after a break, or
-   the very first in the manuscript. A block that merely continues a scene is
-   still mid-prose, so its first paragraph indents like any other. */
-.doc-break + .doc-block .prose:first-child,
-.page-sheet > .doc-block:first-child .prose:first-child {
+/* Whether an opening paragraph runs flush is the break template's call — see
+   `indentFirstParagraph`. The renderer decides and tags the paragraph, so the
+   rule can't drift from the derivation. */
+.prose.flush {
   text-indent: 0;
 }
 

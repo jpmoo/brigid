@@ -169,7 +169,8 @@ INSERT INTO templates (category, name, builtin_key, body, break_settings) VALUES
         {"type":"spacer","lines":2}
       ]}'::jsonb,
     -- A chapter heading directly under a part title is correct, so no suppression.
-    '{"suppressOnFirstChild":false}'::jsonb
+    -- Opening paragraph runs flush, the usual convention for a chapter opening.
+    '{"suppressOnFirstChild":false,"indentFirstParagraph":false}'::jsonb
   ),
   (
     'break',
@@ -182,5 +183,5 @@ INSERT INTO templates (category, name, builtin_key, body, break_settings) VALUES
       ]}'::jsonb,
     -- An ornament immediately beneath a chapter heading is wrong, so suppress it
     -- on the first child.
-    '{"suppressOnFirstChild":true}'::jsonb
+    '{"suppressOnFirstChild":true,"indentFirstParagraph":false}'::jsonb
   );

@@ -56,7 +56,25 @@ export type DocumentItem<B extends BlockNode = BlockNode> =
       entry: OutlineEntry<B>;
       /** The block's format, already resolved. */
       nodes: ResolvedNode[];
+      /**
+       * Whether this block's opening paragraph is indented. A block that merely
+       * continues a scene always is; one that opens after a break follows that
+       * break template's `indentFirstParagraph`.
+       */
+      firstLineIndent: boolean;
     };
+
+/**
+ * A detached break keeps its own body but not its own settings — those still
+ * come from the template it was seeded from, so changing the house style for
+ * chapter openings reaches edited breaks too.
+ */
+function breakSettingsFor<B extends BlockNode>(
+  item: DocumentItem<B> & { kind: "break" },
+  templates: ReadonlyMap<string, TemplateLike>,
+) {
+  return templates.get(item.templateId)?.breakSettings ?? null;
+}
 
 const defaultUnresolved = (name: VariableName): string => `[${VARIABLES[name].label.toLowerCase()}]`;
 
@@ -236,11 +254,22 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
       }
     }
 
+    // An opening paragraph is the one directly after a break, or the very first
+    // in the manuscript. Everything else is mid-prose and indents.
+    const previous = items[items.length - 1];
+    const firstLineIndent =
+      previous === undefined
+        ? false
+        : previous.kind === "break"
+          ? (breakSettingsFor(previous, templates)?.indentFirstParagraph ?? false)
+          : true;
+
     items.push({
       kind: "block",
       block: entry.block,
       entry,
       nodes: format ? resolveBody(format.body.nodes, ctx) : [{ type: "content" }],
+      firstLineIndent,
     });
   }
 

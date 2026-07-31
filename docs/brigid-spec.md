@@ -124,6 +124,10 @@ Built-in: regular text, title page. Each carries:
   and front matter opt out.
 - `renders_in_document` — false for notes, which appear in the outline only
 
+Break templates additionally carry `indent_first_paragraph`, deciding whether
+the paragraph opening after the break is indented. Absent means flush, the usual
+convention for a chapter opening; house styles that indent throughout set it.
+
 Both categories live in one library, tagged by category, with built-ins flagged
 undeletable.
 
@@ -321,7 +325,24 @@ manuscript is wanted — that would add a third model slot and pgvector.
 
 ## 7. Deferred
 
-- **Export.** Real pagination, PDF, EPUB, manuscript-format submission.
+- **Export — target is a submission manuscript, not a finished book.** That is a
+  specific, conventional format (Shunn standard manuscript being the de facto
+  spec): US Letter, 1in margins, 12pt Courier or Times, double-spaced, ragged
+  right, half-inch paragraph indents, `#` alone on a line for a scene break,
+  chapter openings a third of the way down a fresh page, a running head of
+  `Surname / TITLE / page`, and a first page carrying contact details and an
+  approximate word count.
+
+  Two consequences worth settling before export is built:
+
+  1. The seeded built-ins lean *publication* — an asterism `⁂` for scene breaks,
+     small-caps "Chapter One", a 6x9 trim. A submission target wants `#`, plain
+     "CHAPTER ONE", and Letter. Easy to reseed, but it is a different house
+     style, not a tweak.
+  2. _OPEN._ Whether the drafting view should look like the submission
+     manuscript too (double-spaced Courier, ragged right) or stay book-like and
+     only become manuscript on export. Drafting in the target format removes a
+     surprise at the end; drafting in book form is far pleasanter to look at.
 - **Revision history.** Not yet discussed.
 
 ---

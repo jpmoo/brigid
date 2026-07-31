@@ -128,6 +128,35 @@ check(
   "sectbreak",
 );
 
+// --- opening-paragraph indent ----------------------------------------------
+const indentOf = (d: ReturnType<typeof deriveDocument>) =>
+  d.filter((i) => i.kind === "block").map((i) => (i.kind === "block" ? i.firstLineIndent : null));
+
+check(
+  "flush after a break by default; indented when merely continuing",
+  indentOf(doc),
+  // title(first) ch1(after break) s1(continues) s2(after break) ch2(after break) s3(continues)
+  [false, false, true, false, false, true],
+);
+
+const indenting = templates.map((t) =>
+  t.id === "chapbreak"
+    ? { ...t, breakSettings: { suppressOnFirstChild: false, indentFirstParagraph: true } }
+    : t,
+);
+check(
+  "a break that opts in indents the paragraph it opens",
+  indentOf(
+    deriveDocument({
+      blocks,
+      levels,
+      templates: indenting,
+      work: { title: "T", subtitle: null, authorFirstName: null, authorLastName: null },
+    }),
+  ),
+  [false, true, true, false, true, true],
+);
+
 // --- detached break instances ----------------------------------------------
 // Editing one chapter break must not touch any other, and must survive a move
 // that would otherwise re-derive the break from a different level.

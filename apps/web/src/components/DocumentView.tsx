@@ -13,7 +13,7 @@ function spanStyle(span: ResolvedSpan): CSSProperties {
   };
 }
 
-function Nodes({ nodes, prose }: { nodes: ResolvedNode[]; prose?: string }) {
+function Nodes({ nodes, prose, indentFirst = true }: { nodes: ResolvedNode[]; prose?: string; indentFirst?: boolean }) {
   return (
     <>
       {nodes.map((node, i) => {
@@ -42,7 +42,7 @@ function Nodes({ nodes, prose }: { nodes: ResolvedNode[]; prose?: string }) {
             return prose ? (
               <Fragment key={i}>
                 {prose.split(/\n{2,}/).map((para, j) => (
-                  <p className="prose" key={j}>
+                  <p className={j === 0 && !indentFirst ? "prose flush" : "prose"} key={j}>
                     {para}
                   </p>
                 ))}
@@ -95,7 +95,11 @@ export function DocumentView({ items, registerRef, selectedId, onSelect }: Docum
             onClick={() => onSelect(item.block.id)}
             role="presentation"
           >
-            <Nodes nodes={item.nodes} prose={item.block.contentText} />
+            <Nodes
+              nodes={item.nodes}
+              prose={item.block.contentText}
+              indentFirst={item.firstLineIndent}
+            />
           </div>
         ),
       )}
