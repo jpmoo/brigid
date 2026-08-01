@@ -6,7 +6,7 @@ import { countWords } from "@brigid/shared";
 import { blocks, templates, workLevels, works } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
-import { badRequest, notFound } from "../lib/errors.js";
+import { badRequest, conflict, notFound } from "../lib/errors.js";
 
 /**
  * Where a new block lands, relative to the block the writer was on.
@@ -117,6 +117,25 @@ function descendantsOf(all: readonly { id: string; parentId: string | null }[], 
   return out;
 }
 
+/** The work's front matter, if it has any — at most one, by the rule above. */
+async function frontMatterOf(
+  handle: typeof db,
+  workId: string,
+): Promise<{ id: string } | null> {
+  const rows = await handle
+    .select({ id: blocks.id })
+    .from(blocks)
+    .innerJoin(templates, eq(templates.id, blocks.formatId))
+    .where(
+      and(
+        eq(blocks.workId, workId),
+        sql`(${templates.formatSettings} ->> 'structural')::boolean IS FALSE`,
+      ),
+    )
+    .limit(1);
+  return rows[0] ?? null;
+}
+
 export async function blocksRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
@@ -142,7 +161,11 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
     if (!work) throw notFound("work");
 
     const [format] = await db
-      .select({ id: templates.id, category: templates.category })
+      .select({
+        id: templates.id,
+        category: templates.category,
+        settings: templates.formatSettings,
+      })
       .from(templates)
       .where(eq(templates.id, body.formatId))
       .limit(1);
@@ -151,9 +174,34 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
       throw badRequest("a block's format must be a block-format template, not a break");
     }
 
+    /**
+     * A manuscript has one title page, and it comes first.
+     *
+     * Front matter is what a format says isn't part of the structure. There is
+     * only ever one of it, and its place is the top — a second would be a page
+     * the manuscript doesn't have, and one further down would be a title page
+     * in the middle of the writing.
+     */
+    const isFrontMatter = format.settings?.structural === false;
+    if (isFrontMatter && (await frontMatterOf(db, workId))) {
+      throw conflict("this manuscript already has a title page");
+    }
+
     const created = await db.transaction(async (tx) => {
       let parentId: string | null = null;
       let afterId: string | null = null;
+
+      // Front matter goes to the very top whatever was asked for: there is one
+      // right place for it, so there is nothing to decide.
+      if (isFrontMatter) {
+        const roots = await siblingsOf(tx as unknown as typeof db, workId, null);
+        const sortKey = generateKeyBetween(null, roots[0]?.sortKey ?? null);
+        const [row] = await tx
+          .insert(blocks)
+          .values({ workId, parentId: null, sortKey, formatId: body.formatId, label: body.label ?? null })
+          .returning();
+        return row;
+      }
 
       if (body.placement !== "root") {
         if (!body.relativeTo) throw badRequest(`placement '${body.placement}' needs relativeTo`);
@@ -269,7 +317,21 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     if (body.label !== undefined) patch.label = body.label;
-    if (body.formatId !== undefined) patch.formatId = body.formatId;
+    if (body.formatId !== undefined) {
+      // The other way a second title page could appear: not by adding one, but
+      // by making an existing block into one.
+      const [next] = await db
+        .select({ settings: templates.formatSettings })
+        .from(templates)
+        .where(eq(templates.id, body.formatId))
+        .limit(1);
+      if (next?.settings?.structural === false) {
+        const [self] = await db.select({ workId: blocks.workId }).from(blocks).where(eq(blocks.id, id)).limit(1);
+        const front = self ? await frontMatterOf(db, self.workId) : null;
+        if (front && front.id !== id) throw conflict("this manuscript already has a title page");
+      }
+      patch.formatId = body.formatId;
+    }
     if (body.options !== undefined) patch.options = body.options;
     if (body.content !== undefined) {
       // Word count is derived here rather than trusted from the client, so the
@@ -338,6 +400,15 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
       if (format?.formatSettings?.structural === false) {
         throw badRequest("that block isn't part of the structure, so it can't be reordered");
+      }
+
+      // Nothing goes above the title page. The client won't offer it, but the
+      // rule belongs where it can't be got round.
+      if (body.afterId === null && body.parentId === null) {
+        const front = await frontMatterOf(tx as unknown as typeof db, block.workId);
+        if (front && front.id !== id) {
+          throw badRequest("the title page stays at the top");
+        }
       }
 
       const siblings = (await siblingsOf(tx as unknown as typeof db, block.workId, body.parentId))
