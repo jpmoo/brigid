@@ -625,13 +625,16 @@ function RunProgress({ run }: { run: CharacterRunProgress }) {
 
 function RawPane({ workId }: { workId: string }) {
   const [sections, setSections] = useState<PlacedDigest[] | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  /** A set: reading one section against another is the usual reason to be here. */
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     void api.getDigest(workId).then((d) => setSections(d.sections));
   }, [workId]);
 
   if (!sections) return <p className="tpl-note">Loading…</p>;
+
+  const allOpen = sections.length > 0 && open.size >= sections.length;
 
   return (
     <>
@@ -641,14 +644,39 @@ function RawPane({ workId }: { workId: string }) {
         model never sees your prose at analysis time, only this.
       </p>
 
+      {/* Same control as the outline's, for the same job. */}
+      <div className="outline-head-bar fit-head-bar">
+        <span>
+          {sections.length} {sections.length === 1 ? "section" : "sections"}
+        </span>
+        <button
+          className="outline-toggle-all"
+          type="button"
+          title={allOpen ? "Collapse all" : "Expand all"}
+          aria-label={allOpen ? "Collapse all" : "Expand all"}
+          onClick={() =>
+            setOpen(allOpen ? new Set() : new Set(sections.map((sec) => sec.blockId)))
+          }
+        >
+          {allOpen ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+        </button>
+      </div>
+
       {sections.map((section) => (
         <div className="raw-section" key={section.blockId}>
           <button
             type="button"
             className="raw-head"
-            onClick={() => setOpen(open === section.blockId ? null : section.blockId)}
-            aria-expanded={open === section.blockId}
+            onClick={() =>
+              setOpen((held) => {
+                const next = new Set(held);
+                if (!next.delete(section.blockId)) next.add(section.blockId);
+                return next;
+              })
+            }
+            aria-expanded={open.has(section.blockId)}
           >
+            <ChevronRight size={13} className="fit-caret" aria-hidden="true" />
             <span className="raw-at">
               {Math.round(section.start * 100)}&ndash;{Math.round(section.end * 100)}%
             </span>
@@ -659,7 +687,7 @@ function RawPane({ workId }: { workId: string }) {
             </span>
           </button>
 
-          {open === section.blockId ? (
+          {open.has(section.blockId) ? (
             <div className="raw-body">
               {section.events.length > 0 ? (
                 <>

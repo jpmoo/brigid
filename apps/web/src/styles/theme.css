@@ -4276,3 +4276,8 @@ mark.hit.active {
      where there is room and let the reason wrap under it where there isn't. */
   margin-left: 7px;
 }
+
+/* The section rows carry the same triangle as everything else that opens. */
+.raw-head[aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}
