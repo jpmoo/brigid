@@ -375,6 +375,45 @@ export const api = {
     return body as unknown as { backup: BackupFile };
   },
 
+  /**
+   * Returns the file itself rather than JSON, and the name the server chose for
+   * it — which encodes the author and the short title, so it is worth keeping
+   * rather than inventing a second one here.
+   */
+  compileWork: async (
+    workId: string,
+    body: {
+      format: "docx" | "pdf";
+      include: string[];
+      runningHeads: boolean;
+      shortTitle: string;
+    },
+  ) => {
+    const res = await fetch(apiUrl(`/works/${workId}/compile`), {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let message = "could not compile that";
+      try {
+        const parsed = JSON.parse(text) as { error?: string };
+        if (parsed.error) message = parsed.error;
+      } catch {
+        /* not JSON; the default says enough */
+      }
+      throw new ApiError(res.status, message);
+    }
+    const disposition = res.headers.get("content-disposition") ?? "";
+    const named = /filename="([^"]+)"/.exec(disposition);
+    return {
+      blob: await res.blob(),
+      filename: named?.[1] ?? `manuscript.${body.format}`,
+    };
+  },
+
   getPreferences: () => request<{ preferences: Preferences }>("/preferences"),
   savePreferences: (patch: Preferences) =>
     request<{ preferences: Preferences }>("/preferences", {

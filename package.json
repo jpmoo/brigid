@@ -20,5 +20,14 @@
   },
   "devDependencies": {
     "typescript": "^5.6.3"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "@swc/helpers": {
+        "dependencies": {
+          "tslib": "^2.8.0"
+        }
+      }
+    }
   }
 }

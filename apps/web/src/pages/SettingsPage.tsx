@@ -8,6 +8,7 @@ import { LevelsEditor } from "../components/LevelsEditor.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { SpellingPane } from "./settings/SpellingPane.js";
 import { BackupPane } from "./settings/BackupPane.js";
+import { CompilePane } from "./settings/CompilePane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -24,7 +25,7 @@ type TabKey = (typeof TABS)[number]["key"] | "project";
 
 const PROJECT_TABS = [
   { key: "levels", label: "Levels" },
-  { key: "export", label: "Export" },
+  { key: "compile", label: "Compile" },
 ] as const;
 
 type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
@@ -157,13 +158,12 @@ export function SettingsPage() {
                 {projectTab === "levels" ? (
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
                 ) : (
-                  <>
-                    <h3 className="card-title">Export</h3>
-                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
-                      Turning this manuscript into a submission — page size, margins, running
-                      heads, and the file itself. Not built yet; it is the next thing.
-                    </p>
-                  </>
+                  <CompilePane
+                    workId={workId}
+                    blocks={blocks}
+                    templates={templates}
+                    work={work}
+                  />
                 )}
               </>
             ) : null

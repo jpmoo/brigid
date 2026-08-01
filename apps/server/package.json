@@ -8,7 +8,7 @@
     "start": "tsx src/server.ts",
     "build": "tsc -p tsconfig.json --noEmit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "tsx test/docx.test.ts && tsx test/backup.test.ts"
+    "test": "tsx test/docx.test.ts && tsx test/backup.test.ts && tsx test/compile.test.ts"
   },
   "dependencies": {
     "@brigid/db": "workspace:*",
@@ -28,6 +28,7 @@
     "fractional-indexing": "^3.2.0",
     "pdfkit": "^0.19.1",
     "postgres": "^3.4.5",
+    "tslib": "^2.8.1",
     "tsx": "^4.19.2",
     "zod": "^3.23.8"
   },
