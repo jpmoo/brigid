@@ -25,10 +25,14 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"] | "project";
 
+/**
+ * What the manuscript is, then how it is built, then where it is going: stats
+ * describe it, levels shape it, goals aim it, and compile sends it out.
+ */
 const PROJECT_TABS = [
+  { key: "stats", label: "Stats" },
   { key: "levels", label: "Levels" },
   { key: "goals", label: "Goals" },
-  { key: "stats", label: "Stats" },
   { key: "compile", label: "Compile" },
 ] as const;
 
@@ -37,7 +41,7 @@ type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
 export function SettingsPage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("templates");
-  const [projectTab, setProjectTab] = useState<ProjectTabKey>("levels");
+  const [projectTab, setProjectTab] = useState<ProjectTabKey>("stats");
   const [templates, setTemplates] = useState<Template[]>([]);
 
   /**
