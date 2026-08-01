@@ -225,44 +225,61 @@ export function WorkPage() {
    * the current one, and the outline scrolls just enough to keep it visible.
    * `block: "nearest"` so the panel barely moves unless it has to.
    */
+  /**
+   * Which block the top of the pane is inside.
+   *
+   * Measured straight off scroll position rather than through an
+   * IntersectionObserver: the observer only speaks when something crosses its
+   * band, so a scroll that ends mid-block says nothing, and a percentage
+   * rootMargin against a nested scroller is hard to reason about when it goes
+   * wrong. This asks the question directly, on every frame that scrolls.
+   */
   useEffect(() => {
     const pane = paneRef.current;
-    const observed = [...blockRefs.current.entries()].filter(([key]) => !key.startsWith("break:"));
-    if (!pane || observed.length === 0) return;
+    if (!pane) return;
 
-    const visible = new Map<string, number>();
-    const observer = new IntersectionObserver(
-      (entries) => {
-        for (const entry of entries) {
-          const id = entry.target.getAttribute("data-block-id");
-          if (!id) continue;
-          if (entry.isIntersecting) visible.set(id, entry.boundingClientRect.top);
-          else visible.delete(id);
+    let frame = 0;
+    const update = () => {
+      frame = 0;
+      if (scrollingTo.current) return;
+
+      const paneTop = pane.getBoundingClientRect().top;
+      let bestId: string | null = null;
+      let bestTop = -Infinity;
+      let firstId: string | null = null;
+      let firstTop = Infinity;
+
+      for (const [key, el] of blockRefs.current) {
+        if (key.startsWith("break:")) continue;
+        const top = el.getBoundingClientRect().top - paneTop;
+        // The last block starting at or above the top edge is the one the edge
+        // is inside. A few pixels of slack so a block flush to the top counts.
+        if (top <= 8 && top > bestTop) {
+          bestTop = top;
+          bestId = key;
         }
-        if (scrollingTo.current || visible.size === 0) return;
+        if (top < firstTop) {
+          firstTop = top;
+          firstId = key;
+        }
+      }
 
-        // Smallest top wins: the block that began above the band and still
-        // occupies it is the one the top edge is inside.
-        const [topmost] = [...visible.entries()].sort((a, b) => a[1] - b[1]);
-        if (!topmost) return;
-        setSelectedId((current) => (current === topmost[0] ? current : topmost[0]));
-      },
-      {
-        // The document pane is the scroller, not the window. Left to default,
-        // the margins below are measured against the viewport instead and the
-        // band lands in the wrong place — or nowhere.
-        root: paneRef.current,
-        // A thin band at the top of the pane. The current block is whichever
-        // one the top edge is inside — the same block a reader would say they
-        // are "at" — so the outline advances as each one reaches the top
-        // rather than waiting for it to reach the middle.
-        rootMargin: "0px 0px -88% 0px",
-        threshold: 0,
-      },
-    );
+      // Before anything has reached the top — at the very start of the
+      // manuscript — the first block is the one being read.
+      const next = bestId ?? firstId;
+      if (next) setSelectedId((current) => (current === next ? current : next));
+    };
 
-    for (const [, el] of observed) observer.observe(el);
-    return () => observer.disconnect();
+    const onScroll = () => {
+      if (!frame) frame = window.requestAnimationFrame(update);
+    };
+
+    pane.addEventListener("scroll", onScroll, { passive: true });
+    update();
+    return () => {
+      pane.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
   }, [items]);
 
   // Centre the current block in the outline, so there is always context above

@@ -49,6 +49,8 @@ export interface ResolvedCell {
   spans: ResolvedSpan[];
   align?: TemplateAlign;
   lineHeight?: number;
+  fontSizePt?: number;
+  fontFamily?: string;
 }
 
 export type ResolvedNode =
@@ -238,6 +240,8 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
                 .filter((s): s is ResolvedSpan => s !== null),
               ...(cell.align ? { align: cell.align } : {}),
               ...(cell.lineHeight ? { lineHeight: cell.lineHeight } : {}),
+              ...(cell.fontSizePt ? { fontSizePt: cell.fontSizePt } : {}),
+              ...(cell.fontFamily ? { fontFamily: cell.fontFamily } : {}),
             })),
           })),
         });

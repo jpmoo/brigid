@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Columns3, Rows3 } from "lucide-react";
-import { VARIABLES, VARIABLE_NAMES, commonMarks } from "@brigid/shared";
-import type { TemplateAlign, TemplateInline, TemplateNode, VariableName } from "@brigid/shared";
+import { commonMarks } from "@brigid/shared";
+import type { TemplateMarks, TemplateNode } from "@brigid/shared";
 import { ChipEditor } from "./ChipEditor.js";
+import { LineControls } from "./LineControls.js";
 import type { ChipEditorHandle } from "./ChipEditor.js";
 
 type TableNode = Extract<TemplateNode, { type: "table" }>;
@@ -28,6 +29,7 @@ export function TableEditor({
   // Controls live in a full-width row beneath the table rather than inside the
   // cell: a narrow column swallows them entirely.
   const [focused, setFocused] = useState<{ r: number; c: number } | null>(null);
+  const [cellMarks, setCellMarks] = useState<TemplateMarks>({});
   const cellRefs = useRef(new Map<string, ChipEditorHandle>());
   const focusedHandle = focused ? cellRefs.current.get(`${focused.r}-${focused.c}`) : undefined;
 
@@ -148,6 +150,7 @@ export function TableEditor({
                 }}
                 value={cell.content}
                 marks={commonMarks(cell.content)}
+                onActiveMarks={setCellMarks}
                 onChange={(content) => patchCell(r, c, { content })}
                 placeholder=""
                 multiline
@@ -179,63 +182,26 @@ export function TableEditor({
       </div>
 
       <div className="te-cellbar">
-        {focusedCell ? (
+        {focusedCell && focused ? (
           <>
             <span className="te-bar-label">
-              Row {focused!.r + 1}, column {focused!.c + 1}
+              Row {focused.r + 1}, column {focused.c + 1}
             </span>
-            <CellControls
-              content={focusedCell.content}
-              align={focusedCell.align ?? node.columns[focused!.c]?.align ?? "left"}
-              onAlign={(align) => patchCell(focused!.r, focused!.c, { align })}
-              onToggleMark={(mark) => focusedHandle?.toggleMark(mark)}
-            />
-            <select
-              className="be-spacing"
-              title="Line spacing in this cell"
-              value={String(focusedCell.lineHeight ?? "")}
-              onChange={(e) =>
-                patchCell(focused!.r, focused!.c, {
-                  ...(e.target.value
-                    ? { lineHeight: Number(e.target.value) }
-                    : { lineHeight: undefined }),
-                })
-              }
-            >
-              <option value="">Spacing: inherit</option>
-              <option value="1">Single</option>
-              <option value="1.15">1.15</option>
-              <option value="1.5">1½</option>
-              <option value="2">Double</option>
-              <option value="3">Triple</option>
-            </select>
-            <select
-              value=""
-              // Inserting has to reach into the cell's own editor, since that is
-              // where the caret is.
-              onMouseDown={(e) => e.preventDefault()}
-              onChange={(e) => {
-                const name = e.target.value as VariableName;
-                if (name) focusedHandle?.insertVariable(name);
-                e.target.value = "";
-              }}
-            >
-              <option value="">Insert chip…</option>
-              {VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline").map((n) => (
-                <option key={n} value={n}>
-                  {VARIABLES[n].label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="btn secondary chip-tab-btn"
-              title="Advance to the next tab stop — spacing set by the format's tab stop"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => focusedHandle?.insertTab()}
-            >
-              ⇥ Tab
-            </button>
+            {/* The same controls a paragraph gets: a cell is a line of template
+                content like any other. */}
+            <div className="te-cell-lines">
+              <LineControls
+                marks={cellMarks}
+                editor={{ current: focusedHandle ?? null }}
+                style={{
+                  fontFamily: focusedCell.fontFamily,
+                  fontSizePt: focusedCell.fontSizePt,
+                  lineHeight: focusedCell.lineHeight,
+                  align: focusedCell.align ?? node.columns[focused.c]?.align,
+                }}
+                onStyle={(patch) => patchCell(focused.r, focused.c, patch)}
+              />
+            </div>
           </>
         ) : (
           <span className="te-bar-hint">
@@ -318,47 +284,6 @@ export function TableEditor({
   );
 }
 
-/**
- * The same alignment and mark controls a paragraph gets, per cell — a cell is a
- * line of template content like any other, and a title page's contact block
- * needs its columns aligned independently.
- */
-function CellControls({
-  content,
-  align,
-  onAlign,
-  onToggleMark,
-}: {
-  content: TemplateInline[];
-  align: TemplateAlign;
-  onAlign: (align: TemplateAlign) => void;
-  onToggleMark: (mark: "bold" | "italic" | "smallCaps" | "allCaps") => void;
-}) {
-  const marks = commonMarks(content);
-
-  return (
-    <div className="te-cell-controls">
-      <select value={align} onChange={(e) => onAlign(e.target.value as TemplateAlign)} title="Alignment">
-        <option value="left">Left</option>
-        <option value="center">Center</option>
-        <option value="right">Right</option>
-      </select>
-      {(["bold", "italic", "smallCaps", "allCaps"] as const).map((key) => (
-        <button
-          key={key}
-          type="button"
-          className={`be-mark${marks[key] ? " on" : ""}`}
-          aria-pressed={Boolean(marks[key])}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => onToggleMark(key)}
-          title={key}
-        >
-          {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}
-        </button>
-      ))}
-    </div>
-  );
-}
 
 export const NEW_TABLE = (rows: number, columns: number): TableNode => ({
   type: "table",

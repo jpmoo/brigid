@@ -65,7 +65,16 @@ export function PagePreview({
                     {node.rows.map((row, ri) => (
                       <tr key={ri}>
                         {row.cells.map((cell, ci) => (
-                          <td key={ci} style={{ textAlign: cell.align ?? "left" }}>
+                          <td
+                            key={ci}
+                            style={{
+                              textAlign: cell.align ?? "left",
+                              lineHeight: cell.lineHeight,
+                              // px, not pt: on this sheet a point is a pixel.
+                              fontSize: cell.fontSizePt ? `${cell.fontSizePt}px` : undefined,
+                              fontFamily: cell.fontFamily,
+                            }}
+                          >
                             {cell.spans.map((s) => s.text).join("")}
                           </td>
                         ))}

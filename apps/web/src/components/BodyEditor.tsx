@@ -1,10 +1,11 @@
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
-import { FONT_CHOICES, commonMarks } from "@brigid/shared";
+import { commonMarks } from "@brigid/shared";
 import type { TemplateBody, TemplateMarks, TemplateNode } from "@brigid/shared";
 import { useRef, useState } from "react";
-import { ChipEditor, ChipTools } from "./ChipEditor.js";
+import { ChipEditor } from "./ChipEditor.js";
 import type { ChipEditorHandle } from "./ChipEditor.js";
 import { useDialogs } from "./Dialogs.js";
+import { LineControls } from "./LineControls.js";
 import { NEW_TABLE, TableEditor } from "./TableEditor.js";
 
 /**
@@ -157,99 +158,27 @@ function ParagraphRow({
   // What the toolbar shows is where the caret is, not what the whole line is.
   const [marks, setMarks] = useState<TemplateMarks>(() => commonMarks(node.content));
 
-  const patch = (p: Partial<Extract<TemplateNode, { type: "paragraph" }>>) =>
-    onChange({ ...node, ...p });
-
   return (
     <div className="be-para">
       <ChipEditor
         ref={editor}
         value={node.content}
         marks={marks}
-        onChange={(content) => patch({ content })}
+        onChange={(content) => onChange({ ...node, content })}
         onActiveMarks={setMarks}
         showToolbar={false}
       />
-
-      {/* Everything that acts on the words themselves — how they are set, and
-          what can be dropped among them — sits together on the first line,
-          nearest the text it affects. */}
-      <div className="be-line">
-        {(["bold", "italic", "smallCaps", "allCaps"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            className={`be-mark${marks[key] ? " on" : ""}`}
-            aria-pressed={Boolean(marks[key])}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => editor.current?.toggleMark(key)}
-            title={key}
-          >
-            {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}
-          </button>
-        ))}
-        <span className="be-gap" />
-        <ChipTools editor={editor} />
-      </div>
-
-      <div className="be-line">
-        <select
-          className="be-spacing"
-          title="Face for this line"
-          value={node.fontFamily ?? ""}
-          onChange={(e) => patch({ fontFamily: e.target.value || undefined })}
-        >
-          <option value="">Font: inherit</option>
-          {FONT_CHOICES.map((f) => (
-            <option key={f.label} value={f.stack}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-        <select
-          className="be-spacing"
-          title="Size for this line"
-          value={String(node.fontSizePt ?? "")}
-          onChange={(e) =>
-            patch({ fontSizePt: e.target.value ? Number(e.target.value) : undefined })
-          }
-        >
-          <option value="">Size: inherit</option>
-          {[9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36].map((pt) => (
-            <option key={pt} value={pt}>
-              {pt} pt
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="be-line">
-        <select
-          className="be-spacing"
-          title="Line spacing"
-          value={String(node.lineHeight ?? "")}
-          onChange={(e) =>
-            patch({ lineHeight: e.target.value ? Number(e.target.value) : undefined })
-          }
-        >
-          <option value="">Spacing: inherit</option>
-          <option value="1">Single</option>
-          <option value="1.15">1.15</option>
-          <option value="1.5">1½</option>
-          <option value="2">Double</option>
-          <option value="3">Triple</option>
-        </select>
-        <select
-          className="be-spacing"
-          value={node.align ?? "left"}
-          onChange={(e) => patch({ align: e.target.value as typeof node.align })}
-          title="Justification"
-        >
-          <option value="left">Left</option>
-          <option value="center">Center</option>
-          <option value="right">Right</option>
-        </select>
-      </div>
+      <LineControls
+        marks={marks}
+        editor={editor}
+        style={{
+          fontFamily: node.fontFamily,
+          fontSizePt: node.fontSizePt,
+          lineHeight: node.lineHeight,
+          align: node.align,
+        }}
+        onStyle={(patch) => onChange({ ...node, ...patch })}
+      />
     </div>
   );
 }

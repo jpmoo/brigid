@@ -2270,13 +2270,13 @@ input::placeholder {
 
 .doc-block {
   position: relative;
-  /* Air above when scrolled to, so a section opens with a little space rather
-     than flush against the edge of the pane. */
-  scroll-margin-top: 52px;
+  /* Nearly flush: a jump should put the section's first line at the top of the
+     pane, not a line's worth of blank space above it. */
+  scroll-margin-top: 4px;
 }
 
 .doc-break {
-  scroll-margin-top: 52px;
+  scroll-margin-top: 4px;
 }
 
 .doc-bookmark {
@@ -2568,4 +2568,22 @@ mark.hit.active {
 /* Sets the manuscript's own settings apart from the app's. */
 .tab-gap {
   width: 26px;
+}
+
+/* The cell's controls stack exactly as a paragraph's do. */
+.te-cell-lines {
+  flex: 1;
+  min-width: 0;
+}
+
+.te-cell-lines .be-line:first-child {
+  margin-top: 0;
+}
+
+.te-cellbar {
+  align-items: flex-start;
+}
+
+.te-cellbar .te-bar-label {
+  padding-top: 5px;
 }

@@ -127,6 +127,8 @@ function Nodes({
                             textAlign: cell.align ?? node.columns[ci]?.align ?? "left",
                             borderLeft: b.columns && ci > 0 ? rule : undefined,
                             lineHeight: cell.lineHeight,
+                            fontSize: cell.fontSizePt ? `${cell.fontSizePt}pt` : undefined,
+                            fontFamily: cell.fontFamily,
                           }}
                         >
                           {cell.spans.map((span, si) =>

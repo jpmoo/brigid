@@ -49,6 +49,8 @@ export interface TableCell {
   align?: TemplateAlign;
   /** Multiple of the font size, as elsewhere. 2 is double-spaced. */
   lineHeight?: number;
+  fontSizePt?: number;
+  fontFamily?: string;
 }
 
 export interface TableRow {
