@@ -155,13 +155,16 @@ export function LevelsEditor({
                   <span className="lv-name">Name</span>
                   <span className="lv-break">Break before a block at this level</span>
                   <span className="lv-count">Numbering</span>
-                  <span className="lv-used">In use</span>
+                  <span className="lv-used">Sections</span>
                   <span className="lv-actions" />
                 </div>
 
                 {levels.map((level, i) => (
                   <div className="level-row" key={i}>
-                    <span className="level-depth">{i}</span>
+                    {/* Counted as anyone would say it: the first level is the
+                        first, not the zeroth. The depth stays zero-based
+                        underneath, where it indexes things. */}
+                    <span className="level-depth">{i + 1}</span>
                     <input
                       type="text"
                       className="lv-name"
@@ -193,7 +196,10 @@ export function LevelsEditor({
                       <option value="continuous">1, 2, 3 throughout</option>
                       <option value="under-parent">Restart under each parent</option>
                     </select>
-                    <span className="lv-used" title="Blocks currently at this depth">
+                    <span
+                      className="lv-used"
+                      title={`How many sections of the manuscript are at this level`}
+                    >
                       {depthCounts[i] ?? 0}
                     </span>
                     <span className="lv-actions">

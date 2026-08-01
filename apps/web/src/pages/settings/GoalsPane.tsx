@@ -150,6 +150,7 @@ export function GoalsPane({
           <span>The whole manuscript</span>
           <input
             type="number"
+            className="goal-number"
             min={0}
             step={1000}
             placeholder="No goal"
@@ -171,6 +172,7 @@ export function GoalsPane({
             <span>Each {level.name.toLowerCase()}</span>
             <input
               type="number"
+              className="goal-number"
               min={0}
               step={500}
               placeholder="No goal"
@@ -197,10 +199,15 @@ export function GoalsPane({
       ))}
 
       <div className="be-line" style={{ marginTop: 10 }}>
-        <button className="btn" type="button" disabled={saving} onClick={() => void saveGoals()}>
-          {saving ? "Saving…" : "Save goals"}
+        {/* Said on the button that was pressed, as everywhere else that saves. */}
+        <button
+          className="btn"
+          type="button"
+          disabled={saving || saved}
+          onClick={() => void saveGoals()}
+        >
+          {saved ? "Saved!" : saving ? "Saving…" : "Save goals"}
         </button>
-        {saved ? <span className="saved-flash">Saved</span> : null}
         {error ? <span className="compile-warn">{error}</span> : null}
       </div>
     </div>

@@ -3739,3 +3739,9 @@ mark.hit.active {
 .outline-item.met .outline-card.selected {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
+
+/* A manuscript's goal is six figures and a chapter's is four, so the field is
+   sized for the number rather than for the widget. */
+.goal-number {
+  width: 110px;
+}
