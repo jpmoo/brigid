@@ -3,14 +3,54 @@ import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Scissors } from "lucid
 import { subtreeWordCounts } from "@brigid/shared";
 import type { OutlineEntry } from "@brigid/shared";
 import type { Block, Placement, Template } from "../api.js";
+import type { TemplateBody } from "@brigid/shared";
 
 const wordFmt = new Intl.NumberFormat();
 
 /** Two lines of the block's prose, so a card is recognisable without opening it. */
-function preview(block: Block): string {
-  const text = block.contentText.trim();
+function preview(block: Block, template?: Template): string {
+  // A title page holds no prose of its own — what it says lives in its format,
+  // as template lines. Falling back to those gives the card the same excerpt
+  // every other card has, rather than leaving it blank and unlike the rest.
+  const text = block.contentText.trim() || literalText(template?.body ?? block.formatBody);
   if (!text) return "";
   return text.length > 180 ? `${text.slice(0, 180)}…` : text;
+}
+
+/** The words written into a template, ignoring variables and structure. */
+function literalText(body: TemplateBody | null | undefined): string {
+  if (!body) return "";
+  const parts: string[] = [];
+
+  const fromInlines = (content: unknown) => {
+    if (!Array.isArray(content)) return;
+    for (const item of content) {
+      const inline = item as { type?: string; text?: string };
+      if (inline.type === "text" && inline.text) parts.push(inline.text);
+    }
+  };
+
+  for (const node of body.nodes ?? []) {
+    const n = node as { type?: string; content?: unknown; rows?: unknown[] };
+    if (n.type === "paragraph") fromInlines(n.content);
+    if (n.type === "table") {
+      for (const row of (n.rows ?? []) as { cells?: { content?: unknown }[] }[]) {
+        for (const cell of row.cells ?? []) fromInlines(cell.content);
+      }
+    }
+  }
+  return parts.join(" ").replace(/\s+/g, " ").trim();
+}
+
+/**
+ * What kind of block this is, for the corner of the card.
+ *
+ * A format the importer made carries the manuscript's name — "Title page —
+ * Pride and Prejudice" — which is useful in the format library and far too long
+ * here, where it sits beside "CHAPTER".
+ */
+function kindOf(name: string): string {
+  return name.split(/\s+—\s+/)[0] ?? name;
 }
 
 export const BLOCK_DRAG_TYPE = "application/x-brigid-block";
@@ -233,7 +273,7 @@ function OutlineCard(props: CardProps) {
   const { entry, selected, isCollapsed } = props;
   const block = entry.block;
   const [menuOpen, setMenuOpen] = useState(false);
-  const text = preview(block);
+  const text = preview(block, props.templates.get(block.formatId));
 
   return (
     <div
@@ -334,7 +374,7 @@ function OutlineCard(props: CardProps) {
               it takes no break and no chapter number — so naming it by depth
               would be a lie. It says what it actually is. */}
           <span className="outline-level">
-            {props.structural ? props.levelName : props.formatName}
+            {props.structural ? props.levelName : kindOf(props.formatName)}
           </span>
         </div>
         {text ? <p className="outline-preview">{text}</p> : null}

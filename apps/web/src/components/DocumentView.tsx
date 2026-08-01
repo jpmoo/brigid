@@ -32,7 +32,9 @@ function spanStyle(span: ResolvedSpan): CSSProperties {
     fontStyle: span.italic ? "italic" : undefined,
     textDecoration: span.underline ? "underline" : undefined,
     fontVariant: span.smallCaps ? "small-caps" : undefined,
-    textTransform: span.allCaps ? "uppercase" : undefined,
+    // Small caps win if both somehow survive: uppercasing first would leave
+    // small caps nothing lowercase to work on, so it would silently do nothing.
+    textTransform: span.allCaps && !span.smallCaps ? "uppercase" : undefined,
     letterSpacing: span.smallCaps || span.allCaps ? "0.08em" : undefined,
   };
 }

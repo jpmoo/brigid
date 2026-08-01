@@ -406,24 +406,29 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
       while (node.firstChild) parent?.insertBefore(node.firstChild, node);
       parent?.removeChild(node);
     };
-    const dropOther = (within: Node) => {
-      const start =
-        within.nodeType === Node.ELEMENT_NODE ? (within as HTMLElement) : within.parentElement;
-      const above = start?.closest(`[${other}]`);
-      if (above) unwrap(above);
-      const below =
-        within.nodeType === Node.ELEMENT_NODE
-          ? (within as HTMLElement).querySelectorAll(`[${other}]`)
-          : [];
-      for (const el of Array.from(below)) unwrap(el);
+    /**
+     * Clears the other mark from around and inside a span that has just been
+     * applied. Called after, never before: unwrapping moves nodes, and a range
+     * whose boundaries have been moved out from under it no longer describes
+     * the text it was taken from — which is how the text ended up plain, having
+     * lost one mark before the other could be put on it.
+     *
+     * An ancestor is only unwrapped when it holds nothing but this span. A
+     * whole line set in all caps shouldn't lose it because one word in the
+     * middle was made small caps.
+     */
+    const clearOther = (span: HTMLElement) => {
+      for (const el of Array.from(span.querySelectorAll(`[${other}]`))) unwrap(el);
+      const above = span.parentElement?.closest(`[${other}]`);
+      if (above && above.textContent === span.textContent) unwrap(above);
     };
-    dropOther(range.commonAncestorContainer);
 
     if (range.collapsed) {
       const span = document.createElement("span");
       span.setAttribute(attr, "1");
       span.textContent = ZWSP;
       range.insertNode(span);
+      clearOther(span);
       const inner = document.createRange();
       inner.setStart(span.firstChild as Node, 1);
       inner.collapse(true);
@@ -442,8 +447,8 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         const span = document.createElement("span");
         span.setAttribute(attr, "1");
         span.appendChild(range.extractContents());
-        for (const el of Array.from(span.querySelectorAll(`[${other}]`))) unwrap(el);
         range.insertNode(span);
+        clearOther(span);
       }
     }
     emit();
