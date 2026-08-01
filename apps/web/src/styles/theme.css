@@ -2929,6 +2929,11 @@ mark.hit.active {
   text-decoration-thickness: 1px;
   text-decoration-skip-ink: none;
   text-underline-offset: 3px;
+}
+
+/* Only worth pointing at where there is a menu behind it. In prose nobody is
+   editing, the underline is a remark rather than an offer. */
+.prose-surface .misspelled {
   cursor: pointer;
 }
 

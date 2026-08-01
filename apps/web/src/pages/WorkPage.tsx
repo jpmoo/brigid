@@ -827,6 +827,7 @@ export function WorkPage() {
             onDropBookmark={(blockId) => void addBookmark(blockId)}
             search={foldForSearch(query.trim())}
             activeMatch={activeMatch}
+            speller={spelling.speller}
             editingId={editingProse?.id ?? null}
             onEditProse={(blockId, selection) => {
               setSelectedId(blockId);

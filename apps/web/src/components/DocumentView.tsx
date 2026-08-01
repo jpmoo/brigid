@@ -11,6 +11,8 @@ import {
 } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import { offsetOfPoint, offsetOfPosition } from "./ProseEditor.js";
+import { words } from "../spelling.js";
+import type { Speller } from "../spelling.js";
 import type { ProseLayout } from "./ProseEditor.js";
 import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
@@ -57,8 +59,42 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
  * Split a paragraph on the search term, tagging each hit with its ordinal
  * within the block so the active one can be picked out from the rest.
  */
-function highlight(text: string, needle: string, counter: { n: number }, activeIndex: number | null) {
-  if (!needle) return text;
+/**
+ * The words a checker doesn't know, marked in prose nobody is editing.
+ *
+ * Only the parts of a line that aren't already a search hit: a hit is its own
+ * mark, and two overlaid would say less than either. The checker's answers are
+ * remembered per word, because this runs over the whole manuscript rather than
+ * the block being written in.
+ */
+function misspellings(text: string, speller: Speller | null, key: string): ReactNode {
+  if (!speller || !text) return text;
+
+  const parts: ReactNode[] = [];
+  let from = 0;
+  for (const { word, at } of words(text)) {
+    if (speller.correct(word)) continue;
+    if (at > from) parts.push(text.slice(from, at));
+    parts.push(
+      <span className="misspelled" key={`${key}-${at}`}>
+        {word}
+      </span>,
+    );
+    from = at + word.length;
+  }
+  if (parts.length === 0) return text;
+  if (from < text.length) parts.push(text.slice(from));
+  return parts;
+}
+
+function highlight(
+  text: string,
+  needle: string,
+  counter: { n: number },
+  activeIndex: number | null,
+  speller: Speller | null = null,
+) {
+  if (!needle) return misspellings(text, speller, "s");
   const parts: ReactNode[] = [];
 
   // Searched folded, shown unfolded: the reader keeps the typeset punctuation
@@ -75,7 +111,7 @@ function highlight(text: string, needle: string, counter: { n: number }, activeI
 
     const start = folded.at[found] ?? text.length;
     const end = folded.at[found + needle.length] ?? text.length;
-    if (start > shown) parts.push(text.slice(shown, start));
+    if (start > shown) parts.push(misspellings(text.slice(shown, start), speller, `s${shown}`));
 
     const ordinal = counter.n;
     counter.n += 1;
@@ -89,8 +125,8 @@ function highlight(text: string, needle: string, counter: { n: number }, activeI
     shown = end;
   }
 
-  if (parts.length === 0) return text;
-  if (shown < text.length) parts.push(text.slice(shown));
+  if (parts.length === 0) return misspellings(text, speller, "s");
+  if (shown < text.length) parts.push(misspellings(text.slice(shown), speller, `s${shown}`));
   return parts;
 }
 
@@ -105,6 +141,7 @@ function Nodes({
   activeIndex,
   counter,
   smart = false,
+  speller = null,
   editing = false,
   editor,
   onEditProse,
@@ -120,6 +157,8 @@ function Nodes({
   activeIndex: number | null;
   counter: { n: number };
   smart?: boolean;
+  /** Null when checking is off, or before the dictionary has arrived. */
+  speller?: Speller | null;
   editing?: boolean;
   editor?: (layout: ProseLayout) => ReactNode;
   onEditProse?: (selection: { anchor: number; focus: number }) => void;
@@ -282,7 +321,7 @@ function Nodes({
                   >
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
-                      const marked = highlight(text, search, counter, activeIndex);
+                      const marked = highlight(text, search, counter, activeIndex, speller);
                       if (
                         !hasMark(run, "strong") &&
                         !hasMark(run, "em") &&
@@ -366,6 +405,8 @@ export interface DocumentViewProps {
   /** Lowercased needle, or empty when not searching. */
   search: string;
   activeMatch: { blockId: string; indexInBlock: number } | null;
+  /** Marks what the checker doesn't know, in prose nobody is editing. */
+  speller: Speller | null;
   /** The block whose prose is open for editing, if any. */
   editingId: string | null;
   /**
@@ -395,6 +436,7 @@ export function DocumentView({
   onDropBookmark,
   search,
   activeMatch,
+  speller,
   editingId,
   onEditProse,
   editor,
@@ -498,6 +540,7 @@ export function DocumentView({
             <Nodes
               nodes={item.nodes}
               proseDoc={item.block.content}
+              speller={speller}
               prose={item.block.contentText}
               editing={editingId === item.block.id}
               editor={editor}

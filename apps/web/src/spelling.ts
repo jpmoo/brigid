@@ -132,20 +132,20 @@ export function useSpelling(): SpellingState {
   const speller = useMemo<Speller | null>(() => {
     if (!enabled || !checker) return null;
     void generation;
+    const memo = new Map<string, boolean>();
+    const spell = checker;
     return {
+      // Remembered, because the manuscript is checked as a whole now rather
+      // than a block at a time: a novel is sixty thousand words and they are
+      // re-checked whenever anything re-renders. The answers don't change
+      // between renders, and a fresh map is made whenever the checker learns
+      // something, so nothing is remembered that has since become wrong.
       correct: (word) => {
-        const base = foldApostrophes(word);
-        if (ignored.current.has(base.toLocaleLowerCase("en"))) return true;
-        // A word at the start of a sentence is capitalised, and Hunspell is
-        // right to accept that; one in small caps or shouted is not a mistake
-        // either. Falling back to the lowercase form covers both.
-        if (checker.correct(base) || checker.correct(base.toLocaleLowerCase("en"))) return true;
-        // A known name owning something is not a misspelling.
-        const stem = possessiveStem(base);
-        return (
-          stem !== null &&
-          (checker.correct(stem) || checker.correct(stem.toLocaleLowerCase("en")))
-        );
+        const known = memo.get(word);
+        if (known !== undefined) return known;
+        const answer = judge(word);
+        memo.set(word, answer);
+        return answer;
       },
       suggest: (word) => checker.suggest(foldApostrophes(word)).slice(0, 6),
       learn: (word) => {
@@ -153,6 +153,21 @@ export function useSpelling(): SpellingState {
         setGeneration((n) => n + 1);
       },
     };
+
+    function judge(word: string): boolean {
+        const base = foldApostrophes(word);
+        if (ignored.current.has(base.toLocaleLowerCase("en"))) return true;
+        // A word at the start of a sentence is capitalised, and Hunspell is
+        // right to accept that; one in small caps or shouted is not a mistake
+        // either. Falling back to the lowercase form covers both.
+        if (spell.correct(base) || spell.correct(base.toLocaleLowerCase("en"))) return true;
+        // A known name owning something is not a misspelling.
+        const stem = possessiveStem(base);
+        return (
+          stem !== null &&
+          (spell.correct(stem) || spell.correct(stem.toLocaleLowerCase("en")))
+        );
+    }
   }, [enabled, checker, generation]);
 
   const addWord = useCallback(

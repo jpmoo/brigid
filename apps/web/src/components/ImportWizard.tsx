@@ -257,14 +257,15 @@ export function ImportWizard({
             <h4 className="tpl-section">Markers</h4>
             {detected.length > 0 ? (
               <div className="alert ok" style={{ marginBottom: 10 }}>
-                Found in your document:{" "}
+                These look like headings, so Brigid is suggesting them &mdash; nothing is
+                decided yet. Short lines beginning with{" "}
                 {detected.map((d, i) => (
                   <span key={d.prefix}>
                     {i > 0 ? ", " : ""}
-                    <code>{d.prefix}</code> ×{d.count}
+                    <code>{d.prefix}</code> ({d.count} of them)
                   </span>
                 ))}
-                . Adjust anything that isn&rsquo;t right.
+                . Change what these mean below, or remove any that aren&rsquo;t headings.
               </div>
             ) : (
               <div className="alert error" style={{ marginBottom: 10 }}>
