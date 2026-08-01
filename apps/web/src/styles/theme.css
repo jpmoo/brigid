@@ -4108,3 +4108,85 @@ mark.hit.active {
   line-height: 1.5;
   color: var(--text-muted);
 }
+
+/* --- The cast, as tiles --------------------------------------------------- */
+
+/* Two or three across, never more: a radar with ten labelled spokes stops
+   being readable well before it stops being drawable, and "Rival / False Hero"
+   needs the room. The minimum is what keeps the labels legible; auto-fit lets
+   a narrow window drop to two and then to one. */
+.cast-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+/* An opened tile takes the full width — the fuller report is prose, and prose
+   in a third of a column is unreadable. */
+.cast-tile.expanded {
+  grid-column: 1 / -1;
+}
+
+.cast-tile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--paper);
+  padding: 12px 14px 14px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.cast-tile:hover {
+  border-color: var(--border-strong);
+}
+
+.cast-tile.expanded {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.cast-tile-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.cast-tile-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cast-tile-shape {
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* At tile size the chart carries the whole message, so give it the width and
+   let the labels breathe. */
+.spider.compact .spider-svg {
+  width: 100%;
+  height: auto;
+}
+
+.spider.compact .spider-label {
+  font-size: 11px;
+  /* The tile is the click target; the spokes only offer their definitions. */
+  cursor: help;
+  pointer-events: auto;
+}
+
+.cast-tile-body {
+  margin-top: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}

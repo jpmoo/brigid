@@ -358,11 +358,25 @@ function CharactersPane({
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
   const thin = bundle.roster.filter((r) => !r.judgeable);
-  const [who, setWho] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<string | null>(null);
+
+  /**
+   * Most prominent first, and stably so.
+   *
+   * The roster is already ordered by how much of the book a character actually
+   * occupies, which is the order these should arrive in — a tile grid that
+   * re-sorted itself as each profile landed would move the one being read.
+   */
+  const rank = new Map(bundle.roster.map((r, i) => [r.name.toLowerCase(), i]));
+  const ordered = reports
+    .map((report) => ({ profile: report.result as CharacterAnalysis, report }))
+    .sort(
+      (a, b) =>
+        (rank.get(a.profile.name.toLowerCase()) ?? 999) -
+        (rank.get(b.profile.name.toLowerCase()) ?? 999),
+    );
 
   const profiles = reports.map((r) => r.result as CharacterAnalysis);
-  const shown = profiles.find((p) => p.name === who) ?? profiles[0] ?? null;
-  const shownReport = reports.find((r) => r.subject === shown?.name);
 
   return (
     <>
@@ -404,8 +418,6 @@ function CharactersPane({
 
       {profiles.length > 0 ? (
         <>
-          {shownReport && !shownReport.current ? <Stale drift={shownReport.drift} /> : null}
-
           {/* Readable now, but not yet final: the rule that only one character
               ordinarily carries a 5 on an axis can only be applied once there
               is a whole cast to compare, so a score read mid-run may drop. */}
@@ -418,63 +430,62 @@ function CharactersPane({
             </p>
           ) : null}
 
-          <div className="cast-chips">
-            {profiles.map((p) => (
-              <button
-                key={p.name}
-                type="button"
-                className={`cast-chip${p.name === shown?.name ? " selected" : ""}`}
-                onClick={() => setWho(p.name)}
-              >
-                {p.name}
-              </button>
-            ))}
+          <div className="cast-grid">
+            {ordered.map(({ profile, report }) => {
+              const open = expanded === profile.name;
+              return (
+                <div
+                  key={profile.name}
+                  className={`cast-tile${open ? " expanded" : ""}`}
+                >
+                  <button
+                    type="button"
+                    className="cast-tile-head"
+                    onClick={() => setExpanded(open ? null : profile.name)}
+                    aria-expanded={open}
+                  >
+                    <span className="cast-tile-name">{profile.name}</span>
+                    <span className="cast-tile-shape">{shapeOf(profile, bundle.axisLabels)}</span>
+                  </button>
+
+                  <SpiderGraph
+                    profile={profile}
+                    labels={bundle.axisLabels}
+                    blurbs={bundle.axisBlurbs}
+                    compact={!open}
+                  />
+
+                  {open ? (
+                    <div className="cast-tile-body">
+                      {report && !report.current ? <Stale drift={report.drift} /> : null}
+
+                      <p className="tpl-note">
+                        Scored against <strong>{profile.focal}</strong>&rsquo;s arc. One chart
+                        is one perspective. Click a spoke for what the score rested on.
+                      </p>
+
+                      <p className="fit-overview">{profile.summary}</p>
+
+                      {profile.phaseShifts.length > 0 ? (
+                        <>
+                          <h6>Phase shifts</h6>
+                          <ul className="fit-list">
+                            {profile.phaseShifts.map((shift, n) => (
+                              <li key={n}>{shift}</li>
+                            ))}
+                          </ul>
+                        </>
+                      ) : null}
+
+                      {profile.confidence ? (
+                        <p className="tpl-note">{profile.confidence}</p>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            })}
           </div>
-
-          {shown ? (
-            <>
-              <p className="tpl-note">
-                Scored against <strong>{shown.focal}</strong>&rsquo;s arc. One chart is one
-                perspective &mdash; the same character reads differently against a different
-                focal point.
-              </p>
-              <SpiderGraph profile={shown} labels={bundle.axisLabels} blurbs={bundle.axisBlurbs} />
-
-              <h4 className="tpl-section">The shape</h4>
-              <p className="fit-overview">{shown.summary}</p>
-
-              {shown.phaseShifts.length > 0 ? (
-                <>
-                  <h4 className="tpl-section">Shifts across the book</h4>
-                  <ul className="fit-list">
-                    {shown.phaseShifts.map((s, i) => (
-                      <li key={i}>{s}</li>
-                    ))}
-                  </ul>
-                </>
-              ) : null}
-
-              {shown.confidence ? <p className="tpl-note">{shown.confidence}</p> : null}
-            </>
-          ) : null}
-        </>
-      ) : null}
-
-      {thin.length > 0 ? (
-        <>
-          <h4 className="tpl-section">Too little to judge</h4>
-          <p className="tpl-note">
-            These people appear in the manuscript but not enough of them is on the page to
-            score a profile the rubric would accept. They weren&rsquo;t sent to the model.
-          </p>
-          <ul className="thin-cast">
-            {thin.map((r) => (
-              <li key={r.name}>
-                <strong>{r.name}</strong>
-                <span>{r.reason}</span>
-              </li>
-            ))}
-          </ul>
         </>
       ) : null}
     </>
@@ -494,6 +505,22 @@ function CharactersPane({
  * minutes long, and "profiling Elizabeth Bennet, 4 of 12" is a different kind
  * of reassurance from a bar that has not moved for six minutes.
  */
+/**
+ * What the shape is, in two words.
+ *
+ * The chart's value is the combination of its axes, so the tile is captioned
+ * with the two the character actually carries rather than with a single label
+ * that would flatten exactly what the radar exists to show.
+ */
+function shapeOf(profile: CharacterAnalysis, labels: Record<string, string>): string {
+  const top = [...profile.axes]
+    .filter((a) => a.score >= 3)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 2)
+    .map((a) => labels[a.axis] ?? a.axis);
+  return top.length > 0 ? top.join(" · ") : "Flat profile";
+}
+
 function RunProgress({ run }: { run: CharacterRunProgress }) {
   const pct = run.total > 0 ? Math.round((run.done / run.total) * 100) : 0;
   return (

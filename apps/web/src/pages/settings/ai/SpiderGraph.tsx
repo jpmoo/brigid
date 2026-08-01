@@ -29,11 +29,17 @@ export function SpiderGraph({
   profile,
   labels,
   blurbs,
+  compact = false,
 }: {
   profile: CharacterAnalysis;
   labels: Record<string, string>;
   /** One line on what each axis measures — a function, not a job title. */
   blurbs?: Record<string, string>;
+  /**
+   * Tile size: the shape only, with no spoke-picking underneath. On a tile the
+   * whole card is the click target, so an inner one would fight it.
+   */
+  compact?: boolean;
 }) {
   const [openAxis, setOpenAxis] = useState<string | null>(null);
   const axes = profile.axes;
@@ -43,7 +49,7 @@ export function SpiderGraph({
   const selected = axes.find((a) => a.axis === openAxis) ?? null;
 
   return (
-    <div className="spider">
+    <div className={`spider${compact ? " compact" : ""}`}>
       {/* The box is wider than the chart: axis labels sit outside the radius,
           and "Rival / False Hero" on the left runs well past it. */}
       <svg viewBox={`${-PAD} -8 ${SIZE + PAD * 2} ${SIZE + 16}`} className="spider-svg" role="img"
@@ -70,7 +76,7 @@ export function SpiderGraph({
                 y={ly}
                 textAnchor={lx < CENTRE - 4 ? "end" : lx > CENTRE + 4 ? "start" : "middle"}
                 dominantBaseline="middle"
-                onClick={() => setOpenAxis(openAxis === axis.axis ? null : axis.axis)}
+                onClick={compact ? undefined : () => setOpenAxis(openAxis === axis.axis ? null : axis.axis)}
               >
                 {/* SVG's own tooltip: a <title> child, which hovers and is
                     read out. An aria-label here would do neither. */}
@@ -99,7 +105,7 @@ export function SpiderGraph({
         })}
       </svg>
 
-      {selected ? (
+      {selected && !compact ? (
         <div className="spider-detail">
           <h6>
             {labels[selected.axis] ?? selected.axis}
