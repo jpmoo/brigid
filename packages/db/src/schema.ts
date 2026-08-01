@@ -324,11 +324,17 @@ export const analyses = pgTable("analyses", {
   workId: uuid("work_id")
     .notNull()
     .references(() => works.id, { onDelete: "cascade" }),
-  kind: text("kind").$type<"structure" | "character">().notNull(),
+  kind: text("kind").$type<"structure" | "character" | "framework">().notNull(),
   /** For 'character', who it is about. Null for 'structure'. */
   subject: text("subject"),
   model: text("model").notNull(),
   digestFingerprint: text("digest_fingerprint").notNull(),
+  /**
+   * Every section as it stood when this was judged, so drift can be measured in
+   * words rather than reported as a bare yes-or-no. Null on reports written
+   * before this was kept; those fall back to the fingerprint.
+   */
+  digestSnapshot: jsonb("digest_snapshot").$type<[string, string, number][]>(),
   result: jsonb("result").$type<Record<string, unknown>>().notNull(),
   ms: integer("ms"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

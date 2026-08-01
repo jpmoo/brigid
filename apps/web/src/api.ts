@@ -1,6 +1,7 @@
 /** Thin fetch wrapper. Same-origin in production, Vite-proxied in dev. */
 
 import type {
+  AnalysisDrift,
   BlockFormatSettings,
   BreakTemplateSettings,
   CharacterAnalysis,
@@ -137,13 +138,15 @@ export interface AnalysisBundle {
   axisLabels: Record<string, string>;
   modelLabels: Record<string, string>;
   reports: {
-    kind: "structure" | "character";
+    kind: "structure" | "character" | "framework";
     subject: string | null;
     model: string;
     result: unknown;
     createdAt: string;
     /** False once the manuscript has moved on since this was judged. */
     current: boolean;
+    /** And by how much, so a typo doesn't read like a rewrite. */
+    drift: AnalysisDrift;
   }[];
 }
 

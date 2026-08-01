@@ -3,7 +3,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { analyses, settings, works } from "@brigid/db";
-import type { CharacterAnalysis, PlacedDigest } from "@brigid/shared";
+import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
@@ -26,6 +26,65 @@ function fingerprint(sections: PlacedDigest[]): string {
     .map((s) => `${s.blockId}:${s.start.toFixed(4)}:${s.events.length}:${s.characters.length}`)
     .join("|");
   return createHash("sha256").update(material).digest("hex").slice(0, 32);
+}
+
+/**
+ * Each section as it stands: what it is, what the digest found there, and how
+ * long it is. Stored with a report so drift can later be measured against it.
+ */
+function snapshot(sections: PlacedDigest[]): [string, string, number][] {
+  return sections.map((s) => [
+    s.blockId,
+    `${s.events.length}:${s.characters.length}:${s.words}`,
+    s.words,
+  ]);
+}
+
+/**
+ * How much of the book has moved since a report was written.
+ *
+ * Counted in words rather than sections, because sections are not the same
+ * size: rewriting a 4,000-word chapter and retitling a 90-word interstitial are
+ * both "one section changed" and are not remotely the same news. Deleted
+ * sections count their old length, added ones their new — both are work the
+ * report has not seen.
+ */
+function driftFrom(
+  before: [string, string, number][] | null,
+  after: [string, string, number][],
+): AnalysisDrift {
+  const now = after.reduce((sum, [, , w]) => sum + w, 0);
+  if (!before) return { words: 0, fraction: 0, sections: 0, measurable: false };
+
+  const was = new Map(before.map(([id, sig, w]) => [id, { sig, w }]));
+  let words = 0;
+  let count = 0;
+
+  for (const [id, sig, w] of after) {
+    const held = was.get(id);
+    if (!held) {
+      words += w;
+      count += 1;
+    } else if (held.sig !== sig) {
+      // The larger of the two: a chapter cut from 4,000 words to 100 has moved
+      // 4,000 words' worth, not 100.
+      words += Math.max(w, held.w);
+      count += 1;
+    }
+    was.delete(id);
+  }
+  // Whatever is left was deleted.
+  for (const [, held] of was) {
+    words += held.w;
+    count += 1;
+  }
+
+  return {
+    words,
+    fraction: now > 0 ? Math.min(1, words / now) : 0,
+    sections: count,
+    measurable: true,
+  };
 }
 
 async function reader() {
@@ -71,6 +130,7 @@ async function store(
   subject: string | null,
   model: string,
   digestFingerprint: string,
+  digestSnapshot: [string, string, number][],
   result: unknown,
   ms: number,
 ): Promise<void> {
@@ -80,6 +140,7 @@ async function store(
     subject,
     model,
     digestFingerprint,
+    digestSnapshot,
     result: result as Record<string, unknown>,
     ms,
     createdAt: new Date(),
@@ -115,6 +176,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const sections = await placedDigests(workId);
     const stored = await db.select().from(analyses).where(eq(analyses.workId, workId));
     const mark = fingerprint(sections);
+    const now = snapshot(sections);
 
     return {
       progress,
@@ -131,6 +193,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         createdAt: row.createdAt,
         /** False once the manuscript has moved on since this was judged. */
         current: row.digestFingerprint === mark,
+        /** And by how much — so a typo doesn't read like a rewrite. */
+        drift: driftFrom(row.digestSnapshot ?? null, now),
       })),
     };
   });
@@ -149,7 +213,16 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       sections,
     });
 
-    await store(workId, "structure", null, config.model, fingerprint(sections), result, ms);
+    await store(
+      workId,
+      "structure",
+      null,
+      config.model,
+      fingerprint(sections),
+      snapshot(sections),
+      result,
+      ms,
+    );
     return { result, ms };
   });
 
@@ -212,8 +285,9 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     // Only meaningful across a whole cast; harmless for a single re-run.
     const settled = wanted.length > 1 ? reconcilePrimacy(profiles) : profiles;
     const mark = fingerprint(sections);
+    const shot = snapshot(sections);
     for (const profile of settled) {
-      await store(workId, "character", profile.name, config.model, mark, profile, ms);
+      await store(workId, "character", profile.name, config.model, mark, shot, profile, ms);
     }
 
     return { results: settled, ms };

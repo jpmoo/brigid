@@ -35,6 +35,43 @@ const MIN_SECTIONS = 2;
  * recorded, so "the Colonel" and "Colonel Ash" don't become two people with
  * half a profile each.
  */
+/**
+ * Things a model records as people that are not people.
+ *
+ * A digest asked "who is in this section" will sometimes answer "the narrator",
+ * or name the reader, or the author. These are not characters and cannot be
+ * scored on axes that ask what someone does to the plot — but they accumulate
+ * mentions across every section, so they arrive at the top of the roster and
+ * sit in the unscored list looking like an omission. They are dropped outright
+ * rather than reported as too thin to judge, because "not enough evidence" is
+ * the wrong reason: there would be no profile however much was written.
+ *
+ * A first-person narrator who is also in the story is named — Pip, Nick, Ishmael
+ * — and passes through this untouched. Only the bare role words are caught.
+ */
+const NOT_A_CHARACTER = new Set([
+  "narrator",
+  "the narrator",
+  "narration",
+  "narrative voice",
+  "the author",
+  "author",
+  "the reader",
+  "reader",
+  "unnamed narrator",
+  "first-person narrator",
+  "omniscient narrator",
+  "the omniscient narrator",
+  "third-person narrator",
+  "unknown",
+  "none",
+  "n/a",
+]);
+
+function isRealCharacter(name: string): boolean {
+  return !NOT_A_CHARACTER.has(name.trim().toLowerCase());
+}
+
 export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
   const byKey = new Map<string, RosterEntry>();
   const aliasTo = new Map<string, string>();
@@ -47,7 +84,7 @@ export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
   for (const section of sections) {
     for (const character of section.characters) {
       const key = keyFor(character.name);
-      if (!key) continue;
+      if (!key || !isRealCharacter(character.name)) continue;
 
       // Bind this section's aliases to the identity, so a later section using
       // only the nickname lands on the same person.

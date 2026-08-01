@@ -4024,3 +4024,74 @@ mark.hit.active {
   .spider-svg { width: 100%; }
   .raw-body { padding-left: 0; }
 }
+
+/* --- Analysis drift ------------------------------------------------------ */
+
+/* How far the book has moved since a report was written. A measure rather than
+   a warning: the question it answers is whether re-running is worth the time,
+   and that depends entirely on how much changed. */
+.drift {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunk, var(--paper));
+}
+
+.drift-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 7px;
+}
+
+.drift-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.drift-figure {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.drift-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+
+.drift-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s;
+}
+
+/* Green is wrong at every level here — none of this is good news, it is only
+   more or less urgent. So the ramp runs quiet to loud. */
+.drift.slight .drift-fill {
+  background: var(--text-faint);
+}
+.drift.moderate .drift-fill {
+  background: #c98a2b;
+}
+.drift.heavy .drift-fill {
+  background: var(--danger, #b3261e);
+}
+
+.drift.heavy {
+  border-color: color-mix(in srgb, var(--danger, #b3261e) 40%, var(--border));
+}
+
+.drift-note {
+  margin: 7px 0 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}

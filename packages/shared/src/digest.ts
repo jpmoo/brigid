@@ -204,3 +204,21 @@ export interface RosterEntry {
   /** Said plainly when not judgeable. */
   reason?: string;
 }
+
+/**
+ * How far the manuscript has moved since a report was written.
+ *
+ * A count rather than a flag, because "no longer current" covers both a fixed
+ * typo and three new chapters, and only one of those is a reason to spend
+ * twenty minutes running the analysis again.
+ */
+export interface AnalysisDrift {
+  /** Words in sections that were added, cut, or rewritten since the run. */
+  words: number;
+  /** Those words as a share of the manuscript now. 0–1. */
+  fraction: number;
+  /** How many sections differ. */
+  sections: number;
+  /** Null when the report predates snapshots and only the flag is available. */
+  measurable: boolean;
+}

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Play, RefreshCw } from "lucide-react";
 import type {
+  AnalysisDrift,
   CharacterAnalysis,
   ModelFit,
   PlacedDigest,
@@ -188,11 +189,53 @@ function humanDuration(seconds: number): string {
   return `${hours}h ${minutes % 60}m`;
 }
 
-function Stale() {
+/**
+ * How far the book has moved since a report was written.
+ *
+ * A bar rather than a warning, because the decision it informs is "is this
+ * worth twenty minutes of the GPU again", and that turns entirely on the size
+ * of the change. A fixed typo and three new chapters both make a report "no
+ * longer current"; only one of them makes it wrong.
+ */
+function Stale({ drift }: { drift?: AnalysisDrift }) {
+  // Reports written before drift was recorded can only offer the flag.
+  if (!drift?.measurable) {
+    return (
+      <div className="alert warn">
+        <AlertTriangle size={14} /> The manuscript has changed since this was written. Run
+        it again for a current reading.
+      </div>
+    );
+  }
+
+  const pct = Math.round(drift.fraction * 100);
+  const band = pct >= 25 ? "heavy" : pct >= 10 ? "moderate" : "slight";
+  const verdict =
+    band === "heavy"
+      ? "Worth running again — this is about a book that has substantially changed."
+      : band === "moderate"
+        ? "Enough has changed that the proportions may have shifted. Worth a re-run before trusting the positions."
+        : "Small enough that the findings below should still hold.";
+
   return (
-    <div className="alert warn">
-      <AlertTriangle size={14} /> The manuscript has changed since this was written. Run it
-      again for a current reading.
+    <div className={`drift ${band}`}>
+      <div className="drift-head">
+        <span className="drift-label">Changed since this was written</span>
+        <span className="drift-figure">
+          {drift.words.toLocaleString()} {drift.words === 1 ? "word" : "words"}
+          {pct >= 1 ? ` · ${pct}%` : ""}
+        </span>
+      </div>
+      <div
+        className="drift-track"
+        role="img"
+        aria-label={`${pct}% of the manuscript has changed since this analysis`}
+      >
+        <div className="drift-fill" style={{ width: `${Math.max(2, Math.min(100, pct))}%` }} />
+      </div>
+      <p className="drift-note">
+        Across {drift.sections} {drift.sections === 1 ? "section" : "sections"}. {verdict}
+      </p>
     </div>
   );
 }
@@ -229,7 +272,7 @@ function StructurePane({
         </p>
       ) : (
         <>
-          {report && !report.current ? <Stale /> : null}
+          {report && !report.current ? <Stale drift={report.drift} /> : null}
 
           <h4 className="tpl-section">Overall</h4>
           <p className="fit-overview">{result.overview}</p>
@@ -322,7 +365,7 @@ function CharactersPane({
 
       {profiles.length > 0 ? (
         <>
-          {shownReport && !shownReport.current ? <Stale /> : null}
+          {shownReport && !shownReport.current ? <Stale drift={shownReport.drift} /> : null}
 
           <div className="cast-chips">
             {profiles.map((p) => (
