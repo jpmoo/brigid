@@ -120,6 +120,14 @@ export interface GenerateOptions {
   thinks?: boolean | null;
 }
 
+/** A call that ran out of time rather than one that answered badly. */
+export class ModelTimeout extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ModelTimeout";
+  }
+}
+
 export interface GenerateResult {
   text: string;
   /**
@@ -158,9 +166,16 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
   if (opts.format) body.format = opts.format;
   if (opts.think === false) body.think = false;
 
-  // A long chapter through a large model on modest hardware is genuinely slow,
-  // and this runs in the background where nobody is waiting on it.
-  const timeout = AbortSignal.timeout(opts.timeoutMs ?? 10 * 60_000);
+  /**
+   * Generous, because this runs in the background where nobody is waiting.
+   *
+   * A whole-book dossier through a large model on modest hardware is slow in a
+   * way that is not a fault — ten minutes was a guess, and profiling a
+   * well-attested character in a 120,000-word manuscript went past it. The cap
+   * exists only so a wedged Ollama is eventually noticed, not to enforce a
+   * pace.
+   */
+  const timeout = AbortSignal.timeout(opts.timeoutMs ?? 45 * 60_000);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
   const answer = await fetch(`${opts.url}/api/generate`, {
@@ -168,6 +183,15 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
     signal,
+  }).catch((err: unknown) => {
+    // A timeout arrives as an opaque DOMException; say what actually expired.
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
+      const mins = Math.round((opts.timeoutMs ?? 45 * 60_000) / 60_000);
+      throw new ModelTimeout(
+        `the model did not finish within ${mins} minutes — it may be loading a context window larger than this machine can hold`,
+      );
+    }
+    throw err;
   });
 
   if (!answer.ok) {
@@ -302,7 +326,12 @@ export async function generateJson<T>(opts: GenerateOptions): Promise<{ value: T
     try {
       result = await generate(attempt.opts);
     } catch (err) {
-      // A transport or HTTP failure is not something a simpler request fixes.
+      /**
+       * Neither a transport failure nor a timeout is fixed by asking again in a
+       * simpler way. The retries exist for a model that answers badly, not for
+       * one that is slow — and three attempts at forty-five minutes each would
+       * spend most of an afternoon proving the point.
+       */
       throw err;
     }
     ms += result.ms;
