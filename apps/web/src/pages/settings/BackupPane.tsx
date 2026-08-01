@@ -146,7 +146,7 @@ export function BackupPane({ workId }: { workId: string | null }) {
 
       <div className="be-line be-line-setting" style={{ marginTop: 10 }}>
         <label className="bk-field">
-          <span>At</span>
+          <span>Back up at</span>
           <input
             type="time"
             value={`${pad(schedule.hour)}:${pad(schedule.minute)}`}
@@ -159,7 +159,7 @@ export function BackupPane({ workId }: { workId: string | null }) {
           />
         </label>
         <label className="bk-field">
-          <span>Keep</span>
+          <span>keeping</span>
           <input
             type="number"
             min={KEEP_MIN}
@@ -171,7 +171,7 @@ export function BackupPane({ workId }: { workId: string | null }) {
               void patch({ keep: value });
             }}
           />
-          <span className="muted">most recent</span>
+          <span>backups in total.</span>
         </label>
         <span className="be-gap" />
         <button className="btn" type="button" disabled={busy !== null} onClick={backupNow}>
