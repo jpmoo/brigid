@@ -4354,3 +4354,22 @@ mark.hit.active {
 .modal {
   position: relative;
 }
+
+/* A profile is a chart plus a page of prose, which is more than a viewport on a
+   laptop. `.modal-body` was already built to scroll — `flex: 1; min-height: 0;
+   overflow-y: auto` — but that needs a parent that is a flex column with a
+   bounded height, and a plain `.modal` is neither, so the body simply grew past
+   the screen and the end of the report was unreachable. Scoped here rather than
+   applied to `.modal` itself, so the modals that were laid out against the old
+   behaviour keep it. */
+.cast-modal {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 40px);
+}
+
+/* Header and title hold their size; only the body scrolls. */
+.cast-modal > .card-title,
+.cast-modal > .card-subtitle {
+  flex: none;
+}

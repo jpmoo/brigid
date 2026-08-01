@@ -512,7 +512,7 @@ function CharactersPane({
               onClick={() => setExpanded(null)}
               role="presentation"
             >
-              <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+              <div className="modal wide cast-modal" onClick={(e) => e.stopPropagation()}>
                 <button
                   type="button"
                   className="modal-close"
