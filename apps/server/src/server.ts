@@ -3,6 +3,7 @@ import { buildApp } from "./app.js";
 import { env, initConfig } from "./config.js";
 import { initDb } from "./db.js";
 import { startBackupSchedule, stopBackupSchedule } from "./backup/schedule.js";
+import { startProfileWorker, stopProfileWorker } from "./ollama/profile-worker.js";
 import { startDigestWorker, stopDigestWorker } from "./ollama/worker.js";
 
 async function main() {
@@ -28,11 +29,13 @@ async function main() {
   // configured and a database is attached, and does nothing until both are. So
   // connecting a model starts the reading without a restart.
   startDigestWorker();
+  startProfileWorker();
 
   const shutdown = async (signal: string) => {
     app.log.info(`${signal} received, shutting down`);
     stopBackupSchedule();
     stopDigestWorker();
+    stopProfileWorker();
     await app.close();
     process.exit(0);
   };

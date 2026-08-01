@@ -339,3 +339,29 @@ export const analyses = pgTable("analyses", {
   ms: integer("ms"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * A queued run of character profiles.
+ *
+ * One model call per character, a dozen characters — far too long to hold an
+ * HTTP request open for, so the request records the queue and returns, and a
+ * worker writes each profile into `analyses` as it lands. `wanted` minus `done`
+ * is what is left, which is what makes the job survive a restart.
+ */
+export const characterRuns = pgTable("character_runs", {
+  workId: uuid("work_id")
+    .primaryKey()
+    .references(() => works.id, { onDelete: "cascade" }),
+  status: text("status").$type<"queued" | "running" | "idle" | "failed">().notNull().default("queued"),
+  wanted: jsonb("wanted").$type<string[]>().notNull().default([]),
+  done: jsonb("done").$type<string[]>().notNull().default([]),
+  /** Who is being profiled right now, for the progress line. */
+  currentSubject: text("current_subject"),
+  /** Whose arc the axes are scored against — one run, one perspective. */
+  focal: text("focal"),
+  digestFingerprint: text("digest_fingerprint"),
+  lastError: text("last_error"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

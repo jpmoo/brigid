@@ -3,6 +3,7 @@
 import type {
   AnalysisDrift,
   BlockFormatSettings,
+  CharacterRunProgress,
   BreakTemplateSettings,
   CharacterAnalysis,
   DigestProgress,
@@ -134,6 +135,8 @@ export interface Preferences {
 /** Everything the AI panel needs to draw itself. */
 export interface AnalysisBundle {
   progress: DigestProgress;
+  /** A queued run of character profiles, if there has ever been one. */
+  characterRun: CharacterRunProgress | null;
   roster: RosterEntry[];
   axisLabels: Record<string, string>;
   modelLabels: Record<string, string>;
@@ -502,8 +505,17 @@ export const api = {
   getAnalysis: (workId: string) => request<AnalysisBundle>(`/works/${workId}/analysis`),
   runStructureAnalysis: (workId: string) =>
     post<{ result: StructureAnalysis }>(`/works/${workId}/analysis/structure`),
+  /** Queues the run and returns at once; watch `characterRun` for progress. */
   runCharacterAnalysis: (workId: string, body: { name?: string; focal?: string }) =>
-    post<{ results: CharacterAnalysis[] }>(`/works/${workId}/analysis/character`, body),
+    post<{ queued: string[]; progress: CharacterRunProgress | null }>(
+      `/works/${workId}/analysis/character`,
+      body,
+    ),
+  cancelCharacterRun: (workId: string) =>
+    request<{ progress: CharacterRunProgress | null }>(
+      `/works/${workId}/analysis/characters/run`,
+      { method: "DELETE" },
+    ),
 
   getOllama: () => request<OllamaSettings>("/ollama"),
   // The address is passed rather than read, so a host can be tried before it is kept.

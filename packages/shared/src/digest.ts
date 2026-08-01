@@ -222,3 +222,19 @@ export interface AnalysisDrift {
   /** Null when the report predates snapshots and only the flag is available. */
   measurable: boolean;
 }
+
+/** How a queued run of character profiles is getting on. */
+export interface CharacterRunProgress {
+  status: "queued" | "running" | "idle" | "failed";
+  /** Profiles written so far this run. */
+  done: number;
+  /** How many were asked for. */
+  total: number;
+  /** Who is being profiled right now, if anyone. */
+  current: string | null;
+  /** Still to come, in order. */
+  remaining: string[];
+  lastError: string | null;
+  /** Rough seconds left, from what this run has actually cost. Null early on. */
+  etaSeconds: number | null;
+}

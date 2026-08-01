@@ -7,7 +7,12 @@ import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/sha
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { analyseCharacter, analyseStructure, buildRoster, reconcilePrimacy } from "./analysis.js";
+import { analyseStructure, buildRoster } from "./analysis.js";
+import {
+  cancelCharacterRun,
+  characterProgressOf,
+  queueCharacterRun,
+} from "./profile-worker.js";
 import { AXIS_LABELS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
 
@@ -180,6 +185,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
     return {
       progress,
+      characterRun: await characterProgressOf(workId),
       roster: buildRoster(sections),
       // Labels travel with the findings so the web app doesn't keep a second
       // copy of the frameworks' names that could drift from this one.
@@ -268,29 +274,32 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       );
     }
 
-    const profiles: CharacterAnalysis[] = [];
-    let ms = 0;
-    for (const entry of wanted) {
-      const one = await analyseCharacter({
-        ...config,
-        title: work.title,
-        name: entry.name,
-        focal,
-        sections,
-      });
-      profiles.push(one.result);
-      ms += one.ms;
-    }
+    /**
+     * Queued, not run.
+     *
+     * One model call per character makes this an hour's work on a full cast,
+     * and nothing in front of the server will hold a request open that long —
+     * Cloudflare cuts one off at a hundred seconds. So the queue is recorded
+     * and the answer is immediate; the worker writes each profile as it lands
+     * and the panel watches it happen.
+     */
+    await queueCharacterRun(
+      workId,
+      wanted.map((r) => r.name),
+      fingerprint(sections),
+      focal,
+    );
 
-    // Only meaningful across a whole cast; harmless for a single re-run.
-    const settled = wanted.length > 1 ? reconcilePrimacy(profiles) : profiles;
-    const mark = fingerprint(sections);
-    const shot = snapshot(sections);
-    for (const profile of settled) {
-      await store(workId, "character", profile.name, config.model, mark, shot, profile, ms);
-    }
+    return { queued: wanted.map((r) => r.name), progress: await characterProgressOf(workId) };
+  });
 
-    return { results: settled, ms };
+  /** Stop a run. What it has already written stays. */
+  app.delete("/works/:workId/analysis/characters/run", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    await cancelCharacterRun(workId);
+    return { progress: await characterProgressOf(workId) };
   });
 
   app.delete("/works/:workId/analysis", async (req) => {

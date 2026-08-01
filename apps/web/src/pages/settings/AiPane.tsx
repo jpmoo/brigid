@@ -3,6 +3,7 @@ import { AlertTriangle, Play, RefreshCw } from "lucide-react";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
+  CharacterRunProgress,
   ModelFit,
   PlacedDigest,
   StructureAnalysis,
@@ -46,14 +47,16 @@ export function AiPane({ workId }: { workId: string }) {
    * is done the polling stops — there is nothing left to watch, and a settings
    * page left open shouldn't keep a server busy all afternoon.
    */
-  const walking = bundle ? !bundle.progress.ready : false;
+  const run = bundle?.characterRun ?? null;
+  const profiling = run?.status === "queued" || run?.status === "running";
+  const walking = bundle ? !bundle.progress.ready || profiling : false;
   useEffect(() => {
     if (!walking) return;
     const id = setInterval(() => void reload(), 5000);
     return () => clearInterval(id);
   }, [walking, reload]);
 
-  async function run(what: "structure" | "characters") {
+  async function start(what: "structure" | "characters") {
     setBusy(what);
     setError(null);
     try {
@@ -68,6 +71,15 @@ export function AiPane({ workId }: { workId: string }) {
       );
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function cancel() {
+    try {
+      await api.cancelCharacterRun(workId);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not stop the run");
     }
   }
 
@@ -113,14 +125,16 @@ export function AiPane({ workId }: { workId: string }) {
               report={structure}
               labels={bundle.modelLabels}
               busy={busy === "structure"}
-              onRun={() => void run("structure")}
+              onRun={() => void start("structure")}
             />
           ) : tab === "characters" ? (
             <CharactersPane
               bundle={bundle}
               reports={characters}
+              run={run}
               busy={busy === "characters"}
-              onRun={() => void run("characters")}
+              onRun={() => void start("characters")}
+              onCancel={() => void cancel()}
             />
           ) : (
             <RawPane workId={workId} />
@@ -325,14 +339,19 @@ function byFit(models: ModelFit[]): ModelFit[] {
 function CharactersPane({
   bundle,
   reports,
+  run,
   busy,
   onRun,
+  onCancel,
 }: {
   bundle: AnalysisBundle;
   reports: AnalysisBundle["reports"];
+  run: CharacterRunProgress | null;
   busy: boolean;
   onRun: () => void;
+  onCancel: () => void;
 }) {
+  const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
   const thin = bundle.roster.filter((r) => !r.judgeable);
   const [who, setWho] = useState<string | null>(null);
@@ -344,16 +363,32 @@ function CharactersPane({
   return (
     <>
       <div className="be-line" style={{ marginTop: 12 }}>
-        <button className="btn" type="button" disabled={busy || judgeable.length === 0} onClick={onRun}>
+        <button
+          className="btn"
+          type="button"
+          disabled={busy || working || judgeable.length === 0}
+          onClick={onRun}
+        >
           {profiles.length > 0 ? <RefreshCw size={14} /> : <Play size={14} />}
-          {busy
-            ? "Scoring…"
+          {working
+            ? "Profiling…"
             : profiles.length > 0
               ? "Run again"
               : `Profile ${judgeable.length} character${judgeable.length === 1 ? "" : "s"}`}
         </button>
-        {busy ? <span className="muted">A few minutes per character.</span> : null}
+        {working ? (
+          <button className="btn secondary" type="button" onClick={onCancel}>
+            Stop
+          </button>
+        ) : null}
       </div>
+
+      {working ? <RunProgress run={run!} /> : null}
+      {!working && run?.lastError ? (
+        <div className="alert warn">
+          <AlertTriangle size={14} /> {run.lastError}. The rest of the cast was profiled.
+        </div>
+      ) : null}
 
       {judgeable.length === 0 ? (
         <p className="tpl-note">
@@ -436,6 +471,37 @@ function CharactersPane({
  * Shown because the analyses are only as good as this, and a spider graph
  * nobody can check is a spider graph nobody should believe.
  */
+/**
+ * A queued run, as it happens.
+ *
+ * Worth showing character by character rather than as a single bar: each one is
+ * minutes long, and "profiling Elizabeth Bennet, 4 of 12" is a different kind
+ * of reassurance from a bar that has not moved for six minutes.
+ */
+function RunProgress({ run }: { run: CharacterRunProgress }) {
+  const pct = run.total > 0 ? Math.round((run.done / run.total) * 100) : 0;
+  return (
+    <>
+      <div className="digest-bar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+        <div className="digest-fill" style={{ width: `${pct}%` }} />
+      </div>
+      <p className="tpl-note">
+        <strong>
+          {run.done} of {run.total} profiled
+        </strong>
+        {run.current ? <> &mdash; working on {run.current}</> : null}
+        {run.etaSeconds !== null ? <>, about {humanDuration(run.etaSeconds)} left</> : null}. This
+        runs on the server, so you can close this page and come back to it.
+      </p>
+      {run.lastError ? (
+        <p className="tpl-note">
+          <AlertTriangle size={13} /> {run.lastError} &mdash; the run carried on.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
 function RawPane({ workId }: { workId: string }) {
   const [sections, setSections] = useState<PlacedDigest[] | null>(null);
   const [open, setOpen] = useState<string | null>(null);
