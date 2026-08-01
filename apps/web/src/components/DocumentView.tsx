@@ -278,6 +278,7 @@ export function DocumentView({
           <div
             className={`doc-break${item.detached ? " detached" : ""}`}
             key={`b${i}`}
+            data-break-for={item.blockId}
             ref={(el) => registerRef(breakRefKey(item.blockId), el)}
           >
             <div className="doc-break-body" style={typographyStyle(item.typography, mode)}>

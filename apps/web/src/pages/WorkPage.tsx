@@ -208,10 +208,12 @@ export function WorkPage() {
     const target =
       blockRefs.current.get(breakRefKey(blockId)) ?? blockRefs.current.get(blockId);
     target?.scrollIntoView({ behavior: "smooth", block: "start" });
-    // Long enough for a smooth scroll to settle before the observer takes over.
+    // Backstop only: normally the hold is released on arrival. This covers a
+    // scroll that never gets there — a target already at the top, so nothing
+    // moves and no scroll event ever fires.
     window.setTimeout(() => {
       if (scrollingTo.current === blockId) scrollingTo.current = null;
-    }, 700);
+    }, 1200);
   }, []);
 
   const registerOutlineRef = useCallback((blockId: string, el: HTMLDivElement | null) => {
@@ -227,11 +229,16 @@ export function WorkPage() {
   /**
    * Which block the top of the pane is inside.
    *
-   * Measured straight off scroll position rather than through an
-   * IntersectionObserver: the observer only speaks when something crosses its
-   * band, so a scroll that ends mid-block says nothing, and a percentage
-   * rootMargin against a nested scroller is hard to reason about when it goes
-   * wrong. This asks the question directly, on every frame that scrolls.
+   * Asked of the browser directly — what is at this point — rather than
+   * computed from every block's rectangle. Two previous attempts measured
+   * geometry themselves and were unreliable in ways that were hard to pin
+   * down: an IntersectionObserver only speaks when something crosses its band,
+   * and per-element rectangles have to survive `zoom`, sticky positioning and
+   * subpixel rounding. Hit-testing a single point has none of that to get
+   * wrong.
+   *
+   * A break counts as the start of the block it precedes, so reaching
+   * "Chapter Nine" is reaching chapter nine.
    */
   useEffect(() => {
     const pane = paneRef.current;
@@ -240,37 +247,30 @@ export function WorkPage() {
     let frame = 0;
     const update = () => {
       frame = 0;
-      if (scrollingTo.current) return;
 
-      const paneTop = pane.getBoundingClientRect().top;
-      let bestId: string | null = null;
-      let bestTop = -Infinity;
-      let firstId: string | null = null;
-      let firstTop = Infinity;
+      const rect = pane.getBoundingClientRect();
+      // A little inside the top edge, and across the middle where the prose is.
+      const found = document
+        .elementFromPoint(rect.left + rect.width / 2, rect.top + 6)
+        ?.closest("[data-block-id],[data-break-for]");
 
-      for (const [key, el] of blockRefs.current) {
-        if (key.startsWith("break:")) continue;
-        // A block starts at its break, not at its first line of prose: reaching
-        // "Chapter Nine" is reaching chapter nine, and the outline should say
-        // so before the heading has scrolled past.
-        const start = blockRefs.current.get(breakRefKey(key)) ?? el;
-        const top = start.getBoundingClientRect().top - paneTop;
-        // The last block starting at or above the top edge is the one the edge
-        // is inside. A few pixels of slack so a block flush to the top counts.
-        if (top <= 8 && top > bestTop) {
-          bestTop = top;
-          bestId = key;
-        }
-        if (top < firstTop) {
-          firstTop = top;
-          firstId = key;
-        }
+      const next =
+        found && pane.contains(found)
+          ? (found.getAttribute("data-block-id") ?? found.getAttribute("data-break-for"))
+          : null;
+
+      if (!next) return;
+
+      // A click drives a smooth scroll, during which the top of the pane passes
+      // over every block in between. Updates are held until it arrives — and
+      // released the moment it does, rather than after a fixed wait that a long
+      // scroll outlives and a short one sits through.
+      if (scrollingTo.current) {
+        if (scrollingTo.current !== next) return;
+        scrollingTo.current = null;
       }
 
-      // Before anything has reached the top — at the very start of the
-      // manuscript — the first block is the one being read.
-      const next = bestId ?? firstId;
-      if (next) setSelectedId((current) => (current === next ? current : next));
+      setSelectedId((current) => (current === next ? current : next));
     };
 
     const onScroll = () => {
@@ -278,9 +278,14 @@ export function WorkPage() {
     };
 
     pane.addEventListener("scroll", onScroll, { passive: true });
-    update();
+    window.addEventListener("resize", onScroll);
+    // The first paint may not have laid the manuscript out yet.
+    const settle = window.setTimeout(update, 0);
+
     return () => {
       pane.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      window.clearTimeout(settle);
       if (frame) window.cancelAnimationFrame(frame);
     };
   }, [items]);
