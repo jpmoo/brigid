@@ -585,31 +585,32 @@ input::placeholder {
 }
 
 /* The strip left behind when the panel retracts: a plain edge with a single
-   chevron, so it reads as "pull this out" rather than as decoration. */
-.outline-panel.floating::after {
+   chevron, so it reads as "pull this out" rather than as decoration.
+
+   Drawn on the body, not on the panel. The panel is a scroll container, and an
+   absolutely positioned cap inside one scrolls away with the content — so the
+   outline slid out from under its own cap and the strip's top edge stepped and
+   tore as it went. Out here nothing moves it.
+
+   Opaque for the same reason it exists: covering what is behind it is its only
+   job, and frosted, the cards' right edge read straight through. */
+.work-body.panel-hidden::after {
   content: "\203A";
   position: absolute;
   top: 0;
-  right: 0;
+  left: 0;
   width: 18px;
   height: 100%;
   display: grid;
   place-items: center;
-  /* Opaque, unlike the panel it caps. This strip is what remains on screen when
-     the panel retracts, and it sits over the panel's own cards — frosted, their
-     right edge read straight through it. */
   background: var(--surface);
   border-right: 1px solid var(--border);
   color: var(--text-faint);
   font-size: 14px;
   line-height: 1;
-  opacity: 0;
-  transition: opacity 0.16s;
+  /* The panel behind is the hover target that brings it back. */
   pointer-events: none;
-}
-
-.panel-hidden .outline-panel.floating::after {
-  opacity: 1;
+  z-index: 9;
 }
 
 .outline-head-bar {

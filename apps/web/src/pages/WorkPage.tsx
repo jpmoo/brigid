@@ -13,7 +13,7 @@ import {
   Minimize2,
   Settings,
 } from "lucide-react";
-import { buildOutline, deriveDocument } from "@brigid/shared";
+import { buildOutline, currentBlockAt, deriveDocument } from "@brigid/shared";
 import type { BlockOptions, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
@@ -272,16 +272,13 @@ export function WorkPage() {
   /**
    * Which block the top of the pane is inside.
    *
-   * Asked of the browser directly — what is at this point — rather than
-   * computed from every block's rectangle. Two previous attempts measured
-   * geometry themselves and were unreliable in ways that were hard to pin
-   * down: an IntersectionObserver only speaks when something crosses its band,
-   * and per-element rectangles have to survive `zoom`, sticky positioning and
-   * subpixel rounding. Hit-testing a single point has none of that to get
-   * wrong.
-   *
-   * A break counts as the start of the block it precedes, so reaching
-   * "Chapter Nine" is reaching chapter nine.
+   * The decision itself is `currentBlockAt`, which is pure and tested; this
+   * only supplies the measurements. It replaced a hit test — asking the browser
+   * what is painted at a point — which had a hole at exactly the place a reader
+   * starts: the pane is padded and the sheet inside it is padded again, so for
+   * the first inch of the document that point lands on empty margin and finds
+   * no block at all. The highlight didn't move until enough had scrolled past
+   * to reach it, which is why tracking seemed to need a moment to wake up.
    */
   useEffect(() => {
     const pane = paneRef.current;
@@ -292,15 +289,15 @@ export function WorkPage() {
       frame = 0;
 
       const rect = pane.getBoundingClientRect();
-      // A little inside the top edge, and across the middle where the prose is.
-      const found = document
-        .elementFromPoint(rect.left + rect.width / 2, rect.top + 6)
-        ?.closest("[data-block-id],[data-break-for]");
-
-      const next =
-        found && pane.contains(found)
-          ? (found.getAttribute("data-block-id") ?? found.getAttribute("data-break-for"))
-          : null;
+      const next = currentBlockAt(
+        items,
+        (item) => {
+          const key = item.kind === "break" ? breakRefKey(item.blockId) : item.block.id;
+          const el = blockRefs.current.get(key);
+          return el ? el.getBoundingClientRect().top : null;
+        },
+        rect.top + 4,
+      );
 
       if (!next) return;
 

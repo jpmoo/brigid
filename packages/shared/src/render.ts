@@ -453,3 +453,45 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
 
   return items;
 }
+
+/**
+ * Which block the reader is in, given where each rendered item sits.
+ *
+ * Measured rather than hit-tested. Asking the browser what element is painted
+ * at a point looks simpler, but the point has to fall on something: the
+ * manuscript pane is padded and the sheet inside it is padded again, so for the
+ * first inch of a document that point lands on empty margin, finds no block,
+ * and the highlight sits still until enough has scrolled past for content to
+ * reach it — which reads exactly like tracking that takes a while to wake up.
+ *
+ * Walking the items instead has no such hole. They are in document order, so
+ * the answer is the last one to have crossed the line, and the scan stops at
+ * the first one that hasn't. Before anything has crossed — at the very top —
+ * the answer is the first block, which is where the reader actually is.
+ *
+ * A break counts as the start of the block it precedes: reaching "Chapter Nine"
+ * is reaching chapter nine.
+ *
+ * @param topOf Where an item's top edge is, or null if it isn't rendered yet.
+ * @param line The y coordinate that counts as the top of the reading area.
+ */
+export function currentBlockAt<B extends BlockNode = BlockNode>(
+  items: readonly DocumentItem<B>[],
+  topOf: (item: DocumentItem<B>) => number | null,
+  line: number,
+): string | null {
+  let current: string | null = null;
+  let first: string | null = null;
+
+  for (const item of items) {
+    const id = item.kind === "break" ? item.blockId : item.block.id;
+    if (first === null) first = id;
+
+    const top = topOf(item);
+    if (top === null) continue;
+    if (top > line) break;
+    current = id;
+  }
+
+  return current ?? first;
+}

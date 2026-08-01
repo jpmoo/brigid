@@ -1,6 +1,7 @@
 import {
   asProseDoc,
   autocorrectKeystroke,
+  currentBlockAt,
   deriveDocument,
   normalizeProse,
   parseInlines,
@@ -8,7 +9,7 @@ import {
   proseToText,
   serializeInlines,
 } from "@brigid/shared";
-import type { LevelLike, TemplateLike } from "@brigid/shared";
+import type { DocumentItem, LevelLike, TemplateLike } from "@brigid/shared";
 
 let failures = 0;
 function check(label: string, actual: unknown, expected: unknown) {
@@ -422,6 +423,56 @@ check("a quote after a dash closes the speech", typed('"Stop--" she began.'), "\
 check("an elided decade turns round when the digit lands", typed("the '90s"), "the \u201990s");
 check("a lone hyphen is left alone", typed("a-b"), "a-b");
 check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
+
+// --- which block the reader is in ---
+
+{
+  // A break, its block, then two more blocks — document order, as rendered.
+  // Only the fields the function reads; the rest of a real item is irrelevant.
+  const items = [
+    { kind: "break", blockId: "one" },
+    { kind: "block", block: { id: "one" } },
+    { kind: "block", block: { id: "two" } },
+    { kind: "block", block: { id: "three" } },
+  ] as unknown as DocumentItem[];
+
+  /** Tops in the order the items are rendered; null means not laid out yet. */
+  const topsIn =
+    (tops: (number | null)[]) =>
+    (item: DocumentItem): number | null =>
+      tops[items.indexOf(item)] ?? null;
+
+  const line = 100;
+
+  // The pane and the sheet are both padded, so at rest everything sits below
+  // the line. This is the case the old hit test could not answer at all.
+  check(
+    "at the top of a padded document the first block is current",
+    currentBlockAt(items, topsIn([120, 180, 400, 700]), line),
+    "one",
+  );
+  check(
+    "the break counts as the start of its block",
+    currentBlockAt(items, topsIn([90, 180, 400, 700]), line),
+    "one",
+  );
+  check(
+    "the last item to cross the line wins",
+    currentBlockAt(items, topsIn([-300, -240, -20, 700]), line),
+    "two",
+  );
+  check(
+    "scrolled to the end, the last block is current",
+    currentBlockAt(items, topsIn([-900, -840, -600, -200]), line),
+    "three",
+  );
+  check(
+    "an item that has not rendered is skipped, not fatal",
+    currentBlockAt(items, topsIn([-300, -240, null, 700]), line),
+    "one",
+  );
+  check("an empty document has no current block", currentBlockAt([], () => null, line), null);
+}
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
