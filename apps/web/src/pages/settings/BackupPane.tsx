@@ -187,7 +187,7 @@ export function BackupPane({ workId }: { workId: string | null }) {
       {error ? <div className="alert error">{error}</div> : null}
       {note ? <div className="alert ok">{note}</div> : null}
 
-      <h4 className="tpl-section">Backups</h4>
+      <h4 className="tpl-section">Restore a backup</h4>
       <div className="be-line">
         <input
           ref={fileInput}

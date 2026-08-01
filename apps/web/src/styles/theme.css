@@ -196,6 +196,8 @@ a:hover {
 input[type="text"],
 input[type="password"],
 input[type="number"],
+input[type="time"],
+input[type="date"],
 textarea,
 select {
   width: 100%;
@@ -2978,6 +2980,7 @@ mark.hit.active {
 
 .bk-field input[type="time"] {
   width: auto;
+  padding: 6px 9px;
 }
 
 .bk-field input[type="number"] {
@@ -3064,4 +3067,224 @@ mark.hit.active {
 
 .bk-understood {
   margin: 12px 0;
+}
+
+/* --- Phones ------------------------------------------------------------
+ *
+ * Everything above assumes a window wide enough to put the outline beside the
+ * manuscript and a pointer that can hover. A phone has neither, so this is
+ * where those two assumptions are paid off — by width alone, since a desktop
+ * window dragged this narrow has exactly the same problem.
+ */
+
+/* The toggle only exists where the outline has to be dismissable. */
+.work-panel-toggle {
+  display: none;
+}
+
+@media (max-width: 700px) {
+  .work-panel-toggle {
+    display: inline-flex;
+  }
+
+  /* The header has to hold a title and seven controls across 390 pixels, so
+     everything that can be an icon becomes one and the title takes what is
+     left. The logo goes: the toggle beside it already says where you are. */
+  .app-header {
+    gap: 2px;
+    padding: 0 6px;
+  }
+
+  .app-header .mark,
+  .work-title em {
+    display: none;
+  }
+
+  .work-title {
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .work-title strong {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 14px;
+  }
+
+  .segmented.compact button span,
+  .segmented.compact button {
+    font-size: 0;
+  }
+
+  .segmented.compact button svg {
+    font-size: 13px;
+  }
+
+  .segmented.compact button {
+    padding: 5px 7px;
+  }
+
+  /* The outline as a sheet pulled down over the manuscript rather than a column
+     beside it. Full width, its own scroll, and never taller than most of the
+     screen so it is obvious there is a document underneath. */
+  .outline-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: auto;
+    width: auto;
+    flex: none;
+    max-height: 72vh;
+    z-index: 12;
+    border-right: none;
+    border-bottom: 1px solid var(--border-strong);
+    box-shadow: var(--shadow-lift);
+    transition: transform 0.18s ease, visibility 0s;
+  }
+
+  /* Retracted upward, out of the way entirely — there is no edge to hover on a
+     phone, and the header's button is what brings it back.
+
+     Visibility as well as the transform, and not for tidiness: the sheet is
+     positioned inside the body, which starts below the header, so sliding it up
+     by its own height leaves it exactly the header's depth short and a strip of
+     the last chapter stays on screen. Visibility settles that whatever the
+     geometry, and is delayed by the length of the slide so the slide is still
+     seen. */
+  .work-body.panel-hidden .outline-panel {
+    transform: translateY(-100%);
+    visibility: hidden;
+    transition: transform 0.18s ease, visibility 0s linear 0.18s;
+  }
+
+  /* Both are pointer affordances: the strip left behind when the panel
+     retracts, and the margin correction that went with it. */
+  .work-body.panel-hidden::after,
+  .work-body.panel-hidden .document-pane {
+    display: revert;
+    padding-left: revert;
+  }
+
+  .work-body.panel-hidden::after {
+    display: none;
+  }
+
+  .document-pane {
+    padding: 16px 12px 200px;
+  }
+
+  .page-sheet {
+    padding: 24px 18px 40px;
+    border-radius: 0;
+  }
+
+  /* Book mode's fixed measure is wider than the screen; the screen wins. */
+  .page-sheet.book,
+  .page-sheet.manuscript {
+    max-width: none;
+  }
+
+  /* --- Settings and the editors ------------------------------------- */
+
+  .page {
+    padding: 12px;
+  }
+
+  .card,
+  .tab-panel {
+    padding: 16px 14px;
+  }
+
+  /* More tabs than fit. Scrolling them sideways keeps every one reachable,
+     which wrapping to three rows does not do any better. */
+  .tabs,
+  .subtabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+
+  .tabs::-webkit-scrollbar,
+  .subtabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tabs button,
+  .subtabs button {
+    white-space: nowrap;
+  }
+
+  /* The format library is a list and a detail pane side by side. Stacked, the
+     list is a chooser above what it chose. */
+  .tpl-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tpl-list {
+    max-height: 40vh;
+    overflow-y: auto;
+  }
+
+  /* The line's settings refuse to wrap on a desktop because they fit. Here
+     they don't, and a control pushed off the side is worse than a second row. */
+  .be-line-setting {
+    flex-wrap: wrap;
+  }
+
+  .be-line-setting .be-spacing {
+    flex: 1 1 45%;
+  }
+
+  .te-bar.borders {
+    flex-wrap: wrap;
+  }
+
+  /* A dialog is a sheet on a phone, not a box floating in the middle. */
+  .modal {
+    max-width: none;
+    width: 100%;
+    max-height: 92vh;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  }
+
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  /* Two-up rows are one-up. */
+  .row {
+    flex-direction: column;
+  }
+
+  .dict-list {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .bk-list li {
+    flex-wrap: wrap;
+  }
+
+  .bk-parts {
+    margin-left: 0;
+  }
+
+  /* The page preview is sized for a desktop pane; let it shrink rather than
+     push the dialog wider than the screen. */
+  .page-preview,
+  .page-preview > * {
+    max-width: 100%;
+  }
+}
+
+/* Hover reveals are a pointer's idea. Where there isn't one, the things that
+   fade in on hover are simply present — otherwise they are unreachable. */
+@media (hover: none) {
+  .dict-list li .btn.ghost,
+  .zen-controls {
+    opacity: 1;
+  }
 }

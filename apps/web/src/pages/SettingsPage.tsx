@@ -15,6 +15,7 @@ import { ThemeToggle } from "../components/ThemeToggle.js";
 const TABS = [
   { key: "templates", label: "Formats" },
   { key: "spelling", label: "Spelling" },
+  { key: "backup", label: "Backup" },
   { key: "account", label: "Account" },
   { key: "ollama", label: "Ollama" },
 ] as const;
@@ -24,7 +25,6 @@ type TabKey = (typeof TABS)[number]["key"] | "project";
 const PROJECT_TABS = [
   { key: "levels", label: "Levels" },
   { key: "export", label: "Export" },
-  { key: "backup", label: "Backup" },
 ] as const;
 
 type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
@@ -133,6 +133,8 @@ export function SettingsPage() {
             <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
           ) : tab === "spelling" ? (
             <SpellingPane />
+          ) : tab === "backup" ? (
+            <BackupPane workId={workId} />
           ) : tab === "project" ? (
             workId ? (
               <>
@@ -158,7 +160,7 @@ export function SettingsPage() {
 
                 {projectTab === "levels" ? (
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
-                ) : projectTab === "export" ? (
+                ) : (
                   <>
                     <h3 className="card-title">Export</h3>
                     <p className="card-subtitle" style={{ marginBottom: 0 }}>
@@ -166,8 +168,6 @@ export function SettingsPage() {
                       heads, and the file itself. Not built yet; it is the next thing.
                     </p>
                   </>
-                ) : (
-                  <BackupPane workId={workId} />
                 )}
               </>
             ) : null

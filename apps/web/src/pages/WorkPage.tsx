@@ -11,7 +11,9 @@ import {
   LogOut,
   Maximize2,
   Minimize2,
+  PanelLeft,
   Settings,
+  X
 } from "lucide-react";
 import { buildOutline, currentBlockAt, deriveDocument, foldForSearch, smartenText } from "@brigid/shared";
 import type { BlockOptions, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
@@ -30,6 +32,7 @@ import { OutlinePanel } from "../components/OutlinePanel.js";
 import { ProseEditor } from "../components/ProseEditor.js";
 import { useSpelling } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
+import { PHONE, useMediaQuery } from "../useMediaQuery.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
@@ -93,6 +96,12 @@ export function WorkPage() {
   // is simply always there.
   const [zen, setZen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  /**
+   * On a phone the outline can't sit beside the manuscript — there isn't room
+   * for both — so it becomes a sheet pulled down over it, and "showing" is
+   * something the writer asks for rather than the default.
+   */
+  const phone = useMediaQuery(PHONE);
   const [mode, setMode] = useState<ViewMode>(() =>
     // "reading" was the earlier name for this mode; map it forward so an
     // existing browser doesn't come back to a mode that no longer exists.
@@ -220,7 +229,7 @@ export function WorkPage() {
   // Outside zen the outline is always shown; inside zen it retracts to an edge
   // and slides back out when the pointer reaches it. Declared here because the
   // effects below depend on it.
-  const showPanel = !zen || panelOpen;
+  const showPanel = zen || phone ? panelOpen : true;
 
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const entries = useMemo(() => buildOutline(blocks), [blocks]);
@@ -604,6 +613,16 @@ export function WorkPage() {
   return (
     <div className={`work-shell${zen ? " zen" : ""}`}>
       <header className="app-header">
+        <button
+          className="btn ghost work-panel-toggle"
+          type="button"
+          aria-expanded={showPanel}
+          aria-label={showPanel ? "Hide the outline" : "Show the outline"}
+          title="Outline"
+          onClick={() => setPanelOpen((open) => !open)}
+        >
+          {showPanel ? <X size={17} /> : <PanelLeft size={17} />}
+        </button>
         <BrandMark />
         <div className="work-title">
           <strong>{work.title}</strong>
@@ -663,8 +682,10 @@ export function WorkPage() {
       <div className={`work-body${showPanel ? "" : " panel-hidden"}`}>
         <aside
           className={`outline-panel${zen ? " floating" : " docked"}`}
-          onMouseEnter={() => zen && setPanelOpen(true)}
-          onMouseLeave={() => zen && setPanelOpen(false)}
+          // Hovering the retracted edge brings it back, which is only a gesture
+          // a pointer has. A phone gets the button in the header instead.
+          onMouseEnter={() => zen && !phone && setPanelOpen(true)}
+          onMouseLeave={() => zen && !phone && setPanelOpen(false)}
         >
           <BookmarkStrip
             bookmarks={bookmarks}
@@ -701,7 +722,12 @@ export function WorkPage() {
             selectedId={selectedId}
             collapsed={collapsed}
             onToggleCollapse={toggleCollapse}
-            onSelect={selectAndScroll}
+            onSelect={(id) => {
+              selectAndScroll(id);
+              // The sheet covers the manuscript, so choosing where to go means
+              // wanting to see it rather than the list it was chosen from.
+              if (phone) setPanelOpen(false);
+            }}
             breaks={breaks}
             onSelectBreak={scrollToBreak}
             onAdd={(relativeTo, placement) => setAdding({ relativeTo, placement })}
