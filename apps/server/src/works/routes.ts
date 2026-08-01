@@ -159,7 +159,12 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/works/:id", async (req) => {
     requireUser(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = workInput.partial().parse(req.body);
+    const body = workInput
+      .partial()
+      // Null cancels the goal rather than deleting anything, so there is never
+      // a second one to reconcile with the first.
+      .extend({ totalWordGoal: z.number().int().min(1).max(100000000).nullable().optional() })
+      .parse(req.body);
 
     const [updated] = await db
       .update(works)
@@ -197,29 +202,6 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /** Archive and restore share a route: the library needs both, symmetrically. */
-  /**
-   * The manuscript's own settings, of which there is one so far.
-   *
-   * Null cancels the goal rather than deleting anything, so there is never a
-   * second one to reconcile with the first.
-   */
-  app.patch("/works/:id", async (req) => {
-    requireUser(req);
-    const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = z
-      .object({
-        totalWordGoal: z.number().int().min(1).max(100000000).nullable().optional(),
-      })
-      .parse(req.body);
-
-    const patch: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.totalWordGoal !== undefined) patch.totalWordGoal = body.totalWordGoal;
-
-    const [row] = await db.update(works).set(patch).where(eq(works.id, id)).returning();
-    if (!row) throw notFound("work");
-    return { work: row };
-  });
-
   app.post("/works/:id/archive", async (req) => {
     requireUser(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
