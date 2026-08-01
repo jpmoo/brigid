@@ -1,8 +1,8 @@
 import { useState } from "react";
 import {
   Bookmark as BookmarkIcon,
-  ChevronDown,
-  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   GripVertical,
   Pencil,
   Trash2,
@@ -39,17 +39,24 @@ export function BookmarkStrip({
   return (
     <div className="bm-strip">
       <div className="bm-head">
+        {/* The heading is a heading, and the control that opens and closes the
+            list follows it — the same control, in the same place, as the one
+            over the outline below. */}
+        <span className="bm-title">
+          Bookmarks
+          {bookmarks.length > 0 ? <em>{bookmarks.length}</em> : null}
+        </span>
         <button
-          className="bm-twisty"
+          className="outline-toggle-all"
           type="button"
           aria-expanded={open}
           title={open ? "Collapse bookmarks" : "Expand bookmarks"}
+          aria-label={open ? "Collapse bookmarks" : "Expand bookmarks"}
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-          <span>Bookmarks</span>
-          {bookmarks.length > 0 ? <em>{bookmarks.length}</em> : null}
+          {open ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
         </button>
+        <span className="spacer" />
         <span
           className={`bm-source${dragging ? " dragging" : ""}`}
           draggable
