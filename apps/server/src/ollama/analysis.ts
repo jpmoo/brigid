@@ -320,6 +320,8 @@ export async function analyseCharacter(opts: {
   thinks?: boolean | null;
   title: string;
   name: string;
+  /** Lines already written for this cast, so they aren't written again. */
+  taken?: string[];
   /** Whose arc to score against — one chart, one perspective. */
   focal: string;
   sections: PlacedDigest[];
@@ -342,7 +344,11 @@ For every axis give:
 - "aligned": the actions from the record above that MOST support this score — the citable events the rubric demands. For a score of 2 or higher this must not be empty; if you cannot name the events, lower the score.
 - "contradictory": the actions that cut AGAINST this reading, or complicate it — what a careful reader would raise as an objection. If the character's behaviour is consistent on this axis, return an empty list rather than inventing an objection.
 
-Then: "epithet", ONE short line for this character's card — at most twelve words. Either a wry description of what they are in this story, or a line of their own dialogue that captures them. It must come from THIS manuscript: quote or paraphrase what is actually on the page, never what you may know of a character with this name from elsewhere. Dry and specific beats grand and vague — "would rather be right than liked" over "a complex and compelling figure". No quotation marks unless it is their speech.
+Then: "epithet", ONE short line for this character's card — at most twelve words. Either a wry description of what they are in this story, or a line of their own dialogue that captures them. It must come from THIS manuscript: quote or paraphrase what is actually on the page, never what you may know of a character with this name from elsewhere. Dry and specific beats grand and vague — "would rather be right than liked" over "a complex and compelling figure". No quotation marks unless it is their speech.${
+    opts.taken?.length
+      ? `\nThese lines are ALREADY IN USE for other characters in this same book. Yours must be different in wording AND in idea — do not write a variation on one of them, and do not reach for the same observation about a different person:\n${opts.taken.map((t) => `  - ${t}`).join("\n")}`
+      : ""
+  }
 Then: "summary", a one- or two-sentence reading of the SHAPE of the profile (for example "Shapeshifter-Guardian with late Sacrifice: the distrusted gatekeeper who is spent to prove loyalty"), followed by a few sentences on what that means for this character's role. "phaseShifts": any axis concentrated in one span of the book, or any mid-story role flip, with where it turns. "confidence": where the evidence is thin and which scores are least certain.
 
 A flat or near-zero profile is a valid result. Do not inflate.`;

@@ -4280,3 +4280,70 @@ mark.hit.active {
 .raw-head[aria-expanded="true"] .fit-caret {
   transform: rotate(90deg);
 }
+
+/* The tile header: titles on the left, the one control on the right. */
+.cast-tile-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.cast-tile-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.cast-tile-expand {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.cast-tile-expand:hover {
+  color: var(--text);
+  border-color: var(--border-strong);
+  background: var(--paper);
+}
+
+.cast-modal-epithet {
+  font-style: italic;
+}
+
+/* Close control on a modal that has no button row of its own. */
+.modal-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.modal-close:hover {
+  color: var(--text);
+  background: var(--surface-sunk, var(--border));
+}
+
+/* The close button is positioned against it. */
+.modal {
+  position: relative;
+}

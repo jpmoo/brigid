@@ -4,7 +4,9 @@ import {
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
+  Maximize2,
   Play,
+  X,
   RefreshCw,
 } from "lucide-react";
 import type {
@@ -409,6 +411,7 @@ function CharactersPane({
         (rank.get(a.profile.name.toLowerCase()) ?? 999) -
         (rank.get(b.profile.name.toLowerCase()) ?? 999),
     );
+  const shownProfile = ordered.find((o) => o.profile.name === expanded) ?? null;
 
   const profiles = reports.map((r) => r.result as CharacterAnalysis);
 
@@ -466,62 +469,103 @@ function CharactersPane({
 
           <div className="cast-grid">
             {ordered.map(({ profile, report }) => {
-              const open = expanded === profile.name;
               return (
-                <div
-                  key={profile.name}
-                  className={`cast-tile${open ? " expanded" : ""}`}
-                >
-                  <button
-                    type="button"
-                    className="cast-tile-head"
-                    onClick={() => setExpanded(open ? null : profile.name)}
-                    aria-expanded={open}
-                  >
-                    <span className="cast-tile-name">{profile.name}</span>
-                    {profile.epithet ? (
-                      <span className="cast-tile-epithet">{profile.epithet}</span>
-                    ) : null}
-                    <span className="cast-tile-shape">{shapeOf(profile, bundle.axisLabels)}</span>
-                  </button>
+                <div key={profile.name} className="cast-tile">
+                  <div className="cast-tile-head">
+                    <div className="cast-tile-titles">
+                      <span className="cast-tile-name">{profile.name}</span>
+                      {profile.epithet ? (
+                        <span className="cast-tile-epithet">{profile.epithet}</span>
+                      ) : null}
+                      <span className="cast-tile-shape">
+                        {shapeOf(profile, bundle.axisLabels)}
+                      </span>
+                    </div>
+                    {/* The whole report needs room the tile hasn't got, so it
+                        opens over the page rather than pushing the grid apart. */}
+                    <button
+                      type="button"
+                      className="cast-tile-expand"
+                      title={`Open ${profile.name}'s full profile`}
+                      aria-label={`Open ${profile.name}'s full profile`}
+                      onClick={() => setExpanded(profile.name)}
+                    >
+                      <Maximize2 size={14} />
+                    </button>
+                  </div>
 
                   <SpiderGraph
                     profile={profile}
                     labels={bundle.axisLabels}
                     blurbs={bundle.axisBlurbs}
-                    compact={!open}
+                    compact
                   />
 
-                  {open ? (
-                    <div className="cast-tile-body">
-                      {report && !report.current ? <Stale drift={report.drift} /> : null}
-
-                      <p className="tpl-note">
-                        Scored against <strong>{profile.focal}</strong>&rsquo;s arc.
-                      </p>
-
-                      <p className="fit-overview">{profile.summary}</p>
-
-                      {profile.phaseShifts.length > 0 ? (
-                        <>
-                          <h6>Phase shifts</h6>
-                          <ul className="fit-list">
-                            {profile.phaseShifts.map((shift, n) => (
-                              <li key={n}>{shift}</li>
-                            ))}
-                          </ul>
-                        </>
-                      ) : null}
-
-                      {profile.confidence ? (
-                        <p className="tpl-note">{profile.confidence}</p>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
           </div>
+
+          {shownProfile ? (
+            <div
+              className="modal-backdrop"
+              onClick={() => setExpanded(null)}
+              role="presentation"
+            >
+              <div className="modal wide" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="modal-close"
+                  aria-label="Close"
+                  onClick={() => setExpanded(null)}
+                >
+                  <X size={16} />
+                </button>
+
+                <h2 className="card-title">{shownProfile.profile.name}</h2>
+                {shownProfile.profile.epithet ? (
+                  <p className="card-subtitle cast-modal-epithet">
+                    {shownProfile.profile.epithet}
+                  </p>
+                ) : null}
+
+                <div className="modal-body">
+                  {shownProfile.report && !shownProfile.report.current ? (
+                    <Stale drift={shownProfile.report.drift} />
+                  ) : null}
+
+                  {/* Full size, and interactive: a spoke opens what its score
+                      rested on, which is the whole reason to be in here. */}
+                  <SpiderGraph
+                    profile={shownProfile.profile}
+                    labels={bundle.axisLabels}
+                    blurbs={bundle.axisBlurbs}
+                  />
+
+                  <p className="tpl-note">
+                    Scored against <strong>{shownProfile.profile.focal}</strong>&rsquo;s arc.
+                  </p>
+
+                  <p className="fit-overview">{shownProfile.profile.summary}</p>
+
+                  {shownProfile.profile.phaseShifts.length > 0 ? (
+                    <>
+                      <h6>Phase shifts</h6>
+                      <ul className="fit-list">
+                        {shownProfile.profile.phaseShifts.map((shift, n) => (
+                          <li key={n}>{shift}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : null}
+
+                  {shownProfile.profile.confidence ? (
+                    <p className="tpl-note">{shownProfile.profile.confidence}</p>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
         </>
       ) : null}
 

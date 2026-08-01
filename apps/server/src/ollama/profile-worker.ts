@@ -229,6 +229,19 @@ async function drainOne(workId: string, signal: AbortSignal): Promise<boolean> {
     .set({ status: "running", currentSubject: next, updatedAt: new Date() })
     .where(eq(characterRuns.workId, workId));
 
+  /**
+   * Each character is a separate call, so the model cannot see what it wrote
+   * for the others and will happily give three of them the same wry line. The
+   * ones already written are handed over as forbidden.
+   */
+  const written = await db
+    .select({ result: analyses.result })
+    .from(analyses)
+    .where(and(eq(analyses.workId, workId), eq(analyses.kind, "character")));
+  const taken = written
+    .map((r) => (r.result as unknown as CharacterAnalysis).epithet)
+    .filter((line): line is string => Boolean(line));
+
   try {
     const { result, ms } = await analyseCharacter({
       url: config.url,
@@ -237,6 +250,7 @@ async function drainOne(workId: string, signal: AbortSignal): Promise<boolean> {
       thinks: config.thinks,
       title: work.title,
       name: next,
+      taken,
       // Fixed for the run: one chart is one perspective.
       focal: row.focal ?? row.wanted[0] ?? next,
       sections,
