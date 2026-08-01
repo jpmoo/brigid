@@ -76,7 +76,7 @@ function byline(work: Work): string | null {
 }
 
 export function LibraryPage() {
-  const { username, logout } = useAuth();
+  const { logout } = useAuth();
   const [works, setWorks] = useState<Work[] | null>(null);
   // How the shelf is arranged is a habit, so it is remembered — in the browser
   // rather than on the server, since it describes this screen rather than the
@@ -136,9 +136,6 @@ export function LibraryPage() {
         <BrandMark />
         <BrandHeading />
         <div className="spacer" />
-        <span className="muted" style={{ fontSize: 13 }}>
-          {username}
-        </span>
         <ThemeToggle />
         <Link className="btn ghost" to="/settings" title="Settings">
           <Settings size={16} />

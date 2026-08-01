@@ -80,7 +80,7 @@ interface AddRequest {
 
 export function WorkPage() {
   const { id = "" } = useParams<{ id: string }>();
-  const { username, logout } = useAuth();
+  const { logout } = useAuth();
   const dialogs = useDialogs();
 
   const [work, setWork] = useState<Work | null>(null);
@@ -129,7 +129,23 @@ export function WorkPage() {
   const [renaming, setRenaming] = useState<Block | null>(null);
 
   const blockRefs = useRef(new Map<string, HTMLDivElement>());
-  const paneRef = useRef<HTMLElement>(null);
+  /**
+   * The manuscript pane, as state rather than only as a ref.
+   *
+   * The page returns a loading line until the work arrives, so on the first
+   * render there is no pane at all — and an effect that reads a ref on mount
+   * finds null and gives up. A ref changing does not re-run anything, so
+   * whether the scroll listener ever got attached came down to whether some
+   * other dependency happened to change after the pane appeared. It did, until
+   * it didn't. Set through a callback ref, the effect below runs exactly when
+   * there is something to attach to.
+   */
+  const paneRef = useRef<HTMLElement | null>(null);
+  const [paneEl, setPaneEl] = useState<HTMLElement | null>(null);
+  const attachPane = useCallback((el: HTMLElement | null) => {
+    paneRef.current = el;
+    setPaneEl(el);
+  }, []);
   const outlineRefs = useRef(new Map<string, HTMLDivElement>());
   // Set while a click is driving the document, so the observer doesn't fight
   // the smooth scroll it started.
@@ -372,7 +388,7 @@ export function WorkPage() {
    * to reach it, which is why tracking seemed to need a moment to wake up.
    */
   useEffect(() => {
-    const pane = paneRef.current;
+    const pane = paneEl;
     if (!pane) return;
 
     let frame = 0;
@@ -461,12 +477,12 @@ export function WorkPage() {
       window.clearTimeout(settle);
       if (frame) window.cancelAnimationFrame(frame);
     };
-    // Mounted once. It reads the document rather than any rendered value, so
-    // there is nothing here that can go stale — and re-running it on every
-    // change of `items` meant tearing down the listener and cancelling a
-    // pending measurement each time the manuscript was touched.
+    // Once the pane exists, and only then. It reads the document rather than
+    // any rendered value, so nothing else here can go stale — and depending on
+    // `items` instead meant tearing down the listener and cancelling a pending
+    // measurement every time the manuscript was touched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [paneEl]);
 
   // Centre the current block in the outline, so there is always context above
   // and below it rather than it sitting against an edge. Also runs when the
@@ -775,9 +791,6 @@ export function WorkPage() {
               <Settings size={15} />
             </Link>
             <div className="spacer" />
-            <span className="outline-user" title={username ?? undefined}>
-              {username}
-            </span>
             <button
               className="btn ghost"
               type="button"
@@ -789,7 +802,7 @@ export function WorkPage() {
           </div>
         </aside>
 
-        <main className="document-pane" ref={paneRef}>
+        <main className="document-pane" ref={attachPane}>
           <DocumentView
             items={items}
             registerRef={registerRef}

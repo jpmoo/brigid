@@ -30,7 +30,6 @@ const PROJECT_TABS = [
 type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
 
 export function SettingsPage() {
-  const { username } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("templates");
   const [projectTab, setProjectTab] = useState<ProjectTabKey>("levels");
@@ -84,9 +83,6 @@ export function SettingsPage() {
         <BrandHeading />
         <div className="spacer" />
         <ThemeToggle />
-        <span className="muted" style={{ fontSize: 13 }}>
-          {username}
-        </span>
       </header>
 
       <main className="page">
