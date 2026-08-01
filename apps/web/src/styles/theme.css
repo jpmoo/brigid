@@ -4200,3 +4200,24 @@ mark.hit.active {
   color: var(--text-muted);
   margin: 2px 0 1px;
 }
+
+/* The disclosure triangle on a framework row: pointing right when shut, down
+   when open, and turning between the two. */
+.fit-caret {
+  flex: none;
+  /* The row is baseline-aligned for its text; an icon has no baseline worth
+     aligning, so it centres itself against the line instead. */
+  align-self: center;
+  color: var(--text-faint);
+  transition: transform 0.14s;
+}
+
+.fit-row [aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}
+
+/* The head bar over the frameworks reuses the outline's, which was built to sit
+   under a panel title rather than inside a card. */
+.fit-head-bar {
+  margin-top: 18px;
+}

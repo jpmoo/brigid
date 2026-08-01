@@ -1,3 +1,4 @@
+import { ChevronRight } from "lucide-react";
 import type { FitRating, ModelFit } from "@brigid/shared";
 
 /**
@@ -52,6 +53,8 @@ export function FitGauge({
         aria-expanded={open}
         title={open ? "Hide the reasoning" : "Show the reasoning"}
       >
+        {/* The usual disclosure triangle, turned down when open. */}
+        <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
         <span className="fit-name">{label}</span>
         <span className={`fit-verdict ${fit.fit}`}>
           {notApplicable ? "Not applicable" : BANDS.find((b) => b.key === fit.fit)?.label}

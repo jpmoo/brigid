@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Play, RefreshCw } from "lucide-react";
+import { AlertTriangle, ChevronsDownUp, ChevronsUpDown, Play, RefreshCw } from "lucide-react";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -269,7 +269,19 @@ function StructurePane({
   onRun: () => void;
 }) {
   const result = report?.result as StructureAnalysis | undefined;
-  const [open, setOpen] = useState<string | null>(null);
+  /**
+   * A set rather than one at a time: the point of these is comparison, and a
+   * panel that shut Freytag to show you Three-Act made comparing them a memory
+   * exercise.
+   */
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const toggle = (key: string) =>
+    setOpen((held) => {
+      const next = new Set(held);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  const allOpen = (result?.models.length ?? 0) > 0 && open.size >= (result?.models.length ?? 0);
 
   return (
     <>
@@ -302,15 +314,29 @@ function StructurePane({
             {result.bestFitWhy}
           </p>
 
-          <h4 className="tpl-section">Framework by framework</h4>
+          {/* Same control as the outline's, because it does the same thing. */}
+          <div className="outline-head-bar fit-head-bar">
+            <span>Framework by framework</span>
+            <button
+              className="outline-toggle-all"
+              type="button"
+              title={allOpen ? "Collapse all" : "Expand all"}
+              aria-label={allOpen ? "Collapse all" : "Expand all"}
+              onClick={() =>
+                setOpen(allOpen ? new Set() : new Set(result.models.map((m) => m.model)))
+              }
+            >
+              {allOpen ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+            </button>
+          </div>
           {byFit(result.models).map((fit) => (
             <FitGauge
               key={fit.model}
               fit={fit}
               label={labels[fit.model] ?? fit.model}
               blurb={blurbs[fit.model]}
-              open={open === fit.model}
-              onOpen={() => setOpen(open === fit.model ? null : fit.model)}
+              open={open.has(fit.model)}
+              onOpen={() => toggle(fit.model)}
             />
           ))}
         </>
