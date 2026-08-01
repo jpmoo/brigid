@@ -9,6 +9,7 @@ import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { SpellingPane } from "./settings/SpellingPane.js";
 import { BackupPane } from "./settings/BackupPane.js";
 import { CompilePane } from "./settings/CompilePane.js";
+import { GoalsPane } from "./settings/GoalsPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -161,13 +162,7 @@ export function SettingsPage() {
                 {projectTab === "levels" ? (
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
                 ) : projectTab === "goals" ? (
-                  <>
-                    <h3 className="card-title">Goals</h3>
-                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
-                      A target length for the manuscript, and for a day&rsquo;s work — with
-                      something to show how the writing is going against them. Not built yet.
-                    </p>
-                  </>
+                  <GoalsPane blocks={blocks} />
                 ) : (
                   <CompilePane
                     workId={workId}

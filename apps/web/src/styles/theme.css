@@ -3471,3 +3471,108 @@ mark.hit.active {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
+/* --- A writing session ------------------------------------------------- */
+
+:root {
+  --session: #2f7d4f;
+  --session-warm: #b8791f;
+  --session-hot: #b8352a;
+}
+
+:root[data-theme="dark"] {
+  --session: #4f9d6f;
+  --session-warm: #d69a3f;
+  --session-hot: #d95b4e;
+}
+
+/* Fixed to the corner of the window rather than the manuscript: a session is
+   something you are in the middle of, and a control you have to go and find is
+   one you stop noticing. */
+.session-pill {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px 7px 14px;
+  border-radius: 999px;
+  background: var(--session);
+  color: #fff;
+  box-shadow: var(--shadow-lift);
+  font-family: var(--sans);
+  font-size: 13px;
+  /* The clock changes every second; tabular figures keep it from jittering. */
+  font-variant-numeric: tabular-nums;
+  transition: background 0.4s ease;
+}
+
+/* A fifth of the time left, then a tenth: the first is a nudge, the second is
+   the last of it. */
+.session-pill.warm {
+  background: var(--session-warm);
+}
+
+.session-pill.hot {
+  background: var(--session-hot);
+}
+
+/* Time is up. It stops shouting — the sitting is over, not failing. */
+.session-pill.done {
+  background: var(--text-muted);
+}
+
+.session-pill.paused {
+  opacity: 0.75;
+}
+
+.session-clock {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.session-words {
+  opacity: 0.95;
+  white-space: nowrap;
+}
+
+.session-words em {
+  font-style: normal;
+  opacity: 0.7;
+}
+
+/* Deliberately the buttons of a tape deck: round, close together, and read
+   without a label. */
+.session-controls {
+  display: flex;
+  gap: 2px;
+}
+
+.session-controls button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.session-controls button:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+@media (max-width: 700px) {
+  .session-pill {
+    right: 10px;
+    bottom: 10px;
+    font-size: 12px;
+    padding: 6px 7px 6px 12px;
+  }
+}

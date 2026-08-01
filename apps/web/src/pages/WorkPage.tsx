@@ -33,6 +33,14 @@ import { ProseEditor } from "../components/ProseEditor.js";
 import { useSpelling } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { PHONE, useMediaQuery } from "../useMediaQuery.js";
+import {
+  SessionPill,
+  pauseSession,
+  readSession,
+  resumeSession,
+  writeSession,
+} from "../components/SessionGoal.js";
+import type { Session } from "../components/SessionGoal.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
 
 const wordFmt = new Intl.NumberFormat();
@@ -102,6 +110,32 @@ export function WorkPage() {
    * something the writer asks for rather than the default.
    */
   const phone = useMediaQuery(PHONE);
+
+  /**
+   * A writing session, if one is running. Kept in the browser: it is a sitting
+   * at a desk rather than a fact about the manuscript, and it should survive a
+   * reload without following the writer to another machine.
+   */
+  const [session, setSession] = useState<Session | null>(() => readSession());
+
+  const changeSession = useCallback((next: Session | null) => {
+    setSession(next);
+    writeSession(next);
+  }, []);
+
+  /**
+   * The clock runs while the manuscript is open, and stops when it isn't.
+   *
+   * Leaving for the settings or the library is not writing. Unmounting is what
+   * that leaving looks like from here, so the session is banked on the way out
+   * — paused, never cancelled, because it is still yours when you come back.
+   */
+  useEffect(() => {
+    return () => {
+      const current = readSession();
+      if (current) writeSession(pauseSession(current));
+    };
+  }, []);
   const [mode, setMode] = useState<ViewMode>(() =>
     // "reading" was the earlier name for this mode; map it forward so an
     // existing browser doesn't come back to a mode that no longer exists.
@@ -851,7 +885,16 @@ export function WorkPage() {
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}
                   smartPunctuation={smartPunctuationFor(editingProse.id)}
-                  onSave={(doc) => void saveProse(editingProse.id, doc)}
+                  onSave={(doc) => {
+                    void saveProse(editingProse.id, doc);
+                    // Writing is what the clock is for, so writing starts it.
+                    setSession((current) => {
+                      if (!current || current.since !== null) return current;
+                      const going = resumeSession(current);
+                      writeSession(going);
+                      return going;
+                    });
+                  }}
                   onDone={() => setEditingProse(null)}
                   onAddWord={(word) => void spelling.addWord(word)}
                   onIgnoreWord={spelling.ignoreWord}
@@ -859,6 +902,14 @@ export function WorkPage() {
               ) : null
             }
           />
+          {session ? (
+            <SessionPill
+              session={session}
+              totalWords={totalWords}
+              onChange={changeSession}
+            />
+          ) : null}
+
           {zen ? (
             // One cluster that fades in together, rather than controls scattered
             // down the page. Held open while a search is running: the results
