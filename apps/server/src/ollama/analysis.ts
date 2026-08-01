@@ -130,6 +130,108 @@ export function foldName(name: string): string {
   return words.slice(start).join(" ");
 }
 
+/**
+ * Titles that sit in front of a name.
+ *
+ * These cannot be stripped blindly. "Mr Bennet" and "Mrs Bennet" fold to the
+ * same thing and are two people, and merging them corrupts both profiles — far
+ * worse than leaving a duplicate. So they are stripped only where the roster
+ * itself shows it is safe: see `mergeTitled`.
+ */
+const TITLES = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "miss",
+  "master",
+  "sir",
+  "lady",
+  "lord",
+  "dame",
+  "dr",
+  "doctor",
+  "prof",
+  "professor",
+  "rev",
+  "reverend",
+  "father",
+  "mother",
+  "brother",
+  "sister",
+  "saint",
+  "st",
+  "captain",
+  "capt",
+  "colonel",
+  "col",
+  "major",
+  "general",
+  "lieutenant",
+  "lt",
+  "sergeant",
+  "sgt",
+  "admiral",
+  "king",
+  "queen",
+  "prince",
+  "princess",
+  "duke",
+  "duchess",
+  "count",
+  "countess",
+  "baron",
+  "uncle",
+  "aunt",
+  "cousin",
+  "old",
+  "young",
+]);
+
+/** The name with any leading title removed, or null if there wasn't one. */
+function withoutTitle(folded: string): string | null {
+  const words = folded.split(" ");
+  if (words.length < 2 || !TITLES.has(words[0]!)) return null;
+  return words.slice(1).join(" ");
+}
+
+/**
+ * Fold "Brother Tuan" into "Tuan" — but only when that is demonstrably safe.
+ *
+ * The test is the roster itself. If exactly one titled form reduces to a given
+ * bare name, the two are the same person and are merged. If two do — Mr Bennet
+ * and Mrs Bennet both reducing to "bennet" — the title is the only thing
+ * telling them apart, so nothing is touched.
+ *
+ * This is why it runs after the roster is built rather than inside the fold: it
+ * is a question about the cast, and a string on its own cannot answer it.
+ */
+function mergeTitled(byKey: Map<string, RosterEntry>): void {
+  const reducesTo = new Map<string, string[]>();
+  for (const key of byKey.keys()) {
+    const bare = withoutTitle(key);
+    if (!bare) continue;
+    reducesTo.set(bare, [...(reducesTo.get(bare) ?? []), key]);
+  }
+
+  for (const [bare, titled] of reducesTo) {
+    // Only when the bare name is itself in the cast, and only one title claims
+    // it. Two claimants means the title is load-bearing.
+    if (titled.length !== 1) continue;
+    const host = byKey.get(bare);
+    const held = byKey.get(titled[0]!);
+    if (!host || !held) continue;
+
+    host.sections += held.sections;
+    host.actions += held.actions;
+    host.span.first = Math.min(host.span.first, held.span.first);
+    host.span.last = Math.max(host.span.last, held.span.last);
+    for (const alias of [held.name, ...held.aliases]) {
+      if (!host.aliases.includes(alias) && alias !== host.name) host.aliases.push(alias);
+    }
+    byKey.delete(titled[0]!);
+  }
+}
+
 export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
   const byKey = new Map<string, RosterEntry>();
   const aliasTo = new Map<string, string>();
@@ -177,6 +279,10 @@ export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
       }
     }
   }
+
+  // After the whole cast is known, because the question "is this title the only
+  // thing distinguishing two people?" cannot be answered one name at a time.
+  mergeTitled(byKey);
 
   return [...byKey.values()]
     .map((entry) => decideJudgeable(entry))

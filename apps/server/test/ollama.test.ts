@@ -10,7 +10,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { parseJson, thinksFrom } from "../src/ollama/client.js";
-import { foldName } from "../src/ollama/analysis.js";
+import { buildRoster, foldName } from "../src/ollama/analysis.js";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -187,6 +187,48 @@ check("honorifics are kept", foldName("Mr Bennet") !== foldName("Mrs Bennet"));
 check("distinct names stay distinct", foldName("Jane") !== foldName("Jane Fairfax"));
 // A name that is only a counting word must survive being folded.
 check("a bare noise word is left alone", foldName("The Two") !== "");
+
+console.log("\ntitles, folded only when the cast says it is safe");
+
+/** A roster from bare (name, sections) pairs — one action each, two sections. */
+function rosterOf(names: string[]) {
+  const sections = [0, 1].map((i) => ({
+    blockId: `b${i}`,
+    label: `s${i}`,
+    start: i / 2,
+    end: (i + 1) / 2,
+    words: 100,
+    summary: "",
+    events: [],
+    characters: names.map((name) => ({ name, aliases: [], actions: ["did a thing"] })),
+  }));
+  return buildRoster(sections as never);
+}
+
+// One title claims the bare name, so they are the same person.
+{
+  const names = rosterOf(["Tuan", "Brother Tuan"]).map((r) => r.name);
+  check("Brother Tuan folds into Tuan", names.length === 1 && names[0] === "Tuan");
+}
+
+// Two titles claim it, so the title is the only thing telling them apart.
+{
+  const names = rosterOf(["Mr Bennet", "Mrs Bennet"]).map((r) => r.name).sort();
+  check("Mr and Mrs Bennet stay two people", names.length === 2);
+}
+
+// A title with no bare form to fold into is left exactly as it is.
+{
+  const names = rosterOf(["Captain Wentworth", "Anne"]).map((r) => r.name).sort();
+  check("a title with nothing to fold into is untouched", names.length === 2);
+}
+
+// And the bare name keeps the titled one as an alias, so the record is whole.
+{
+  const [entry] = rosterOf(["Tuan", "Brother Tuan"]);
+  check("the folded form is kept as an alias", entry!.aliases.includes("Brother Tuan"));
+  check("and its record is added, not discarded", entry!.actions === 4);
+}
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
