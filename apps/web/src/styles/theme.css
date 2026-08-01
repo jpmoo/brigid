@@ -2786,21 +2786,45 @@ mark.hit.active {
 }
 
 /* The toolbar carries only what belongs to the words themselves. Spacing,
-   alignment and face are the format's business and are deliberately absent. */
+   alignment and face are the format's business and are deliberately absent.
+
+   It floats above the block rather than sitting in the flow: a click on a
+   paragraph puts the caret where the click landed, and a toolbar that pushed
+   the text down would move the words out from under the finger between the
+   press and the caret arriving. */
 .prose-toolbar {
+  position: absolute;
+  bottom: 100%;
+  left: -12px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-bottom: 6px;
+  padding: 3px 6px;
+  background: var(--surface-veil);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
   /* Never scaled with the manuscript: it is app furniture, not the page. */
   zoom: 1;
   font-family: var(--sans);
+  white-space: nowrap;
+  z-index: 4;
 }
 
 .prose-hint {
   font-size: 11px;
   color: var(--text-faint);
   font-family: var(--sans);
+}
+
+/* Reading the manuscript, a click into prose starts writing there, so the
+   pointer should say so before the click rather than after. */
+.prose,
+.prose.empty {
+  cursor: text;
 }
 
 /* Under the word, not through it — a strikethrough reads as deleted. */

@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bold, Italic } from "lucide-react";
-import { asProseDoc, autocorrectKeystroke, hasMark, normalizeProse, proseFromParagraphs } from "@brigid/shared";
+import {
+  asProseDoc,
+  autocorrectKeystroke,
+  hasMark,
+  normalizeProse,
+  proseFromParagraphs,
+  proseToText,
+} from "@brigid/shared";
 import type { ProseDoc, ProseText } from "@brigid/shared";
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
@@ -28,6 +35,17 @@ const ZWSP = "​";
  * is a few tens of kilobytes at worst.
  */
 const HISTORY_DEPTH = 500;
+
+/**
+ * Our own clipboard flavour, carried beside the plain text.
+ *
+ * Copying a bold passage and pasting it back has to stay bold, and the only
+ * thing that survives a round trip through the system clipboard intact is what
+ * we put there ourselves. The browser's own HTML would come back carrying the
+ * spell-check spans and whatever styles the page had, which is why paste from
+ * elsewhere is flattened — but text copied from Brigid keeps its marks.
+ */
+const PROSE_FLAVOUR = "application/x-brigid-prose";
 
 // --- The model, in the DOM and back -------------------------------------
 //
@@ -75,6 +93,15 @@ function markMisspellings(text: string, speller: Speller): string {
 export function docToHtml(doc: ProseDoc, speller: Speller | null): string {
   if (doc.content.length === 0) return "<p><br></p>";
   return doc.content.map((p) => `<p>${runsToHtml(p.content ?? [], speller)}</p>`).join("");
+}
+
+/** Our own clipboard flavour, or null if it isn't ours or isn't readable. */
+function readFlavour(raw: string): ProseDoc | null {
+  try {
+    return asProseDoc(JSON.parse(raw));
+  } catch {
+    return null;
+  }
 }
 
 /** Reads the element back into the model, ignoring the decoration spans. */
@@ -152,11 +179,12 @@ function isItalic(el: HTMLElement): boolean {
  * Redecorating rebuilds the element's HTML, which destroys every node the
  * selection referred to. An offset survives that; a node reference does not.
  */
-export function caretOffset(root: HTMLElement): number | null {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return null;
-  const range = selection.getRangeAt(0);
-  if (!root.contains(range.startContainer)) return null;
+export function offsetOfPosition(
+  root: HTMLElement,
+  container: Node,
+  within: number,
+): number | null {
+  if (!root.contains(container)) return null;
 
   let offset = 0;
   let found = false;
@@ -164,8 +192,8 @@ export function caretOffset(root: HTMLElement): number | null {
   const walk = (node: Node) => {
     if (found) return;
     if (node.nodeType === Node.TEXT_NODE) {
-      if (node === range.startContainer) {
-        offset += range.startOffset;
+      if (node === container) {
+        offset += within;
         found = true;
         return;
       }
@@ -175,9 +203,9 @@ export function caretOffset(root: HTMLElement): number | null {
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const el = node as HTMLElement;
     if (el !== root && el.tagName === "P" && el !== root.firstChild) offset += 1;
-    if (node === range.startContainer) {
-      // Caret sits between children rather than inside a text node.
-      for (let i = 0; i < range.startOffset; i += 1) {
+    if (node === container) {
+      // The position sits between children rather than inside a text node.
+      for (let i = 0; i < within; i += 1) {
         const child = node.childNodes[i];
         if (child) offset += (child.textContent ?? "").length;
       }
@@ -189,6 +217,39 @@ export function caretOffset(root: HTMLElement): number | null {
 
   for (const child of Array.from(root.childNodes)) walk(child);
   return found ? offset : null;
+}
+
+export function caretOffset(root: HTMLElement): number | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const range = selection.getRangeAt(0);
+  return offsetOfPosition(root, range.startContainer, range.startOffset);
+}
+
+/**
+ * The character a point on screen falls on.
+ *
+ * Used to carry the caret across the swap from the rendered manuscript to the
+ * editor: a click lands on read-only paragraphs, which are then replaced, so
+ * the position has to survive as an offset rather than as a node. Counted the
+ * same way as the caret, so the two are the same currency.
+ *
+ * The two spellings of the same API are both needed — Chrome and Firefox have
+ * caretPositionFromPoint, WebKit has caretRangeFromPoint.
+ */
+export function offsetOfPoint(root: HTMLElement, x: number, y: number): number {
+  const doc = document as Document & {
+    caretPositionFromPoint?: (x: number, y: number) => { offsetNode: Node; offset: number } | null;
+    caretRangeFromPoint?: (x: number, y: number) => Range | null;
+  };
+
+  const position = doc.caretPositionFromPoint?.(x, y);
+  if (position) return offsetOfPosition(root, position.offsetNode, position.offset) ?? 0;
+
+  const range = doc.caretRangeFromPoint?.(x, y);
+  if (range) return offsetOfPosition(root, range.startContainer, range.startOffset) ?? 0;
+
+  return 0;
 }
 
 export function setCaret(root: HTMLElement, offset: number): void {
@@ -257,6 +318,12 @@ const BOUNDARY = /[\s.,;:!?)\]}"”'’—–…]/;
 
 export interface ProseEditorProps {
   blockId: string;
+  /**
+   * Where the click that opened the editor landed, counted in characters. The
+   * rendered paragraphs are replaced by this component, so the position has to
+   * cross the swap as an offset rather than as a node.
+   */
+  initialCaret: number;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
@@ -270,6 +337,7 @@ export interface ProseEditorProps {
 
 export function ProseEditor({
   blockId,
+  initialCaret,
   content,
   fallbackText,
   speller,
@@ -307,7 +375,7 @@ export function ProseEditor({
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
     el.innerHTML = docToHtml(doc, speller);
     el.focus();
-    setCaret(el, 0);
+    setCaret(el, initialCaret);
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -432,6 +500,38 @@ export function ProseEditor({
     scheduleSave();
   };
 
+  /** The selected fragment, read as the model. */
+  const selectionDoc = useCallback((): ProseDoc | null => {
+    const el = ref.current;
+    if (!el) return null;
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+    const range = selection.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return null;
+
+    // A selection inside one paragraph clones as bare runs with no <p> around
+    // them; htmlToDoc folds loose nodes into a paragraph, so both cases work.
+    const holder = document.createElement("div");
+    holder.appendChild(range.cloneContents());
+    const doc = htmlToDoc(holder);
+    return doc.content.length ? doc : null;
+  }, []);
+
+  /** Writes the selection to the clipboard. False when there was none. */
+  const writeClipboard = useCallback(
+    (data: DataTransfer): boolean => {
+      const doc = selectionDoc();
+      if (!doc) return false;
+      // Rebuilt from the model rather than lifted from the page, so the
+      // underlines and their data attributes don't travel with the words.
+      data.setData("text/plain", proseToText(doc));
+      data.setData("text/html", docToHtml(doc, null));
+      data.setData(PROSE_FLAVOUR, JSON.stringify(doc));
+      return true;
+    },
+    [selectionDoc],
+  );
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;
@@ -475,13 +575,17 @@ export function ProseEditor({
 
     // A finished word, a new paragraph, or a deletion is a step worth having
     // back on its own. Ordinary letters are folded into the word being typed.
-    if (
-      event.key === "Enter" ||
-      event.key === "Backspace" ||
-      event.key === "Delete" ||
-      (event.key.length === 1 && BOUNDARY.test(event.key))
-    ) {
+    const deleting = event.key === "Backspace" || event.key === "Delete";
+    if (event.key === "Enter" || deleting || (event.key.length === 1 && BOUNDARY.test(event.key))) {
       remember();
+    }
+
+    // Deleting a stretch of text can strand an underline on a word that is no
+    // longer there, or join two halves into a word that is. A single character
+    // is left to the next word boundary, as with typing — the word being edited
+    // isn't misspelled yet, it's unfinished.
+    if (deleting && window.getSelection()?.isCollapsed === false) {
+      window.setTimeout(recheck, 0);
     }
 
     if (smartPunctuation && event.key.length === 1) {
@@ -602,15 +706,44 @@ export function ProseEditor({
         // colour, from a dictionary this app can't add to.
         spellCheck={false}
         onKeyDown={onKeyDown}
-        onPaste={(event) => {
-          // Plain text only: a paste out of a word processor carries a stylesheet
-          // with it, and none of it belongs in a manuscript whose look is decided
-          // by its formats.
+        onCopy={(event) => {
+          if (writeClipboard(event.clipboardData)) event.preventDefault();
+        }}
+        onCut={(event) => {
+          if (!writeClipboard(event.clipboardData)) return;
           event.preventDefault();
           remember();
-          const text = event.clipboardData.getData("text/plain");
-          document.execCommand("insertText", false, text);
+          // We took the event, so the deletion is ours to do. execCommand rather
+          // than deleteFromDocument: it merges the paragraphs either side of a
+          // selection that spanned them, which is what a cut should leave.
+          document.execCommand("delete");
           window.setTimeout(recheck, 0);
+          scheduleSave();
+        }}
+        onPaste={(event) => {
+          event.preventDefault();
+          remember();
+
+          // Text copied from Brigid keeps its bold and italic. Anything else is
+          // flattened: a paste out of a word processor carries a stylesheet with
+          // it, and none of it belongs in a manuscript whose look is decided by
+          // its formats.
+          const own = event.clipboardData.getData(PROSE_FLAVOUR);
+          const doc = own ? readFlavour(own) : null;
+          if (doc) {
+            // A single paragraph is inserted inline so it joins the sentence it
+            // was dropped into; more than one brings its paragraph breaks.
+            const html =
+              doc.content.length === 1
+                ? runsToHtml(doc.content[0]?.content ?? [], null)
+                : docToHtml(doc, null);
+            document.execCommand("insertHTML", false, html);
+          } else {
+            document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+          }
+
+          window.setTimeout(recheck, 0);
+          refreshMarks();
           scheduleSave();
         }}
         onInput={scheduleSave}

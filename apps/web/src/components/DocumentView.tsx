@@ -4,6 +4,7 @@ import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
 import { asProseDoc, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
+import { offsetOfPoint } from "./ProseEditor.js";
 import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
@@ -99,7 +100,7 @@ function Nodes({
   smart?: boolean;
   editing?: boolean;
   editor?: ReactNode;
-  onEditProse?: () => void;
+  onEditProse?: (caret: number) => void;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -208,8 +209,16 @@ function Nodes({
                 : [];
             const written = paragraphs.some((runs) => runs.some((r) => r.text.trim()));
 
+            const enter = (event: React.MouseEvent<HTMLElement>) => {
+              if (!onEditProse) return;
+              // The block beneath has its own click; writing where the pointer
+              // is should not also be a click on the block.
+              event.stopPropagation();
+              onEditProse(offsetOfPoint(event.currentTarget, event.clientX, event.clientY));
+            };
+
             return written ? (
-              <Fragment key={i}>
+              <div className="prose-body" key={i} onClick={enter}>
                 {paragraphs.map((runs, j) => (
                   <p
                     className={j === 0 && !indentFirst ? "prose flush" : "prose"}
@@ -219,7 +228,6 @@ function Nodes({
                         ? { textIndent: indent }
                         : undefined
                     }
-                    onDoubleClick={onEditProse}
                   >
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
@@ -236,9 +244,9 @@ function Nodes({
                     })}
                   </p>
                 ))}
-              </Fragment>
+              </div>
             ) : (
-              <p className="prose empty" key={i} onDoubleClick={onEditProse}>
+              <p className="prose empty" key={i} onClick={enter}>
                 Nothing written here yet.
               </p>
             );
@@ -274,11 +282,12 @@ export interface DocumentViewProps {
   /** The block whose prose is open for editing, if any. */
   editingId: string | null;
   /**
-   * Asked when a block's prose is double-clicked. Only offered for blocks whose
-   * format has a content node — a title page is composed of template lines and
-   * is edited in its format, not on the page.
+   * Asked when a block's prose is clicked, with the character the click landed
+   * on so the caret can go there. Only offered for blocks whose format has a
+   * content node — a title page is composed of template lines and is edited in
+   * its format, not on the page.
    */
-  onEditProse: (blockId: string) => void;
+  onEditProse: (blockId: string, caret: number) => void;
   editor: ReactNode;
 }
 
@@ -401,7 +410,7 @@ export function DocumentView({
               prose={item.block.contentText}
               editing={editingId === item.block.id}
               editor={editor}
-              onEditProse={() => onEditProse(item.block.id)}
+              onEditProse={(caret) => onEditProse(item.block.id, caret)}
               indentFirst={item.firstLineIndent}
               mode={mode}
               typography={item.typography}

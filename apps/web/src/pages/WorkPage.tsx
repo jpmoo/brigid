@@ -90,8 +90,11 @@ export function WorkPage() {
   // the smooth scroll it started.
   const scrollingTo = useRef<string | null>(null);
 
-  /** The block whose prose is open for writing, if any. */
-  const [editingProse, setEditingProse] = useState<string | null>(null);
+  /**
+   * The block whose prose is open for writing, and where in it the click that
+   * opened it landed.
+   */
+  const [editingProse, setEditingProse] = useState<{ id: string; caret: number } | null>(null);
   const spelling = useSpelling();
 
   const load = useCallback(async () => {
@@ -675,20 +678,25 @@ export function WorkPage() {
             onDropBookmark={(blockId) => void addBookmark(blockId)}
             search={query.trim().toLowerCase()}
             activeMatch={activeMatch}
-            editingId={editingProse}
-            onEditProse={(blockId) => {
+            editingId={editingProse?.id ?? null}
+            onEditProse={(blockId, caret) => {
               setSelectedId(blockId);
-              setEditingProse(blockId);
+              setEditingProse({ id: blockId, caret });
             }}
             editor={
               editingProse ? (
                 <ProseEditor
-                  blockId={editingProse}
-                  content={blocks.find((b) => b.id === editingProse)?.content ?? null}
-                  fallbackText={blocks.find((b) => b.id === editingProse)?.contentText ?? ""}
+                  // A fresh editor per block. Reusing one across a switch would
+                  // leave the outgoing block's debounced save holding the
+                  // incoming block's text.
+                  key={editingProse.id}
+                  blockId={editingProse.id}
+                  initialCaret={editingProse.caret}
+                  content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
+                  fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}
-                  smartPunctuation={smartPunctuationFor(editingProse)}
-                  onSave={(doc) => void saveProse(editingProse, doc)}
+                  smartPunctuation={smartPunctuationFor(editingProse.id)}
+                  onSave={(doc) => void saveProse(editingProse.id, doc)}
                   onDone={() => setEditingProse(null)}
                   onAddWord={(word) => void spelling.addWord(word)}
                   onIgnoreWord={spelling.ignoreWord}
