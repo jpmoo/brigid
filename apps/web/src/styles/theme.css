@@ -2875,7 +2875,14 @@ mark.hit.active {
 
 .spell-menu {
   position: fixed;
-  min-width: 170px;
+  /* `.menu` pins itself to the right of whatever it hangs from; this one is
+     placed by measurement, and leaving that in fought the computed left edge. */
+  right: auto;
+  width: 210px;
+  min-width: 0;
+  /* Capped by the room measured at open time, and scrolls within it. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   font-family: var(--sans);
   font-size: 13px;
 }
@@ -2892,4 +2899,23 @@ mark.hit.active {
   color: var(--text-faint);
   font-size: 12px;
   font-style: italic;
+}
+
+/* An extract set apart from the prose around it — a letter, an epigraph, a
+   passage being quoted. Inset from both margins and never first-line indented:
+   the inset is what marks it, and doing both reads as a mistake. Left ragged
+   rather than justified, which is how extracts are usually set and keeps them
+   distinguishable from the body at a glance. */
+.prose.blockquote {
+  margin: 0.75em 0;
+  padding: 0 2.5em;
+  text-indent: 0;
+  text-align: left;
+}
+
+/* In the editor the same paragraph carries a rule on the inset, so it is
+   obvious which lines the button turned. */
+.prose-surface .prose.blockquote {
+  border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  padding-left: calc(2.5em - 2px);
 }

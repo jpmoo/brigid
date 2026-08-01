@@ -27,6 +27,17 @@ export interface ProseText {
 export interface ProseParagraph {
   type: "paragraph";
   content?: ProseText[];
+  /**
+   * An extract set apart from the prose around it — a letter, an epigraph, a
+   * passage being quoted.
+   *
+   * A property of the paragraph rather than a mark on its words, because that
+   * is what it is: the whole line is set differently, and half a blockquote is
+   * not a thing. How far it is inset and how it is spaced belong to the format,
+   * as with every other measurement; this only records that the paragraph is
+   * one.
+   */
+  blockquote?: boolean;
 }
 
 export interface ProseDoc {
@@ -61,7 +72,12 @@ export function asProseDoc(value: unknown): ProseDoc | null {
         runs.push(marks.length ? { type: "text", text: run.text, marks } : { type: "text", text: run.text });
       }
     }
-    paragraphs.push(runs.length ? { type: "paragraph", content: runs } : { type: "paragraph" });
+    const quoted = (para as { blockquote?: unknown }).blockquote === true;
+    paragraphs.push({
+      type: "paragraph",
+      ...(runs.length ? { content: runs } : {}),
+      ...(quoted ? { blockquote: true } : {}),
+    });
   }
   return { type: "doc", content: paragraphs };
 }
@@ -113,7 +129,11 @@ export function normalizeProse(doc: ProseDoc): ProseDoc {
         }
         runs.push({ ...run, marks: run.marks ? [...run.marks] : undefined });
       }
-      return runs.length ? { type: "paragraph", content: runs } : { type: "paragraph" };
+      return {
+        type: "paragraph",
+        ...(runs.length ? { content: runs } : {}),
+        ...(para.blockquote ? { blockquote: true } : {}),
+      };
     }),
   };
 }

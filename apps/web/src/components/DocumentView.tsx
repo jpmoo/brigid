@@ -215,6 +215,7 @@ function Nodes({
               : prose
                 ? prose.split(/\n{2,}/).map((text) => [{ type: "text" as const, text }])
                 : [];
+            const quoted = doc ? doc.content.map((p) => p.blockquote === true) : [];
             const written = paragraphs.some((runs) => runs.some((r) => r.text.trim()));
 
             const enter = (event: React.MouseEvent<HTMLElement>) => {
@@ -227,15 +228,16 @@ function Nodes({
 
             return written ? (
               <div className="prose-body" key={i} onClick={enter}>
-                {paragraphs.map((runs, j) => (
+                {paragraphs.map((runs, j) => {
+                  // An extract is inset as a whole and never carries a
+                  // first-line indent, whatever the block's setting.
+                  const isQuote = quoted[j] === true;
+                  const flush = isQuote || (j === 0 && !indentFirst);
+                  return (
                   <p
-                    className={j === 0 && !indentFirst ? "prose flush" : "prose"}
+                    className={`prose${flush && !isQuote ? " flush" : ""}${isQuote ? " blockquote" : ""}`}
                     key={j}
-                    style={
-                      indent !== undefined && !(j === 0 && !indentFirst)
-                        ? { textIndent: indent }
-                        : undefined
-                    }
+                    style={indent !== undefined && !flush ? { textIndent: indent } : undefined}
                   >
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
@@ -256,7 +258,8 @@ function Nodes({
                       );
                     })}
                   </p>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <p className="prose empty" key={i} onClick={enter}>

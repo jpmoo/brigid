@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bold, Italic, Redo2, SpellCheck, Underline, Undo2 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Bold, Italic, Quote, Redo2, SpellCheck, Underline, Undo2 } from "lucide-react";
 import {
   asProseDoc,
   autocorrectKeystroke,
@@ -108,12 +109,22 @@ export interface ProseLayout {
   indentFirst?: boolean | undefined;
 }
 
-function paragraphAttrs(index: number, layout: ProseLayout | undefined): string {
-  // The clipboard asks for bare paragraphs; only the editing surface is set.
-  if (!layout) return "";
-  const flush = index === 0 && layout.indentFirst === false;
+function paragraphAttrs(
+  index: number,
+  quoted: boolean,
+  layout: ProseLayout | undefined,
+): string {
+  // The clipboard asks for bare paragraphs, but a blockquote has to survive a
+  // copy, so that much is written either way.
+  const quote = quoted ? ' data-blockquote="1"' : "";
+  if (!layout) return quote;
+  // A quoted paragraph is inset as a whole and never takes a first-line indent.
+  const flush = quoted || (index === 0 && layout.indentFirst === false);
   const indent = !flush && layout.indent ? ` style="text-indent:${layout.indent}"` : "";
-  return ` class="prose${flush ? " flush" : ""}"${indent}`;
+  const classes = ["prose", flush && !quoted ? "flush" : "", quoted ? "blockquote" : ""]
+    .filter(Boolean)
+    .join(" ");
+  return ` class="${classes}"${indent}${quote}`;
 }
 
 export function docToHtml(
@@ -121,9 +132,13 @@ export function docToHtml(
   speller: Speller | null,
   layout?: ProseLayout,
 ): string {
-  if (doc.content.length === 0) return `<p${paragraphAttrs(0, layout)}><br></p>`;
+  if (doc.content.length === 0) return `<p${paragraphAttrs(0, false, layout)}><br></p>`;
   return doc.content
-    .map((p, i) => `<p${paragraphAttrs(i, layout)}>${runsToHtml(p.content ?? [], speller)}</p>`)
+    .map(
+      (p, i) =>
+        `<p${paragraphAttrs(i, p.blockquote === true, layout)}>` +
+        `${runsToHtml(p.content ?? [], speller)}</p>`,
+    )
     .join("");
 }
 
@@ -180,7 +195,12 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
     if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === "P") {
       flush();
       const runs = readParagraph(child);
-      paragraphs.push(runs.length ? { type: "paragraph", content: runs } : { type: "paragraph" });
+      const quoted = (child as HTMLElement).dataset.blockquote === "1";
+      paragraphs.push({
+        type: "paragraph",
+        ...(runs.length ? { content: runs } : {}),
+        ...(quoted ? { blockquote: true } : {}),
+      });
     } else if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === "BR") {
       flush();
       paragraphs.push({ type: "paragraph" });
@@ -379,6 +399,52 @@ export function textBeforeCaret(root: HTMLElement, range: Range): string {
 /** Characters that end a word, and so are worth re-checking the spelling on. */
 const BOUNDARY = /[\s.,;:!?)\]}"”'’—–…]/;
 
+// --- Where the suggestions go --------------------------------------------
+
+interface SpellMenu {
+  word: string;
+  left: number;
+  top?: number;
+  /** Set instead of `top` when the menu opens upward. */
+  bottom?: number;
+  maxHeight: number;
+}
+
+const MENU_WIDTH = 210;
+const MENU_GAP = 4;
+const VIEWPORT_EDGE = 8;
+/** Below this there isn't room for suggestions worth reading. */
+const MENU_MIN = 120;
+
+/**
+ * The menu goes under the word, unless the word is near the foot of the screen
+ * — which, in a manuscript being read from the top down, it very often is. Then
+ * it opens upward instead, and either way it is capped to the room available
+ * and scrolls inside it rather than running off the edge.
+ */
+export function placeSpellMenu(word: string, box: DOMRect): SpellMenu {
+  const below = window.innerHeight - box.bottom - MENU_GAP - VIEWPORT_EDGE;
+  const above = box.top - MENU_GAP - VIEWPORT_EDGE;
+  const upward = below < MENU_MIN && above > below;
+
+  const room = Math.max(MENU_MIN, upward ? above : below);
+  const left = Math.max(
+    VIEWPORT_EDGE,
+    Math.min(box.left, window.innerWidth - MENU_WIDTH - VIEWPORT_EDGE),
+  );
+
+  return {
+    word,
+    left,
+    maxHeight: Math.min(300, room),
+    // Anchored to whichever edge it grows from, so a short list still sits
+    // against the word rather than floating away from it.
+    ...(upward
+      ? { bottom: window.innerHeight - box.top + MENU_GAP }
+      : { top: box.bottom + MENU_GAP }),
+  };
+}
+
 // --- The component -------------------------------------------------------
 
 export interface ProseEditorProps {
@@ -439,7 +505,8 @@ export function ProseEditor({
   /** Set while an undo is being applied, so it isn't recorded as a new edit. */
   const restoring = useRef(false);
   const [marks, setMarks] = useState({ strong: false, em: false, underline: false });
-  const [menu, setMenu] = useState<{ word: string; x: number; y: number } | null>(null);
+  const [quoted, setQuoted] = useState(false);
+  const [menu, setMenu] = useState<SpellMenu | null>(null);
   const saveTimer = useRef<number | null>(null);
 
   // Rendered once per block. Later renders would take the caret with them.
@@ -573,13 +640,69 @@ export function ProseEditor({
     recheck();
   }, [speller, recheck]);
 
+  /**
+   * The paragraphs the selection covers, or the one the caret sits in.
+   *
+   * A blockquote applies to whole paragraphs, so a selection that clips the end
+   * of one and the start of the next turns both — which is what a writer
+   * dragging across a passage means, and dropping the partial ends would be
+   * surprising.
+   */
+  const paragraphsInSelection = useCallback((): HTMLElement[] => {
+    const el = ref.current;
+    if (!el) return [];
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return [];
+    const range = selection.getRangeAt(0);
+    if (!el.contains(range.commonAncestorContainer)) return [];
+
+    return Array.from(el.querySelectorAll("p")).filter((p) => range.intersectsNode(p));
+  }, []);
+
+  const refreshQuoted = useCallback(() => {
+    const paragraphs = paragraphsInSelection();
+    setQuoted(paragraphs.length > 0 && paragraphs.every((p) => p.dataset.blockquote === "1"));
+  }, [paragraphsInSelection]);
+
+  /**
+   * Turn the paragraphs under the selection into an extract, or back into
+   * prose. Mixed selections become quoted rather than toggling each one, since
+   * the button reads as off in that state and pressing an off button should
+   * turn things on.
+   */
+  const toggleBlockquote = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const paragraphs = paragraphsInSelection();
+    if (paragraphs.length === 0) return;
+
+    remember();
+    const offset = caretOffset(el);
+    const allQuoted = paragraphs.every((p) => p.dataset.blockquote === "1");
+    for (const paragraph of paragraphs) {
+      if (allQuoted) delete paragraph.dataset.blockquote;
+      else paragraph.dataset.blockquote = "1";
+    }
+
+    // Rebuilt from the model so the class and the indent follow the attribute,
+    // rather than being patched onto the element by hand in two places.
+    const doc = htmlToDoc(el);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current);
+    if (offset !== null) setCaret(el, offset);
+
+    setQuoted(!allQuoted);
+    scheduleSave();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paragraphsInSelection, speller, scheduleSave]);
+
   const refreshMarks = useCallback(() => {
     setMarks({
       strong: document.queryCommandState("bold"),
       em: document.queryCommandState("italic"),
       underline: document.queryCommandState("underline"),
     });
-  }, []);
+    refreshQuoted();
+  }, [refreshQuoted]);
 
   const applyMark = (kind: "bold" | "italic" | "underline") => {
     remember();
@@ -722,12 +845,12 @@ export function ProseEditor({
       refreshMarks();
       return;
     }
-    const box = flagged.getBoundingClientRect();
-    setMenu({
-      word: flagged.getAttribute("data-word") ?? flagged.textContent ?? "",
-      x: box.left,
-      y: box.bottom + 4,
-    });
+    setMenu(
+      placeSpellMenu(
+        flagged.getAttribute("data-word") ?? flagged.textContent ?? "",
+        flagged.getBoundingClientRect(),
+      ),
+    );
   };
 
   const replaceWord = (word: string, replacement: string) => {
@@ -791,6 +914,17 @@ export function ProseEditor({
           onClick={() => applyMark("underline")}
         >
           <Underline size={13} />
+        </button>
+        <span className="be-gap" />
+        <button
+          type="button"
+          className={`be-mark${quoted ? " on" : ""}`}
+          aria-pressed={quoted}
+          title="Block quote"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={toggleBlockquote}
+        >
+          <Quote size={13} />
         </button>
         <span className="be-gap" />
         <button
@@ -894,10 +1028,19 @@ export function ProseEditor({
         }}
       />
 
-      {menu ? (
-        <>
+      {menu
+        ? createPortal(
+            <>
           <div className="menu-scrim" role="presentation" onClick={() => setMenu(null)} />
-          <div className="menu spell-menu" role="menu" style={{ left: menu.x, top: menu.y }}>
+          <div
+            className="menu spell-menu"
+            role="menu"
+            style={{
+              left: menu.left,
+              maxHeight: menu.maxHeight,
+              ...(menu.bottom === undefined ? { top: menu.top } : { bottom: menu.bottom }),
+            }}
+          >
             {speller?.suggest(menu.word).length ? (
               speller.suggest(menu.word).map((suggestion) => (
                 <button
@@ -936,8 +1079,15 @@ export function ProseEditor({
               Ignore for now
             </button>
           </div>
-        </>
-      ) : null}
+            </>,
+            // Out of the manuscript and onto the page. The sheet is `zoom`ed,
+            // and zoom scales a fixed-positioned descendant's own coordinates
+            // as well — so a menu placed at the word's measured position landed
+            // somewhere else entirely, further off the harder the text was
+            // scaled. Out here the numbers mean what they say.
+            document.body,
+          )
+        : null}
     </div>
   );
 }
