@@ -107,6 +107,12 @@ export interface Preferences {
   viewMode?: "book" | "manuscript";
 }
 
+export interface OllamaSettings {
+  /** Origin only — no path, no trailing slash. Null until a host is set. */
+  url: string | null;
+  analysisModel: string | null;
+}
+
 export interface DictionaryWord {
   id: string;
   word: string;
@@ -443,6 +449,15 @@ export const api = {
   deleteDictionaryWord: (id: string) =>
     request<{ ok: true }>(`/spelling/words/${id}`, { method: "DELETE" }),
   getDictionary: () => request<{ aff: string; dic: string }>("/spelling/dictionary"),
+
+  getOllama: () => request<OllamaSettings>("/ollama"),
+  // The address is passed rather than read, so a host can be tried before it is kept.
+  listOllamaModels: (url?: string) =>
+    request<{ url: string; models: string[] }>(
+      url ? `/ollama/models?url=${encodeURIComponent(url)}` : "/ollama/models",
+    ),
+  saveOllama: (patch: Partial<OllamaSettings>) =>
+    request<OllamaSettings>("/ollama", { method: "PATCH", body: JSON.stringify(patch) }),
 
   detachBreak: (id: string) => post<{ block: Block }>(`/blocks/${id}/break/detach`),
   updateBreak: (id: string, body: TemplateBody) =>

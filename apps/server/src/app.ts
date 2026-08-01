@@ -13,6 +13,7 @@ import { bookmarksRoutes } from "./bookmarks/routes.js";
 import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
 import { importRoutes } from "./import/routes.js";
+import { ollamaRoutes } from "./ollama/routes.js";
 import { HttpError } from "./lib/errors.js";
 import { backupRoutes } from "./backup/routes.js";
 import { compileRoutes } from "./compile/routes.js";
@@ -76,6 +77,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(preferencesRoutes);
       await scope.register(backupRoutes);
       await scope.register(compileRoutes);
+      await scope.register(ollamaRoutes);
     },
     { prefix: "/api" },
   );

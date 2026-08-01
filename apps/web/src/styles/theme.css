@@ -198,6 +198,7 @@ input[type="password"],
 input[type="number"],
 input[type="time"],
 input[type="date"],
+input[type="url"],
 textarea,
 select {
   width: 100%;
@@ -3002,6 +3003,13 @@ mark.hit.active {
 
 .bk-field input[type="number"] {
   width: 72px;
+}
+
+/* A model name is as long as it is; let the menu take the room it needs
+   rather than the full width of a label sitting on one line. */
+.bk-field select {
+  width: auto;
+  padding: 6px 9px;
 }
 
 .bk-list {

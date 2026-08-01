@@ -11,6 +11,7 @@ import { BackupPane } from "./settings/BackupPane.js";
 import { CompilePane } from "./settings/CompilePane.js";
 import { GoalsPane } from "./settings/GoalsPane.js";
 import { StatsPane } from "./settings/StatsPane.js";
+import { OllamaPane } from "./settings/OllamaPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -36,7 +37,7 @@ const PROJECT_TABS = [
   { key: "compile", label: "Compile" },
 ] as const;
 
-type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
+type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"] | "ai";
 
 export function SettingsPage() {
   const navigate = useNavigate();
@@ -78,6 +79,31 @@ export function SettingsPage() {
   useEffect(() => {
     void loadTemplates();
   }, [loadTemplates]);
+
+  /**
+   * The AI tab appears only once there is something behind it — a host saved
+   * and a model chosen. An empty tab that explains it can't do anything is
+   * worse than no tab, and the Ollama pane is where that is put right.
+   */
+  const [aiReady, setAiReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    void api
+      .getOllama()
+      .then((s) => {
+        if (alive) setAiReady(Boolean(s.url && s.analysisModel));
+      })
+      .catch(() => {
+        /* No model, no tab. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [tab]);
+
+  const projectTabs = aiReady
+    ? [...PROJECT_TABS, { key: "ai", label: "AI" } as const]
+    : PROJECT_TABS;
 
   // Back to wherever the writer came from — usually the work they were in the
   // middle of, not the library. react-router records its position in history
@@ -155,7 +181,7 @@ export function SettingsPage() {
                 </p>
 
                 <nav className="subtabs" role="tablist">
-                  {PROJECT_TABS.map((t) => (
+                  {projectTabs.map((t) => (
                     <button
                       key={t.key}
                       type="button"
@@ -181,6 +207,8 @@ export function SettingsPage() {
                   />
                 ) : projectTab === "stats" ? (
                   <StatsPane blocks={blocks} levels={levels} templates={templates} />
+                ) : projectTab === "ai" ? (
+                  <AiPane />
                 ) : (
                   <CompilePane
                     workId={workId}
@@ -194,18 +222,53 @@ export function SettingsPage() {
           ) : tab === "account" ? (
             <PasswordFields />
           ) : (
-            <>
-              <h3 className="card-title">Ollama</h3>
-              <p className="card-subtitle" style={{ marginBottom: 0 }}>
-                Brigid will connect to an Ollama host and let you pick a model for inference and
-                another for summarization. Not built yet — the settings row is in the database
-                waiting for it.
-              </p>
-            </>
+            <OllamaPane />
           )}
         </div>
       </main>
     </>
+  );
+}
+
+/**
+ * The AI tools for this manuscript.
+ *
+ * Nothing here yet — the tab exists because a model is connected, and what it
+ * should do is still being decided. It names the model so it is obvious which
+ * one any of this will run against.
+ */
+function AiPane() {
+  const [model, setModel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .getOllama()
+      .then((s) => {
+        if (alive) setModel(s.analysisModel);
+      })
+      .catch(() => {
+        /* The tab wouldn't be showing if this failed a moment ago. */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return (
+    <div className="tpl-detail">
+      <h4 className="tpl-section">AI</h4>
+      <p className="tpl-note">
+        {model ? (
+          <>
+            Connected to <strong>{model}</strong>. Tools that read this manuscript and
+            report back will live here.
+          </>
+        ) : (
+          <>Connected. Tools that read this manuscript and report back will live here.</>
+        )}
+      </p>
+    </div>
   );
 }
 

@@ -37,7 +37,7 @@ try {
   // names of the parts rather than for whole routes — enough to notice a whole
   // group of endpoints failing to register, which is the other silent failure.
   const routes = app.printRoutes({ commonPrefix: false });
-  for (const part of ["works", "backups", "spelling", "preferences", "compile"]) {
+  for (const part of ["works", "backups", "spelling", "preferences", "compile", "ollama"]) {
     check(`the ${part} routes are mounted`, routes.includes(part));
   }
 
