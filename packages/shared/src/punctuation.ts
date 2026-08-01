@@ -13,6 +13,7 @@
  */
 
 const OPENERS = new Set([" ", "\t", "\n", "(", "[", "{", "—", "–", "“", "‘"]);
+const DASHES = new Set(["—", "–"]);
 
 /** Letters or digits, so an apostrophe inside a word can be recognised. */
 function isWordChar(ch: string | undefined): boolean {
@@ -36,7 +37,13 @@ export function smartenText(input: string): string {
     const next = text[i + 1];
 
     if (ch === '"') {
-      const opening = prev === undefined || OPENERS.has(prev);
+      // A dash cuts both ways: «He turned—"Wait!"» opens, «"Wait—"» closes, and
+      // the second is far the commoner in fiction. Unlike the editor, this pass
+      // has the whole string, so it can look at what follows instead of
+      // guessing — a letter after the quote means speech is starting.
+      const opening =
+        prev === undefined ||
+        (DASHES.has(prev) ? next !== undefined && /[\p{L}\p{N}]/u.test(next) : OPENERS.has(prev));
       out += opening ? "“" : "”";
       continue;
     }
@@ -66,4 +73,47 @@ export function smartenText(input: string): string {
   }
 
   return out;
+}
+
+const TYPED_OPENERS = new Set([" ", "\t", "\n", "(", "[", "{", "“", "‘", ""]);
+
+/**
+ * What a typed character should actually become, given what precedes it, or
+ * null to let it through unchanged.
+ *
+ * Done a character at a time as it is typed rather than by sweeping the text
+ * afterwards, so the caret never moves under the writer and an undo puts back
+ * exactly what they typed. `replace` is how many characters before the caret
+ * the substitution eats.
+ */
+export function autocorrectKeystroke(typed: string, before: string): { text: string; replace: number } | null {
+  const prev = before.slice(-1);
+  const prev2 = before.slice(-2);
+
+  if (typed === '"') {
+    return { text: TYPED_OPENERS.has(prev) ? "“" : "”", replace: 0 };
+  }
+  if (typed === "'") {
+    // Inside a word it's an apostrophe: don't, o'clock, Maren's.
+    if (/[\p{L}\p{N}]/u.test(prev)) return { text: "’", replace: 0 };
+    return { text: TYPED_OPENERS.has(prev) ? "‘" : "’", replace: 0 };
+  }
+  // An elided decade — '90s, '73 — reads as an opening quote until the digit
+  // arrives, which is only one keystroke later. Turning it round then is
+  // invisible; guessing beforehand is impossible, since nothing follows it yet.
+  if (/\p{N}/u.test(typed) && prev === "‘") {
+    return { text: `’${typed}`, replace: 1 };
+  }
+  if (typed === "-") {
+    // Two hyphens make an en dash, three an em — the third arriving after the
+    // en dash the second one already produced.
+    if (prev === "–") return { text: "—", replace: 1 };
+    if (prev === "-") return { text: "–", replace: 1 };
+    return null;
+  }
+  if (typed === ".") {
+    if (prev2 === "..") return { text: "…", replace: 2 };
+    return null;
+  }
+  return null;
 }

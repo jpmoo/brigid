@@ -1,4 +1,13 @@
-import { deriveDocument, parseInlines, serializeInlines } from "@brigid/shared";
+import {
+  asProseDoc,
+  autocorrectKeystroke,
+  deriveDocument,
+  normalizeProse,
+  parseInlines,
+  proseFromParagraphs,
+  proseToText,
+  serializeInlines,
+} from "@brigid/shared";
 import type { LevelLike, TemplateLike } from "@brigid/shared";
 
 let failures = 0;
@@ -327,6 +336,66 @@ check(
     "—“Yes.”",
   );
 }
+
+// --- prose model ---
+
+{
+  const doc = proseFromParagraphs(["One two.", "", "Three."]);
+  check("blank paragraphs survive a round trip", proseToText(doc), "One two.\n\n\n\nThree.");
+  check("a doc reads back as itself", asProseDoc(doc), doc);
+  check("anything else is not a doc", asProseDoc({ type: "paragraph" }), null);
+}
+
+{
+  // Neighbouring runs that carry the same marks are one run, or every keystroke
+  // in a bold passage would become its own.
+  const merged = normalizeProse({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "so", marks: [{ type: "strong" }] },
+          { type: "text", text: "on", marks: [{ type: "strong" }] },
+          { type: "text", text: " after" },
+          { type: "text", text: "" },
+        ],
+      },
+    ],
+  });
+  const runs = merged.content[0]?.content ?? [];
+  check("runs with the same marks fuse", [runs.length, runs[0]?.text], [2, "soon"]);
+  check("empty runs are dropped", runs.every((r) => r.text.length > 0), true);
+}
+
+// --- autocorrect, as it is typed ---
+
+/** Types a string a character at a time, exactly as the editor feeds it. */
+function typed(input: string): string {
+  let out = "";
+  for (const ch of input) {
+    const fix = autocorrectKeystroke(ch, out);
+    if (!fix) {
+      out += ch;
+      continue;
+    }
+    out = out.slice(0, out.length - fix.replace) + fix.text;
+  }
+  return out;
+}
+
+check("dialogue gets the quotes the right way round", typed('He said "no."'), "He said \u201cno.\u201d");
+check("an apostrophe inside a word stays one", typed("don't"), "don\u2019t");
+check("single quotes open and close", typed("'Tis a wonder,' she said"), "\u2018Tis a wonder,\u2019 she said");
+check("two hyphens make an en dash, three an em", [typed("wait--no"), typed("wait---no")], ["wait\u2013no", "wait\u2014no"]);
+check("three dots make an ellipsis while typing", typed("well..."), "well\u2026");
+// Interrupted dialogue: the quote after a dash closes, since nothing follows
+// it yet to say otherwise.
+check("a quote after a dash closes the speech", typed('"Stop---" she began.'), "\u201cStop\u2014\u201d she began.");
+// The digit is what reveals it, and it arrives one keystroke late.
+check("an elided decade turns round when the digit lands", typed("the '90s"), "the \u201990s");
+check("a lone hyphen is left alone", typed("a-b"), "a-b");
+check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

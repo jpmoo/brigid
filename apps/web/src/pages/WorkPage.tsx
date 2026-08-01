@@ -14,7 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { buildOutline, deriveDocument } from "@brigid/shared";
-import type { BlockOptions, TemplateBody, Typography } from "@brigid/shared";
+import type { BlockOptions, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
@@ -27,6 +27,8 @@ import { SearchBar, findMatches } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
+import { ProseEditor } from "../components/ProseEditor.js";
+import { useSpelling } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
 import type { BreakChip } from "../components/OutlinePanel.js";
 
@@ -88,6 +90,10 @@ export function WorkPage() {
   // the smooth scroll it started.
   const scrollingTo = useRef<string | null>(null);
 
+  /** The block whose prose is open for writing, if any. */
+  const [editingProse, setEditingProse] = useState<string | null>(null);
+  const spelling = useSpelling();
+
   const load = useCallback(async () => {
     try {
       const [{ work: w, levels: ls }, { blocks: bs }, { templates: ts }] = await Promise.all([
@@ -107,6 +113,18 @@ export function WorkPage() {
       setLoading(false);
     }
   }, [id]);
+
+  const saveProse = useCallback(
+    async (blockId: string, doc: ProseDoc) => {
+      const { block } = await api.updateBlock(blockId, {
+        content: doc as unknown as Record<string, unknown>,
+      });
+      // The word count is derived on the server, so the block that comes back
+      // is the authority — including for the outline's totals.
+      setBlocks((current) => current.map((b) => (b.id === blockId ? block : b)));
+    },
+    [],
+  );
 
   useEffect(() => {
     void load();
@@ -144,6 +162,7 @@ export function WorkPage() {
 
   const items = useMemo(() => {
     if (!work) return [];
+
     return deriveDocument<Block>({
       blocks,
       levels,
@@ -156,6 +175,19 @@ export function WorkPage() {
       },
     });
   }, [blocks, levels, templates, work]);
+
+  /**
+   * Typeset punctuation is a property of the block's format, so the editor has
+   * to be told the same answer the renderer already worked out rather than
+   * guessing at it.
+   */
+  const smartPunctuationFor = useCallback(
+    (blockId: string) => {
+      const item = items.find((i) => i.kind === "block" && i.block.id === blockId);
+      return item && item.kind === "block" ? (item.smartPunctuation ?? false) : false;
+    },
+    [items],
+  );
 
   // The outline shows each break attached above the block it precedes, so the
   // structure reads the same in both panes.
@@ -643,6 +675,26 @@ export function WorkPage() {
             onDropBookmark={(blockId) => void addBookmark(blockId)}
             search={query.trim().toLowerCase()}
             activeMatch={activeMatch}
+            editingId={editingProse}
+            onEditProse={(blockId) => {
+              setSelectedId(blockId);
+              setEditingProse(blockId);
+            }}
+            editor={
+              editingProse ? (
+                <ProseEditor
+                  blockId={editingProse}
+                  content={blocks.find((b) => b.id === editingProse)?.content ?? null}
+                  fallbackText={blocks.find((b) => b.id === editingProse)?.contentText ?? ""}
+                  speller={spelling.speller}
+                  smartPunctuation={smartPunctuationFor(editingProse)}
+                  onSave={(doc) => void saveProse(editingProse, doc)}
+                  onDone={() => setEditingProse(null)}
+                  onAddWord={(word) => void spelling.addWord(word)}
+                  onIgnoreWord={spelling.ignoreWord}
+                />
+              ) : null
+            }
           />
           {zen ? (
             // Fades in together with the exit control: in zen the only things

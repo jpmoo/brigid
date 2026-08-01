@@ -2,9 +2,9 @@ import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
-import { smartenText } from "@brigid/shared";
+import { asProseDoc, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
-import type { DocumentItem, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
+import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
 /**
@@ -74,6 +74,7 @@ function highlight(text: string, needle: string, counter: { n: number }, activeI
 function Nodes({
   nodes,
   prose,
+  proseDoc,
   indentFirst = true,
   mode,
   typography,
@@ -81,9 +82,14 @@ function Nodes({
   activeIndex,
   counter,
   smart = false,
+  editing = false,
+  editor,
+  onEditProse,
 }: {
   nodes: ResolvedNode[];
   prose?: string;
+  /** The structured prose, when the block has it. Carries bold and italic. */
+  proseDoc?: Record<string, unknown> | null;
   indentFirst?: boolean;
   mode: ViewMode;
   typography: Typography | null;
@@ -91,6 +97,9 @@ function Nodes({
   activeIndex: number | null;
   counter: { n: number };
   smart?: boolean;
+  editing?: boolean;
+  editor?: ReactNode;
+  onEditProse?: () => void;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -185,10 +194,23 @@ function Nodes({
                 )}
               </p>
             );
-          case "content":
-            return prose ? (
+          case "content": {
+            // A content node is what makes a block writable. The title page has
+            // none — it is composed of template lines — so it is not editable
+            // here, without that needing to be said anywhere as a special case.
+            if (editing) return <Fragment key={i}>{editor}</Fragment>;
+
+            const doc = asProseDoc(proseDoc);
+            const paragraphs: ProseText[][] = doc
+              ? proseParagraphs(doc)
+              : prose
+                ? prose.split(/\n{2,}/).map((text) => [{ type: "text" as const, text }])
+                : [];
+            const written = paragraphs.some((runs) => runs.some((r) => r.text.trim()));
+
+            return written ? (
               <Fragment key={i}>
-                {(smart ? smartenText(prose) : prose).split(/\n{2,}/).map((para, j) => (
+                {paragraphs.map((runs, j) => (
                   <p
                     className={j === 0 && !indentFirst ? "prose flush" : "prose"}
                     key={j}
@@ -197,16 +219,30 @@ function Nodes({
                         ? { textIndent: indent }
                         : undefined
                     }
+                    onDoubleClick={onEditProse}
                   >
-                    {highlight(para, search, counter, activeIndex)}
+                    {runs.map((run, k) => {
+                      const text = smart ? smartenText(run.text) : run.text;
+                      const marked = highlight(text, search, counter, activeIndex);
+                      if (!hasMark(run, "strong") && !hasMark(run, "em")) {
+                        return <Fragment key={k}>{marked}</Fragment>;
+                      }
+                      const inner = hasMark(run, "em") ? <em>{marked}</em> : marked;
+                      return hasMark(run, "strong") ? (
+                        <strong key={k}>{inner}</strong>
+                      ) : (
+                        <Fragment key={k}>{inner}</Fragment>
+                      );
+                    })}
                   </p>
                 ))}
               </Fragment>
             ) : (
-              <p className="prose empty" key={i}>
+              <p className="prose empty" key={i} onDoubleClick={onEditProse}>
                 Nothing written here yet.
               </p>
             );
+          }
         }
       })}
     </>
@@ -235,6 +271,15 @@ export interface DocumentViewProps {
   /** Lowercased needle, or empty when not searching. */
   search: string;
   activeMatch: { blockId: string; indexInBlock: number } | null;
+  /** The block whose prose is open for editing, if any. */
+  editingId: string | null;
+  /**
+   * Asked when a block's prose is double-clicked. Only offered for blocks whose
+   * format has a content node — a title page is composed of template lines and
+   * is edited in its format, not on the page.
+   */
+  onEditProse: (blockId: string) => void;
+  editor: ReactNode;
 }
 
 export function DocumentView({
@@ -250,6 +295,9 @@ export function DocumentView({
   onDropBookmark,
   search,
   activeMatch,
+  editingId,
+  onEditProse,
+  editor,
 }: DocumentViewProps) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
 
@@ -349,7 +397,11 @@ export function DocumentView({
             ) : null}
             <Nodes
               nodes={item.nodes}
+              proseDoc={item.block.content}
               prose={item.block.contentText}
+              editing={editingId === item.block.id}
+              editor={editor}
+              onEditProse={() => onEditProse(item.block.id)}
               indentFirst={item.firstLineIndent}
               mode={mode}
               typography={item.typography}

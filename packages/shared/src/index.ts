@@ -8,3 +8,4 @@ export * from "./render.js";
 export * from "./template-text.js";
 export * from "./import.js";
 export * from "./punctuation.js";
+export * from "./prose.js";

@@ -2761,3 +2761,73 @@ mark.hit.active {
 .dict-list li .btn.ghost:focus-visible {
   opacity: 1;
 }
+
+/* --- Writing prose ----------------------------------------------------- */
+
+.prose-editor {
+  position: relative;
+}
+
+/* The surface inherits the manuscript's type: what is being typed has to look
+   like what will be read, or the line breaks lie. Only a faint ground and rule
+   separate it, so the page doesn't turn into a form. */
+.prose-surface {
+  outline: none;
+  border-left: 2px solid var(--accent);
+  padding-left: 10px;
+  margin-left: -12px;
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+  border-radius: 0 var(--radius) var(--radius) 0;
+}
+
+.prose-surface p {
+  margin: 0;
+  text-indent: inherit;
+}
+
+/* The toolbar carries only what belongs to the words themselves. Spacing,
+   alignment and face are the format's business and are deliberately absent. */
+.prose-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+  /* Never scaled with the manuscript: it is app furniture, not the page. */
+  zoom: 1;
+  font-family: var(--sans);
+}
+
+.prose-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  font-family: var(--sans);
+}
+
+/* Under the word, not through it — a strikethrough reads as deleted. */
+.misspelled {
+  text-decoration: underline wavy var(--danger);
+  text-decoration-skip-ink: none;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.spell-menu {
+  position: fixed;
+  min-width: 170px;
+  font-family: var(--sans);
+  font-size: 13px;
+}
+
+.spell-menu hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 4px 0;
+}
+
+.menu-note {
+  display: block;
+  padding: 5px 10px;
+  color: var(--text-faint);
+  font-size: 12px;
+  font-style: italic;
+}
