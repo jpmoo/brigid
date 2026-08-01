@@ -559,8 +559,61 @@ function CharactersPane({
                     </>
                   ) : null}
 
+                  {/* Every axis laid out, rather than one at a time behind a
+                      click. The rubric's whole discipline is that a score of 2
+                      or higher rests on events you can point at — so in the
+                      full report they are all on the page, including what cuts
+                      against each reading. */}
+                  <h6 className="cast-axes-head">Axis by axis</h6>
+                  {[...shownProfile.profile.axes]
+                    .sort((a, b) => b.score - a.score)
+                    .map((axis) => (
+                      <div className="cast-axis" key={axis.axis}>
+                        <div className="cast-axis-head">
+                          <span className="cast-axis-name">
+                            {bundle.axisLabels[axis.axis] ?? axis.axis}
+                          </span>
+                          <span className={`cast-axis-score s${axis.score}`}>
+                            {axis.score} of 5
+                          </span>
+                        </div>
+
+                        {bundle.axisBlurbs[axis.axis] ? (
+                          <p className="axis-blurb">{bundle.axisBlurbs[axis.axis]}</p>
+                        ) : null}
+
+                        <p className="axis-head">Most aligned actions</p>
+                        {axis.aligned.length > 0 ? (
+                          <ul className="axis-list aligned">
+                            {axis.aligned.map((a, i) => (
+                              <li key={i}>{a}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="tpl-note">
+                            Nothing in the manuscript instantiates this function for{" "}
+                            {shownProfile.profile.name}.
+                          </p>
+                        )}
+
+                        <p className="axis-head">What cuts against it</p>
+                        {axis.contradictory.length > 0 ? (
+                          <ul className="axis-list contradictory">
+                            {axis.contradictory.map((a, i) => (
+                              <li key={i}>{a}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="tpl-note">Nothing recorded cuts against this reading.</p>
+                        )}
+                      </div>
+                    ))}
+
                   {shownProfile.profile.confidence ? (
-                    <p className="tpl-note">{shownProfile.profile.confidence}</p>
+                    <>
+                      <h6 className="cast-axes-head">Confidence</h6>
+                      <p className="tpl-note">{shownProfile.profile.confidence}</p>
+                    </>
                   ) : null}
                 </div>
               </div>

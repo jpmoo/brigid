@@ -4373,3 +4373,58 @@ mark.hit.active {
 .cast-modal > .card-subtitle {
   flex: none;
 }
+
+/* --- The full axis breakdown, in the profile modal ----------------------- */
+
+.cast-axes-head {
+  margin: 20px 0 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Ordered strongest first, so the shape of the profile is legible as a list
+   and not only as a chart. */
+.cast-axis {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.cast-axis:first-of-type {
+  border-top: 0;
+}
+
+.cast-axis-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.cast-axis-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cast-axis-score {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+/* A carried function reads differently from an absent one at a glance. */
+.cast-axis-score.s4,
+.cast-axis-score.s5 {
+  color: var(--accent);
+}
+
+.cast-axis-score.s0,
+.cast-axis-score.s1 {
+  opacity: 0.55;
+}
