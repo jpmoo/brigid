@@ -4,6 +4,7 @@ import {
   currentBlockAt,
   deriveDocument,
   foldApostrophes,
+  foldForSearch,
   normalizeProse,
   parseInlines,
   possessiveStem,
@@ -492,6 +493,31 @@ check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
   check("a plain name has no stem", possessiveStem("Brandan"), null);
   // Not every trailing apostrophe is a plural possessive.
   check("nor does a word ending in a bare apostrophe", possessiveStem("rock'n'"), null);
+}
+
+// --- searching a typeset manuscript with a plain keyboard ---
+
+{
+  const prose = "Abbot Brandan\u2019s absence \u2014 and \u201cthe North,\u201d he said.";
+
+  // What a keyboard produces has to find what the page holds.
+  const find = (needle: string) => foldForSearch(prose).indexOf(foldForSearch(needle));
+  check("a straight apostrophe finds a typeset one", find("Brandan's") >= 0, true);
+  check("a typeset apostrophe still finds itself", find("Brandan\u2019s") >= 0, true);
+  check("a straight quote finds a curled one", find('"the North,"') >= 0, true);
+  check("a hyphen finds an em dash", find("absence - and") >= 0, true);
+  check("and nonsense still finds nothing", find("Brandanx"), -1);
+
+  // The highlight slices the original text at the offset matching reports, so
+  // any fold that changed a length would move every match after it.
+  check("folding never changes the length", foldForSearch(prose).length, prose.length);
+  check(
+    "an offset means the same thing in both",
+    prose.slice(find("Brandan's"), find("Brandan's") + 9),
+    "Brandan\u2019s",
+  );
+  // "..." is three characters and the ellipsis is one, so it is left alone.
+  check("the ellipsis is not folded", foldForSearch("\u2026").length, 1);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

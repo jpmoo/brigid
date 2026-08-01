@@ -35,3 +35,31 @@ export function possessiveStem(word: string): string | null {
   const plural = /^(.+?s)'$/i.exec(folded);
   return plural?.[1] ?? null;
 }
+
+/**
+ * The form a word is searched in.
+ *
+ * A manuscript is full of typeset punctuation — curled quotes, real dashes —
+ * and a keyboard produces none of it. Someone hunting for "Brandan's" types the
+ * straight apostrophe, and without this it matches nothing, which is the same
+ * mismatch that stopped the checker recognising words it had been taught.
+ *
+ * Every substitution is one character for one, deliberately. Matching reports
+ * offsets into the text, and the highlight slices the original at them, so a
+ * fold that changed any length would move every match after it. That rules out
+ * the ellipsis — "..." is three characters and "…" is one — which is left
+ * alone rather than quietly shifting the results.
+ */
+const SEARCH_FOLD: Record<string, string> = {
+  "‘": "'",
+  "’": "'",
+  "ʼ": "'",
+  "“": '"',
+  "”": '"',
+  "–": "-",
+  "—": "-",
+};
+
+export function foldForSearch(text: string): string {
+  return text.replace(/[‘’ʼ“”–—]/g, (c) => SEARCH_FOLD[c] ?? c).toLowerCase();
+}

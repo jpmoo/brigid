@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { foldForSearch } from "@brigid/shared";
 
 export interface SearchMatch {
   blockId: string;
@@ -18,12 +19,14 @@ export function findMatches(
   blocks: { id: string; contentText: string }[],
   query: string,
 ): SearchMatch[] {
-  const needle = query.trim().toLowerCase();
+  // Both sides folded the same way, so a straight apostrophe typed into the box
+  // finds the typeset one the manuscript actually holds.
+  const needle = foldForSearch(query.trim());
   if (needle.length === 0) return [];
 
   const out: SearchMatch[] = [];
   for (const block of blocks) {
-    const haystack = block.contentText.toLowerCase();
+    const haystack = foldForSearch(block.contentText);
     let from = 0;
     let n = 0;
     for (;;) {

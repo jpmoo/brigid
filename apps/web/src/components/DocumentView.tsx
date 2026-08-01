@@ -2,7 +2,7 @@ import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
-import { asProseDoc, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
+import { asProseDoc, foldForSearch, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import { offsetOfPoint } from "./ProseEditor.js";
 import type { ProseLayout } from "./ProseEditor.js";
@@ -54,7 +54,10 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
 function highlight(text: string, needle: string, counter: { n: number }, activeIndex: number | null) {
   if (!needle) return text;
   const parts: ReactNode[] = [];
-  const lower = text.toLowerCase();
+  // Searched folded, sliced unfolded: the reader keeps the typeset punctuation
+  // while the match is found however it was typed. Safe only because every
+  // substitution is one character for one.
+  const lower = foldForSearch(text);
   let from = 0;
   for (;;) {
     const at = lower.indexOf(needle, from);

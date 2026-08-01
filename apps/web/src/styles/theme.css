@@ -2873,9 +2873,11 @@ mark.hit.active {
 /* Under the word, not through it — a strikethrough reads as deleted. */
 .misspelled {
   text-decoration: underline wavy var(--misspelled);
-  /* The wave is thin at manuscript sizes and the point is that it carries at a
-     glance, so it is thickened rather than left to hairline against the page. */
-  text-decoration-thickness: 1.5px;
+  /* Thin on purpose. The thickness also sets the wave's amplitude, so a heavier
+     line is a taller ripple as well, and at manuscript sizes that stopped being
+     a mark under the word and started being a second line of its own. The
+     colour is what carries it; the wave only has to be legible. */
+  text-decoration-thickness: 1px;
   text-decoration-skip-ink: none;
   text-underline-offset: 3px;
   cursor: pointer;

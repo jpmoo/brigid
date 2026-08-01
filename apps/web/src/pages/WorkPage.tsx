@@ -13,7 +13,7 @@ import {
   Minimize2,
   Settings,
 } from "lucide-react";
-import { buildOutline, currentBlockAt, deriveDocument } from "@brigid/shared";
+import { buildOutline, currentBlockAt, deriveDocument, foldForSearch, smartenText } from "@brigid/shared";
 import type { BlockOptions, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
@@ -219,7 +219,18 @@ export function WorkPage() {
     () =>
       items
         .filter((i) => i.kind === "block")
-        .map((i) => (i.kind === "block" ? { id: i.block.id, contentText: i.block.contentText } : null))
+        // Smartened where the format smartens it, so the tally counts what is
+        // on the page rather than what is in the column behind it.
+        .map((i) =>
+          i.kind === "block"
+            ? {
+                id: i.block.id,
+                contentText: i.smartPunctuation
+                  ? smartenText(i.block.contentText)
+                  : i.block.contentText,
+              }
+            : null,
+        )
         .filter((b): b is { id: string; contentText: string } => b !== null),
     [items],
   );
@@ -673,7 +684,7 @@ export function WorkPage() {
             }
             bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
             onDropBookmark={(blockId) => void addBookmark(blockId)}
-            search={query.trim().toLowerCase()}
+            search={foldForSearch(query.trim())}
             activeMatch={activeMatch}
             editingId={editingProse?.id ?? null}
             onEditProse={(blockId, caret) => {
