@@ -30,6 +30,11 @@ const ZWSP = "​";
 const HISTORY_DEPTH = 500;
 
 // --- The model, in the DOM and back -------------------------------------
+//
+// docToHtml, htmlToDoc, caretOffset and setCaret are exported so they can be
+// driven in a real browser: the round trip and the caret's survival across a
+// rebuild are the things most likely to break here, and neither can be tested
+// without a live DOM and a live selection.
 
 function runsToHtml(runs: ProseText[], speller: Speller | null): string {
   if (runs.length === 0) return "<br>";
@@ -67,13 +72,13 @@ function markMisspellings(text: string, speller: Speller): string {
   return out;
 }
 
-function docToHtml(doc: ProseDoc, speller: Speller | null): string {
+export function docToHtml(doc: ProseDoc, speller: Speller | null): string {
   if (doc.content.length === 0) return "<p><br></p>";
   return doc.content.map((p) => `<p>${runsToHtml(p.content ?? [], speller)}</p>`).join("");
 }
 
 /** Reads the element back into the model, ignoring the decoration spans. */
-function htmlToDoc(root: HTMLElement): ProseDoc {
+export function htmlToDoc(root: HTMLElement): ProseDoc {
   const paragraphs: ProseDoc["content"] = [];
 
   const readParagraph = (node: Node): ProseText[] => {
@@ -147,7 +152,7 @@ function isItalic(el: HTMLElement): boolean {
  * Redecorating rebuilds the element's HTML, which destroys every node the
  * selection referred to. An offset survives that; a node reference does not.
  */
-function caretOffset(root: HTMLElement): number | null {
+export function caretOffset(root: HTMLElement): number | null {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return null;
   const range = selection.getRangeAt(0);
@@ -186,7 +191,7 @@ function caretOffset(root: HTMLElement): number | null {
   return found ? offset : null;
 }
 
-function setCaret(root: HTMLElement, offset: number): void {
+export function setCaret(root: HTMLElement, offset: number): void {
   let remaining = offset;
   let target: { node: Node; at: number } | null = null;
 
