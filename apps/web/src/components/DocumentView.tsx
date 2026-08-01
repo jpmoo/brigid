@@ -305,14 +305,29 @@ function Nodes({
               // The block beneath has its own click; writing where the pointer
               // is should not also be a click on the block.
               event.stopPropagation();
+
               // Clicking an underlined word is a question about that word, so
               // the editor opens with the suggestions already showing rather
               // than making the writer find and click it a second time.
               const flagged = (event.target as HTMLElement).closest(".misspelled");
-              onEditProse(
-                selectionIn(event.currentTarget, event.clientX, event.clientY),
-                flagged?.textContent ?? undefined,
-              );
+              const word = flagged?.textContent ?? undefined;
+              // Read now: the event's own properties don't survive the wait.
+              const root = event.currentTarget;
+              const { clientX, clientY } = event;
+
+              /**
+               * Read on the next frame, not on this one.
+               *
+               * A pointer release arrives before the browser has finished
+               * settling the selection it ended — `pointerup` precedes
+               * `mouseup`, and the selection is finalised somewhere between
+               * them. Reading it here caught the caret rather than the drag,
+               * which is why a passage selected in the manuscript arrived in
+               * the editor as a single point.
+               */
+              requestAnimationFrame(() => {
+                onEditProse(selectionIn(root, clientX, clientY), word);
+              });
             };
 
             return written ? (
