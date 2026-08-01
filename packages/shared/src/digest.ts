@@ -172,6 +172,11 @@ export interface CharacterAnalysis {
   /** Whose arc the axes are relative to. One chart, one perspective. */
   focal: string;
   axes: AxisScore[];
+  /**
+   * A line for the tile: how the book would introduce them, or something they
+   * might actually say. Drawn from the manuscript, not invented around a name.
+   */
+  epithet: string;
   /** The report: a reading of the shape, in prose. */
   summary: string;
   /** Role flips and axes concentrated in one span, kept out of the average. */

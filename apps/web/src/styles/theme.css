@@ -4190,3 +4190,13 @@ mark.hit.active {
   padding-top: 12px;
   border-top: 1px solid var(--border);
 }
+
+/* The line the model wrote for the card. Set in italic and given room, because
+   it is the one part of a tile written for a reader rather than for a rubric. */
+.cast-tile-epithet {
+  font-size: 13px;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--text-muted);
+  margin: 2px 0 1px;
+}

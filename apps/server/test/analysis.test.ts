@@ -176,6 +176,7 @@ function profile(name: string, score: number, aligned: string[]): CharacterAnaly
     name,
     focal: "Ines",
     axes: [{ axis: "shadow", score, aligned, contradictory: [] }],
+    epithet: "",
     summary: "",
     phaseShifts: [],
     confidence: "",

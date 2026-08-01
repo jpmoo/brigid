@@ -445,6 +445,9 @@ function CharactersPane({
                     aria-expanded={open}
                   >
                     <span className="cast-tile-name">{profile.name}</span>
+                    {profile.epithet ? (
+                      <span className="cast-tile-epithet">{profile.epithet}</span>
+                    ) : null}
                     <span className="cast-tile-shape">{shapeOf(profile, bundle.axisLabels)}</span>
                   </button>
 
