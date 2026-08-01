@@ -65,15 +65,16 @@ export function SpiderGraph({
               <line className="spider-spoke" x1={CENTRE} y1={CENTRE} x2={x} y2={y} />
               <text
                 className={`spider-label${openAxis === axis.axis ? " open" : ""}`}
-                // The commonest misreading of a radar chart is taking an axis
-                // for a job title; a definition on hover costs nothing.
-                aria-label={blurbs?.[axis.axis] ? `${labels[axis.axis] ?? axis.axis}: ${blurbs[axis.axis]}` : undefined}
+
                 x={lx}
                 y={ly}
                 textAnchor={lx < CENTRE - 4 ? "end" : lx > CENTRE + 4 ? "start" : "middle"}
                 dominantBaseline="middle"
                 onClick={() => setOpenAxis(openAxis === axis.axis ? null : axis.axis)}
               >
+                {/* SVG's own tooltip: a <title> child, which hovers and is
+                    read out. An aria-label here would do neither. */}
+                {blurbs?.[axis.axis] ? <title>{blurbs[axis.axis]}</title> : null}
                 {labels[axis.axis] ?? axis.axis}
                 <tspan className="spider-score"> {axis.score}</tspan>
               </text>
