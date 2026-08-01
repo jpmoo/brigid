@@ -183,7 +183,27 @@ export interface DigestRequest {
   /** What the outline calls this section, if anything. Context, not content. */
   label: string | null;
   text: string;
+  /**
+   * Everyone already named earlier in this book. Each section is read on its
+   * own, so without this the reader has no idea the person it wants to call
+   * "Brother Tuan" was called "Tuan" three chapters ago — and the roster gets
+   * two characters with half a record each.
+   */
+  known?: string[];
   signal?: AbortSignal;
+}
+
+/**
+ * The cast so far, handed to the reader as the spellings to prefer.
+ *
+ * Capped, because a long book's cast would crowd out the prose it is meant to
+ * help read. The most recently seen are the ones a section is most likely to
+ * be about.
+ */
+function namesInUse(known: string[] | undefined): string {
+  if (!known?.length) return "";
+  const shown = known.slice(0, 60);
+  return `CHARACTERS ALREADY NAMED EARLIER IN THIS BOOK:\n${shown.join(", ")}\n\nIf someone in this section is one of them, use that EXACT name in "name" and put the wording this section uses in "aliases". A title or a count is not a new person: if the text says "Brother Tuan" and "Tuan" is listed above, the name is "Tuan" and "Brother Tuan" is an alias. Only introduce a new name for someone genuinely not listed.\n`;
 }
 
 /** Read one section. Returns the digest and what it cost. */
@@ -208,7 +228,7 @@ export async function digestSection(
       thinks: req.thinks ?? null,
       system: SYSTEM,
       format: SCHEMA as unknown as Record<string, unknown>,
-      prompt: `${heading}${ofN}\n${part}`,
+      prompt: `${heading}${ofN}${namesInUse(req.known)}\n${part}`,
       ...(req.signal ? { signal: req.signal } : {}),
     });
 

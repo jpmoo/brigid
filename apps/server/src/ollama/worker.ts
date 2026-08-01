@@ -205,6 +205,21 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
   await setState(workId, { status: "walking", lastError: null });
 
   try {
+    /**
+     * Who this book has already named. Read once per walk rather than per
+     * section — it only grows, and a fresh query for every chapter would be a
+     * lot of database for a list that barely moves.
+     */
+    const known = new Set<string>();
+    for (const row of await db
+      .select({ characters: sectionDigests.characters })
+      .from(sectionDigests)
+      .where(eq(sectionDigests.workId, workId))) {
+      for (const character of row.characters) {
+        if (character.name?.trim()) known.add(character.name.trim());
+      }
+    }
+
     for (const section of stale) {
       if (signal.aborted) break;
 
@@ -217,6 +232,7 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
         model: config.model,
         numCtx: config.numCtx,
         thinks: config.thinks,
+        known: [...known],
         label: section.label,
         text: section.text,
         signal,
@@ -240,6 +256,10 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
         ms,
         updatedAt: new Date(),
       };
+      for (const character of digest.characters) {
+        if (character.name?.trim()) known.add(character.name.trim());
+      }
+
       await db
         .insert(sectionDigests)
         .values(values)
