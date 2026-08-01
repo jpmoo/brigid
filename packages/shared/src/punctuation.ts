@@ -25,9 +25,11 @@ export function smartenText(input: string): string {
 
   // Dashes and the ellipsis first: they change what counts as the character
   // before a quote, which the quote pass then reads.
+  // Triples first, so what is left of the pass is genuine pairs. Two hyphens
+  // are an em dash and three an en, matching what typing them produces.
   let text = input
-    .replace(/---/g, "—")
-    .replace(/(?<!-)--(?!-)/g, "–")
+    .replace(/---/g, "–")
+    .replace(/(?<!-)--(?!-)/g, "—")
     .replace(/\.\.\./g, "…");
 
   let out = "";
@@ -105,10 +107,12 @@ export function autocorrectKeystroke(typed: string, before: string): { text: str
     return { text: `’${typed}`, replace: 1 };
   }
   if (typed === "-") {
-    // Two hyphens make an en dash, three an em — the third arriving after the
-    // en dash the second one already produced.
-    if (prev === "–") return { text: "—", replace: 1 };
-    if (prev === "-") return { text: "–", replace: 1 };
+    // Two hyphens make an em dash, the way a word processor does it — it is by
+    // far the commoner mark in prose, so it gets the shorter sequence. A third
+    // hyphen steps back to the en dash, arriving after the em the second one
+    // already produced, which keeps both reachable from the keyboard.
+    if (prev === "—") return { text: "–", replace: 1 };
+    if (prev === "-") return { text: "—", replace: 1 };
     return null;
   }
   if (typed === ".") {

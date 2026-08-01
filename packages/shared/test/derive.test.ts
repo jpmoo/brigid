@@ -328,7 +328,7 @@ check(
     smartenText(`"Don't," she said. "It's the '90s."`),
     "“Don’t,” she said. “It’s the ’90s.”",
   );
-  check("double hyphen is an en dash, triple an em", smartenText("a--b---c"), "a–b—c");
+  check("double hyphen is an em dash, triple an en", smartenText("a--b---c"), "a—b–c");
   check("three dots become an ellipsis", smartenText("wait..."), "wait…");
   check(
     "a quote opening after an em dash still opens",
@@ -387,11 +387,11 @@ function typed(input: string): string {
 check("dialogue gets the quotes the right way round", typed('He said "no."'), "He said \u201cno.\u201d");
 check("an apostrophe inside a word stays one", typed("don't"), "don\u2019t");
 check("single quotes open and close", typed("'Tis a wonder,' she said"), "\u2018Tis a wonder,\u2019 she said");
-check("two hyphens make an en dash, three an em", [typed("wait--no"), typed("wait---no")], ["wait\u2013no", "wait\u2014no"]);
+check("two hyphens make an em dash, three an en", [typed("wait--no"), typed("wait---no")], ["wait\u2014no", "wait\u2013no"]);
 check("three dots make an ellipsis while typing", typed("well..."), "well\u2026");
 // Interrupted dialogue: the quote after a dash closes, since nothing follows
 // it yet to say otherwise.
-check("a quote after a dash closes the speech", typed('"Stop---" she began.'), "\u201cStop\u2014\u201d she began.");
+check("a quote after a dash closes the speech", typed('"Stop--" she began.'), "\u201cStop\u2014\u201d she began.");
 // The digit is what reveals it, and it arrives one keystroke late.
 check("an elided decade turns round when the digit lands", typed("the '90s"), "the \u201990s");
 check("a lone hyphen is left alone", typed("a-b"), "a-b");
