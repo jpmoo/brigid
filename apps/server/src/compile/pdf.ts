@@ -153,7 +153,7 @@ function drawLine(doc: PDFKit.PDFDocument, line: CompiledLine): void {
   if ((line.align === "center" || line.align === "right") && line.runs.length > 1) {
     let total = 0;
     for (const run of line.runs) {
-      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt);
+      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt * (run.sizeScale ?? 1));
       total += doc.widthOfString(run.text);
     }
 
@@ -162,7 +162,7 @@ function drawLine(doc: PDFKit.PDFDocument, line: CompiledLine): void {
     let x = MARGIN + (line.align === "center" ? (USABLE - total) / 2 : USABLE - total);
 
     for (const run of line.runs) {
-      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt);
+      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt * (run.sizeScale ?? 1));
       doc.text(run.text, x, top, {
         lineBreak: false,
         ...(run.underline === true ? { underline: true } : {}),
@@ -174,7 +174,7 @@ function drawLine(doc: PDFKit.PDFDocument, line: CompiledLine): void {
   } else {
     doc.x = MARGIN;
     line.runs.forEach((run, i) => {
-      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt);
+      use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt * (run.sizeScale ?? 1));
       doc.text(run.text, {
         width: USABLE,
         align: line.align,
@@ -225,7 +225,7 @@ function drawTable(doc: PDFKit.PDFDocument, table: CompiledTable): void {
         // line is: each would otherwise be aligned on its own.
         let total = 0;
         for (const run of line.runs) {
-          use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt);
+          use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt * (run.sizeScale ?? 1));
           total += doc.widthOfString(run.text);
         }
         let cellX =
@@ -237,7 +237,7 @@ function drawTable(doc: PDFKit.PDFDocument, table: CompiledTable): void {
               : 0);
 
         for (const run of line.runs) {
-          use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt);
+          use(doc, faceFor(line.fontFamily, run.bold, run.italic), line.fontSizePt * (run.sizeScale ?? 1));
           doc.text(run.text, cellX, y, {
             lineBreak: false,
             ...(run.underline === true ? { underline: true } : {}),

@@ -20,6 +20,15 @@ export interface CompiledRun {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  /**
+   * A fraction of the line's size, for the small letters of small caps.
+   *
+   * Small caps are the one mark neither output format can be told about
+   * directly and have come out right: the base fourteen fonts a PDF can rely on
+   * have no small-capital variant at all. So the shape is made here, once, and
+   * both writers set what they are given — which is also why they agree.
+   */
+  sizeScale?: number;
 }
 
 export interface CompiledLine {
@@ -109,16 +118,53 @@ function runsFrom(spans: ResolvedSpan[]): CompiledRun[] {
     // indent is the paragraph's own, so it becomes ordinary spacing.
     const text = span.tab ? "    " : span.text;
     if (!text) continue;
-    runs.push({
-      // Small caps and all caps have no counterpart in either format that is
-      // worth the complication, and both are set by capitalising the text.
-      text: span.allCaps || span.smallCaps ? text.toLocaleUpperCase("en") : text,
+
+    const marks = {
       ...(span.bold ? { bold: true } : {}),
       ...(span.italic ? { italic: true } : {}),
       ...(span.underline ? { underline: true } : {}),
+    };
+
+    if (span.smallCaps) {
+      // A letter already capital stays a full capital; the rest become capitals
+      // at a smaller size. That is what small caps are, and uppercasing the lot
+      // — which is what this used to do — makes them indistinguishable from all
+      // caps.
+      for (const piece of splitByCase(text)) {
+        runs.push({
+          text: piece.text.toLocaleUpperCase("en"),
+          ...marks,
+          ...(piece.small ? { sizeScale: SMALL_CAP_SCALE } : {}),
+        });
+      }
+      continue;
+    }
+
+    runs.push({
+      text: span.allCaps ? text.toLocaleUpperCase("en") : text,
+      ...marks,
     });
   }
   return runs;
+}
+
+/** How much smaller a small capital is than a full one. */
+const SMALL_CAP_SCALE = 0.8;
+
+/**
+ * Splits text into stretches that were already capital and stretches that were
+ * not, so each can be set at its own size. Anything that isn't a letter goes
+ * with the capitals: a space or a comma has no case to lose.
+ */
+function splitByCase(text: string): { text: string; small: boolean }[] {
+  const pieces: { text: string; small: boolean }[] = [];
+  for (const ch of text) {
+    const small = /\p{Ll}/u.test(ch);
+    const last = pieces[pieces.length - 1];
+    if (last && last.small === small) last.text += ch;
+    else pieces.push({ text: ch, small });
+  }
+  return pieces;
 }
 
 function lineFrom(

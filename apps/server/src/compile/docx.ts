@@ -60,8 +60,9 @@ function paragraphFor(line: CompiledLine, pageBreakBefore = false): Paragraph {
         italics: run.italic === true,
         underline: run.underline === true ? {} : undefined,
         font: faceOf(line.fontFamily),
-        size: half,
-        ...(i === 0 && pageBreakBefore ? {} : {}),
+        // Half-points, and the plan may have made this one of the small
+        // letters of a small-capital run.
+        size: Math.round(half * (run.sizeScale ?? 1)),
       }),
     ];
   });

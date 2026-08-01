@@ -264,5 +264,74 @@ const build = (options: Parameters<typeof compileManuscript>[1]) =>
   check("and it is complete", file.subarray(-6).toString("latin1").includes("%%EOF"), true);
 }
 
+// --- small caps keep the capitals they were given ---
+
+{
+  const capsTemplates = templates.map((t) =>
+    t.id === "chapbreak"
+      ? {
+          ...t,
+          body: {
+            nodes: [
+              {
+                type: "paragraph",
+                align: "center",
+                content: [{ type: "text", text: "Chapter Nine", smallCaps: true }],
+              },
+            ],
+          },
+        }
+      : t,
+  );
+
+  const m = compileManuscript(
+    {
+      blocks: rows,
+      levels,
+      templates: capsTemplates as never,
+      work: { title: "T", subtitle: null, authorFirstName: "M", authorLastName: "H" },
+      prose: new Map(rows.map((b) => [b.id, { content: b.content, contentText: b.contentText }])),
+      structural: (id) =>
+        capsTemplates.find((t) => t.id === id)?.formatSettings?.structural ?? true,
+    },
+    { runningHeads: false, shortTitle: "N" },
+  );
+
+  const head = m.body.find(
+    (n) => n.kind === "line" && n.line.runs.some((r) => r.text.startsWith("C")),
+  );
+  const runs = head && head.kind === "line" ? head.line.runs : [];
+
+  // "Chapter Nine" — the C and the N were already capitals and stay full size;
+  // everything else becomes a capital at a smaller one. The space has no case
+  // to lose, so it goes with the full-size letters rather than being set at
+  // four fifths of a space.
+  check("it is split by the case it was written in", runs.map((r) => r.text), ["C", "HAPTER", " N", "INE"]);
+  check("the capitals stay full size", [runs[0]?.sizeScale, runs[2]?.sizeScale], [undefined, undefined]);
+  check("and the rest are smaller", [runs[1]?.sizeScale, runs[3]?.sizeScale], [0.8, 0.8]);
+  check("nothing is left lowercase", runs.every((r) => r.text === r.text.toUpperCase()), true);
+
+  // All caps is still all caps: one run, everything capital, no size change.
+  const allCaps = compileManuscript(
+    {
+      blocks: rows,
+      levels,
+      templates: templates.map((t) =>
+        t.id === "chapbreak"
+          ? { ...t, body: { nodes: [{ type: "paragraph", align: "center", content: [{ type: "text", text: "Chapter Nine", allCaps: true }] }] } }
+          : t,
+      ) as never,
+      work: { title: "T", subtitle: null, authorFirstName: "M", authorLastName: "H" },
+      prose: new Map(rows.map((b) => [b.id, { content: b.content, contentText: b.contentText }])),
+      structural: () => true,
+    },
+    { runningHeads: false, shortTitle: "N" },
+  );
+  const loud = allCaps.body.find((n) => n.kind === "line" && n.line.runs.some((r) => r.text.includes("CHAPTER")));
+  const loudRuns = loud && loud.kind === "line" ? loud.line.runs : [];
+  check("all caps stays one run", loudRuns.map((r) => r.text), ["CHAPTER NINE"]);
+  check("at one size", loudRuns[0]?.sizeScale, undefined);
+}
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
