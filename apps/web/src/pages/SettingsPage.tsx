@@ -6,12 +6,14 @@ import { ApiError, api } from "../api.js";
 import type { Block, Template, Work } from "../api.js";
 import { LevelsEditor } from "../components/LevelsEditor.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
+import { SpellingPane } from "./settings/SpellingPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const TABS = [
   { key: "templates", label: "Formats" },
+  { key: "spelling", label: "Spelling" },
   { key: "account", label: "Account" },
   { key: "ollama", label: "Ollama" },
 ] as const;
@@ -128,6 +130,8 @@ export function SettingsPage() {
         <div className="card tab-panel" role="tabpanel">
           {tab === "templates" ? (
             <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
+          ) : tab === "spelling" ? (
+            <SpellingPane />
           ) : tab === "project" ? (
             workId ? (
               <>

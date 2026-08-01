@@ -1,4 +1,5 @@
 import {
+  boolean,
   index,
   integer,
   jsonb,
@@ -57,9 +58,25 @@ export const settings = pgTable("settings", {
   ollamaUrl: text("ollama_url"),
   inferenceModel: text("inference_model"),
   summarizationModel: text("summarization_model"),
+  /** How the writer likes to work, not anything about a particular manuscript. */
+  spellcheckEnabled: boolean("spellcheck_enabled").notNull().default(true),
   /** Free-form UI preferences (panel pinned, panel width, theme, …). */
   preferences: jsonb("preferences").$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Words the writer has taught the checker: names, places, invented things. A
+ * novel is full of them, and a checker that keeps flagging them is one that
+ * gets switched off.
+ */
+export const dictionaryWords = pgTable("dictionary_words", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  /** As typed — how it reads back in the list. */
+  word: text("word").notNull(),
+  /** Case-folded, and the uniqueness key: "Maren" also settles "maren". */
+  wordFolded: text("word_folded").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** One manuscript. The library on the landing page lists these. */

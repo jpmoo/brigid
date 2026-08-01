@@ -2708,3 +2708,56 @@ mark.hit.active {
   gap: 4px;
   font-weight: 400;
 }
+
+/* --- Personal dictionary ---------------------------------------------- */
+
+.dict-add {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+
+.dict-add input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Words are short and there are eventually a lot of them, so they wrap into
+   columns rather than running down a single long list. */
+.dict-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 4px;
+}
+
+.dict-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 4px 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.dict-word {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+/* The remove button stays out of the way until the row is under the pointer:
+   a wall of trash icons reads as a warning rather than a list. */
+.dict-list li .btn.ghost {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.dict-list li:hover .btn.ghost,
+.dict-list li .btn.ghost:focus-visible {
+  opacity: 1;
+}

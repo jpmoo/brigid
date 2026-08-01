@@ -73,6 +73,13 @@ export interface WorkLevel {
   counterRestart: "continuous" | "under-parent";
 }
 
+export interface DictionaryWord {
+  id: string;
+  word: string;
+  wordFolded: string;
+  createdAt: string;
+}
+
 export interface Block {
   id: string;
   workId: string;
@@ -291,6 +298,17 @@ export const api = {
   moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
     post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),
   deleteBlock: (id: string) => request<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
+
+  getSpelling: () => request<{ enabled: boolean; words: DictionaryWord[] }>("/spelling"),
+  setSpellcheckEnabled: (enabled: boolean) =>
+    request<{ enabled: boolean }>("/spelling", {
+      method: "PATCH",
+      body: JSON.stringify({ enabled }),
+    }),
+  addDictionaryWord: (word: string) => post<{ word: DictionaryWord }>("/spelling/words", { word }),
+  deleteDictionaryWord: (id: string) =>
+    request<{ ok: true }>(`/spelling/words/${id}`, { method: "DELETE" }),
+  getDictionary: () => request<{ aff: string; dic: string }>("/spelling/dictionary"),
 
   detachBreak: (id: string) => post<{ block: Block }>(`/blocks/${id}/break/detach`),
   updateBreak: (id: string, body: TemplateBody) =>

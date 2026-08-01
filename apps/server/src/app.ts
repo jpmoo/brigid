@@ -15,6 +15,7 @@ import { isDbReady } from "./db.js";
 import { importRoutes } from "./import/routes.js";
 import { HttpError } from "./lib/errors.js";
 import { setupRoutes } from "./setup/routes.js";
+import { spellingRoutes } from "./spelling/routes.js";
 import { templatesRoutes } from "./templates/routes.js";
 import { worksRoutes } from "./works/routes.js";
 
@@ -68,6 +69,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(bookmarksRoutes);
       await scope.register(templatesRoutes);
       await scope.register(importRoutes);
+      await scope.register(spellingRoutes);
     },
     { prefix: "/api" },
   );
