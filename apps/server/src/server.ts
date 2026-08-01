@@ -2,6 +2,7 @@ import { runMigrations } from "@brigid/db";
 import { buildApp } from "./app.js";
 import { env, initConfig } from "./config.js";
 import { initDb } from "./db.js";
+import { startBackupSchedule, stopBackupSchedule } from "./backup/schedule.js";
 
 async function main() {
   // Resolve config (env + persisted file) and mint the session secret if this is
@@ -18,8 +19,13 @@ async function main() {
 
   const app = await buildApp();
 
+  // Armed even without a database: it re-checks rather than giving up, so the
+  // schedule is running from the moment first-time setup finishes.
+  startBackupSchedule((message) => app.log.info(message));
+
   const shutdown = async (signal: string) => {
     app.log.info(`${signal} received, shutting down`);
+    stopBackupSchedule();
     await app.close();
     process.exit(0);
   };

@@ -73,6 +73,30 @@ export interface WorkLevel {
   counterRestart: "continuous" | "under-parent";
 }
 
+export interface BackupSchedule {
+  enabled: boolean;
+  /** On the server's own clock, which is what "1am" was meant in. */
+  hour: number;
+  minute: number;
+  keep: number;
+}
+
+export interface BackupFile {
+  /** The filename, which is also its id — backups are files, not rows. */
+  name: string;
+  takenAt: string;
+  bytes: number;
+}
+
+/** Everything, or any combination of the parts. */
+export interface RestoreRequest {
+  everything?: boolean;
+  workId?: string;
+  settings?: boolean;
+  dictionary?: boolean;
+  templates?: boolean;
+}
+
 /** How the writer likes to be shown their work. Small, and they accumulate. */
 export interface Preferences {
   /** A multiplier, not an index — the ladder of sizes can change. */
@@ -305,6 +329,50 @@ export const api = {
   moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
     post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),
   deleteBlock: (id: string) => request<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
+
+  getBackups: () =>
+    request<{
+      schedule: BackupSchedule;
+      backups: BackupFile[];
+      directory: string;
+      tools: boolean;
+    }>("/backups"),
+  setBackupSchedule: (patch: Partial<BackupSchedule>) =>
+    request<{ schedule: BackupSchedule }>("/backups/schedule", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+  backupNow: () => post<{ backup: BackupFile; removed: string[] }>("/backups"),
+  deleteBackup: (name: string) =>
+    request<{ ok: true }>(`/backups/${encodeURIComponent(name)}`, { method: "DELETE" }),
+  worksInBackup: (name: string) =>
+    request<{ works: { id: string; title: string }[] }>(
+      `/backups/${encodeURIComponent(name)}/works`,
+    ),
+  restoreBackup: (name: string, what: RestoreRequest) =>
+    post<{ restored: string[]; safety: string }>(
+      `/backups/${encodeURIComponent(name)}/restore`,
+      what,
+    ),
+  backupDownloadUrl: (name: string) => apiUrl(`/backups/${encodeURIComponent(name)}/download`),
+  /** Brings a file in from elsewhere; it becomes a backup like any other. */
+  importBackup: async (file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(apiUrl("/backups/import"), {
+      method: "POST",
+      credentials: "same-origin",
+      body: form,
+    });
+    const body = (await res.json()) as Record<string, unknown>;
+    if (!res.ok) {
+      throw new ApiError(
+        res.status,
+        typeof body.error === "string" ? body.error : "could not read that file",
+      );
+    }
+    return body as unknown as { backup: BackupFile };
+  },
 
   getPreferences: () => request<{ preferences: Preferences }>("/preferences"),
   savePreferences: (patch: Preferences) =>

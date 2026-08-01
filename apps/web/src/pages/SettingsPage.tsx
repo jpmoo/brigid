@@ -7,6 +7,7 @@ import type { Block, Template, Work } from "../api.js";
 import { LevelsEditor } from "../components/LevelsEditor.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { SpellingPane } from "./settings/SpellingPane.js";
+import { BackupPane } from "./settings/BackupPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -166,12 +167,7 @@ export function SettingsPage() {
                     </p>
                   </>
                 ) : (
-                  <>
-                    <h3 className="card-title">Backup</h3>
-                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
-                      Taking a copy of this manuscript, and putting one back. Not built yet.
-                    </p>
-                  </>
+                  <BackupPane workId={workId} />
                 )}
               </>
             ) : null

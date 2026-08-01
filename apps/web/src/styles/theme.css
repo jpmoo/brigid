@@ -2964,3 +2964,104 @@ mark.hit.active {
   border-left: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
   padding-left: calc(2.5em - 2px);
 }
+
+/* --- Backups ----------------------------------------------------------- */
+
+.bk-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.bk-field input[type="time"] {
+  width: auto;
+}
+
+.bk-field input[type="number"] {
+  width: 72px;
+}
+
+.bk-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.bk-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding-right: 4px;
+}
+
+.bk-list li.selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+/* The row itself is the control that opens the restore panel, so the whole
+   width of it is the target rather than a separate button on the end. */
+.bk-pick {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.bk-when {
+  font-size: 14px;
+}
+
+.bk-meta {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* Set apart from the list above it: what follows replaces data, and should not
+   read as one more row. */
+.bk-restore {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+}
+
+.bk-parts {
+  margin: 4px 0 4px 24px;
+  padding-left: 12px;
+  border-left: 2px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bk-part-label {
+  min-width: 84px;
+  font-size: 13px;
+}
+
+.bk-parts select {
+  width: auto;
+  min-width: 160px;
+}
+
+.bk-understood {
+  margin: 12px 0;
+}

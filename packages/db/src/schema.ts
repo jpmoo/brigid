@@ -60,6 +60,11 @@ export const settings = pgTable("settings", {
   summarizationModel: text("summarization_model"),
   /** How the writer likes to work, not anything about a particular manuscript. */
   spellcheckEnabled: boolean("spellcheck_enabled").notNull().default(true),
+  /** The nightly backup: whether, when on the server's own clock, and how many. */
+  backupEnabled: boolean("backup_enabled").notNull().default(true),
+  backupHour: integer("backup_hour").notNull().default(1),
+  backupMinute: integer("backup_minute").notNull().default(0),
+  backupKeep: integer("backup_keep").notNull().default(10),
   /** Free-form UI preferences (panel pinned, panel width, theme, …). */
   preferences: jsonb("preferences").$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
