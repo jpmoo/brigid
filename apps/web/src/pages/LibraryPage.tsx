@@ -3,13 +3,15 @@ import type { FormEvent } from "react";
 import {
   Archive,
   ArchiveRestore,
+  ArrowDown,
+  ArrowUp,
   BookOpen,
   FileUp,
   LogOut,
   Plus,
   Settings,
   SquarePen,
-  Trash2,
+  Trash2
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { ApiError, api } from "../api.js";
@@ -22,6 +24,52 @@ import { ThemeToggle } from "../components/ThemeToggle.js";
 
 const wordFmt = new Intl.NumberFormat();
 
+const SORT_KEY = "brigid.library.sort";
+
+const SORTS = [
+  { key: "title", label: "Title" },
+  { key: "edited", label: "Last edited" },
+  { key: "created", label: "Created" },
+] as const;
+
+type SortKey = (typeof SORTS)[number]["key"];
+
+/**
+ * Newest first for the two dates, A to Z for the title.
+ *
+ * "Descending" reads differently either way round — the useful end of a date is
+ * the recent one, and the useful end of an alphabet is its start — so the
+ * direction each sort opens on is the one someone means by it.
+ */
+const DEFAULT_ASCENDING: Record<SortKey, boolean> = {
+  title: true,
+  edited: false,
+  created: false,
+};
+
+function sortWorks(works: Work[], by: SortKey, ascending: boolean): Work[] {
+  const ordered = [...works].sort((a, b) => {
+    if (by === "title") return a.title.localeCompare(b.title, undefined, { sensitivity: "base" });
+    const at = by === "created" ? a.createdAt : a.lastEditedAt;
+    const bt = by === "created" ? b.createdAt : b.lastEditedAt;
+    return new Date(at).getTime() - new Date(bt).getTime();
+  });
+  return ascending ? ordered : ordered.reverse();
+}
+
+/** A date is only worth a time if it was today; otherwise the day is enough. */
+function when(iso: string): string {
+  const at = new Date(iso);
+  const today = new Date();
+  const sameDay =
+    at.getFullYear() === today.getFullYear() &&
+    at.getMonth() === today.getMonth() &&
+    at.getDate() === today.getDate();
+  return sameDay
+    ? at.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+    : at.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+}
+
 function byline(work: Work): string | null {
   const name = [work.authorFirstName, work.authorLastName].filter(Boolean).join(" ");
   return name || null;
@@ -30,6 +78,20 @@ function byline(work: Work): string | null {
 export function LibraryPage() {
   const { username, logout } = useAuth();
   const [works, setWorks] = useState<Work[] | null>(null);
+  // How the shelf is arranged is a habit, so it is remembered — in the browser
+  // rather than on the server, since it describes this screen rather than the
+  // manuscripts on it.
+  const [sortBy, setSortBy] = useState<SortKey>(() => {
+    const stored = localStorage.getItem(SORT_KEY)?.split(":")[0];
+    return SORTS.some((s) => s.key === stored) ? (stored as SortKey) : "edited";
+  });
+  const [ascending, setAscending] = useState(
+    () => localStorage.getItem(SORT_KEY)?.split(":")[1] === "asc",
+  );
+
+  useEffect(() => {
+    localStorage.setItem(SORT_KEY, `${sortBy}:${ascending ? "asc" : "desc"}`);
+  }, [sortBy, ascending]);
   const [showArchived, setShowArchived] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // "New work" first asks blank or import; the wizard is a different shape of
@@ -107,6 +169,46 @@ export function LibraryPage() {
 
         {error ? <div className="alert error">{error}</div> : null}
 
+        {works && works.length > 1 ? (
+          <div className="library-sort">
+            <span className="library-sort-label">Sort by</span>
+            <div className="segmented compact" role="group" aria-label="Sort by">
+              {SORTS.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={sortBy === option.key}
+                  onClick={() => {
+                    setSortBy(option.key);
+                    // Each sort opens the way round it is usually wanted, and
+                    // only keeps a reversal while that sort is the one chosen.
+                    if (option.key !== sortBy) setAscending(DEFAULT_ASCENDING[option.key]);
+                  }}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="btn ghost"
+              type="button"
+              aria-label={ascending ? "Reverse: showing lowest first" : "Reverse: showing highest first"}
+              title={
+                sortBy === "title"
+                  ? ascending
+                    ? "A to Z"
+                    : "Z to A"
+                  : ascending
+                    ? "Oldest first"
+                    : "Newest first"
+              }
+              onClick={() => setAscending((up) => !up)}
+            >
+              {ascending ? <ArrowUp size={15} /> : <ArrowDown size={15} />}
+            </button>
+          </div>
+        ) : null}
+
         {works === null ? (
           <p className="muted">Loading…</p>
         ) : works.length === 0 ? (
@@ -120,7 +222,7 @@ export function LibraryPage() {
           </div>
         ) : (
           <div className="work-grid">
-            {works.map((work) => (
+            {sortWorks(works, sortBy, ascending).map((work) => (
               <div className="work-card" key={work.id}>
                 <Link className="work-card-open" to={`/works/${work.id}`}>
                   <h3>{work.title}</h3>
@@ -151,6 +253,14 @@ export function LibraryPage() {
                       <Trash2 size={13} />
                     </button>
                   ) : null}
+                </div>
+                <div className="work-dates">
+                  <span>
+                    <em>Edited</em> {when(work.lastEditedAt)}
+                  </span>
+                  <span>
+                    <em>Created</em> {when(work.createdAt)}
+                  </span>
                 </div>
               </div>
             ))}

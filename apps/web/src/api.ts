@@ -62,6 +62,8 @@ export interface Work {
   updatedAt: string;
   wordCount: number;
   blockCount: number;
+  /** The later of the work's own row and the last block written in it. */
+  lastEditedAt: string;
 }
 
 export interface WorkLevel {

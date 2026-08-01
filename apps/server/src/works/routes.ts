@@ -49,6 +49,21 @@ async function wordCountsByWork(): Promise<Map<string, number>> {
   return new Map(rows.map((r) => [r.work_id, Number(r.total)]));
 }
 
+/**
+ * When each manuscript was last written in.
+ *
+ * Not `works.updated_at`, which only moves when the work's own row changes —
+ * its title, its page setup. Writing a chapter touches a block, so the answer
+ * is the most recent of the two, and a manuscript that has been written in
+ * today doesn't claim it was last touched the day it was created.
+ */
+async function lastEditedByWork(): Promise<Map<string, string>> {
+  const rows = await db.execute<{ work_id: string; at: string }>(sql`
+    SELECT work_id, MAX(updated_at) AS at FROM blocks GROUP BY work_id
+  `);
+  return new Map(rows.map((r) => [r.work_id, r.at]));
+}
+
 export async function worksRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
@@ -64,13 +79,23 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
       .where(archived === "true" ? sql`${works.archivedAt} IS NOT NULL` : isNull(works.archivedAt))
       .orderBy(asc(works.title));
 
-    const [counts, blockCounts] = await Promise.all([wordCountsByWork(), blockCountsByWork()]);
+    const [counts, blockCounts, edited] = await Promise.all([
+      wordCountsByWork(),
+      blockCountsByWork(),
+      lastEditedByWork(),
+    ]);
     return {
-      works: rows.map((w) => ({
-        ...w,
-        wordCount: counts.get(w.id) ?? 0,
-        blockCount: blockCounts.get(w.id) ?? 0,
-      })),
+      works: rows.map((w) => {
+        const inBlocks = edited.get(w.id);
+        const own = w.updatedAt.toISOString();
+        return {
+          ...w,
+          wordCount: counts.get(w.id) ?? 0,
+          blockCount: blockCounts.get(w.id) ?? 0,
+          lastEditedAt:
+            inBlocks && new Date(inBlocks) > new Date(own) ? new Date(inBlocks).toISOString() : own,
+        };
+      }),
     };
   });
 

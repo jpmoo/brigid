@@ -3333,3 +3333,57 @@ mark.hit.active {
     opacity: 1;
   }
 }
+
+/* --- Arranging the library --------------------------------------------- */
+
+.library-sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.library-sort-label {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* A line of its own under the card's tally. Sharing that row meant competing
+   with the word count and the byline for a width none of the three had. */
+.work-dates {
+  display: flex;
+  gap: 14px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.work-dates em {
+  font-style: normal;
+  opacity: 0.7;
+  margin-right: 3px;
+}
+
+/* "Last edited" is two words and must stay on one line, or the control grows a
+   row taller than the two beside it. */
+.segmented.compact button {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .library-sort {
+    flex-wrap: wrap;
+  }
+
+  .work-card .meta {
+    flex-wrap: wrap;
+  }
+
+  .work-dates {
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+}
