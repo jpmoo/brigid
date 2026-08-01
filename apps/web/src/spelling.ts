@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import nspell from "nspell";
+import { foldApostrophes, possessiveStem } from "@brigid/shared";
 import { api } from "./api.js";
 import type { DictionaryWord } from "./api.js";
 
@@ -51,11 +52,20 @@ export function words(text: string): { word: string; at: number }[] {
 }
 
 /**
- * The typeset apostrophe is what the manuscript holds, and Hunspell's word list
- * is written with the typewriter one. Folding before lookup means a word isn't
- * flagged purely because the punctuation pass has been over it.
+ * Teaches the checker a word, and the name under it when it is a possessive.
+ *
+ * Both directions matter. Teaching "Brandan's" has to settle "Brandan", or the
+ * next sentence flags it; and the stored form is folded to a straight
+ * apostrophe first, because that is the form every lookup asks about. Adding
+ * the typeset form was the whole bug: the word taught and the word looked up
+ * were never the same string.
  */
-const forLookup = (word: string) => word.replace(/’/g, "'");
+function teach(checker: ReturnType<typeof nspell>, word: string): void {
+  const base = foldApostrophes(word);
+  checker.add(base);
+  const stem = possessiveStem(base);
+  if (stem) checker.add(stem);
+}
 
 export interface SpellingState {
   /** Undefined until settings have loaded; then whether checking is wanted. */
@@ -111,7 +121,7 @@ export function useSpelling(): SpellingState {
   // beside it, so suggestions can offer them too.
   useEffect(() => {
     if (!checker) return;
-    for (const row of customWords) checker.add(row.word);
+    for (const row of customWords) teach(checker, row.word);
     setGeneration((n) => n + 1);
   }, [checker, customWords]);
 
@@ -119,16 +129,23 @@ export function useSpelling(): SpellingState {
     if (!enabled || !checker) return null;
     void generation;
     return {
-      correct: (word) =>
-        ignored.current.has(word.toLocaleLowerCase("en")) ||
-        checker.correct(forLookup(word)) ||
+      correct: (word) => {
+        const base = foldApostrophes(word);
+        if (ignored.current.has(base.toLocaleLowerCase("en"))) return true;
         // A word at the start of a sentence is capitalised, and Hunspell is
         // right to accept that; one in small caps or shouted is not a mistake
         // either. Falling back to the lowercase form covers both.
-        checker.correct(forLookup(word).toLocaleLowerCase("en")),
-      suggest: (word) => checker.suggest(forLookup(word)).slice(0, 6),
+        if (checker.correct(base) || checker.correct(base.toLocaleLowerCase("en"))) return true;
+        // A known name owning something is not a misspelling.
+        const stem = possessiveStem(base);
+        return (
+          stem !== null &&
+          (checker.correct(stem) || checker.correct(stem.toLocaleLowerCase("en")))
+        );
+      },
+      suggest: (word) => checker.suggest(foldApostrophes(word)).slice(0, 6),
       learn: (word) => {
-        checker.add(word);
+        teach(checker, word);
         setGeneration((n) => n + 1);
       },
     };
@@ -138,7 +155,7 @@ export function useSpelling(): SpellingState {
     async (word: string) => {
       // Learned locally first: the underline should go the moment it's chosen,
       // not a round trip later.
-      checker?.add(word);
+      if (checker) teach(checker, word);
       setGeneration((n) => n + 1);
       const { word: row } = await api.addDictionaryWord(word);
       setCustomWords((current) =>
@@ -149,7 +166,7 @@ export function useSpelling(): SpellingState {
   );
 
   const ignoreWord = useCallback((word: string) => {
-    ignored.current.add(word.toLocaleLowerCase("en"));
+    ignored.current.add(foldApostrophes(word).toLocaleLowerCase("en"));
     setGeneration((n) => n + 1);
   }, []);
 

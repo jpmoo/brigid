@@ -3,8 +3,10 @@ import {
   autocorrectKeystroke,
   currentBlockAt,
   deriveDocument,
+  foldApostrophes,
   normalizeProse,
   parseInlines,
+  possessiveStem,
   proseFromParagraphs,
   proseToText,
   serializeInlines,
@@ -472,6 +474,24 @@ check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
     "one",
   );
   check("an empty document has no current block", currentBlockAt([], () => null, line), null);
+}
+
+// --- what counts as the same word ---
+
+{
+  // The manuscript holds the typeset apostrophe; every word list is written
+  // with the typewriter one. A word taught in one form must be found in the
+  // other, which is what went wrong with "Brandan\u2019s".
+  check("the typeset apostrophe folds to a straight one", foldApostrophes("Brandan\u2019s"), "Brandan's");
+  check("a straight one is left alone", foldApostrophes("Brandan's"), "Brandan's");
+  check("and the rest of the word is untouched", foldApostrophes("caf\u00e9"), "caf\u00e9");
+
+  check("a possessive gives up its name", possessiveStem("Brandan\u2019s"), "Brandan");
+  check("however the apostrophe is drawn", possessiveStem("Brandan's"), "Brandan");
+  check("a plural possessive too", possessiveStem("Hallorans\u2019"), "Hallorans");
+  check("a plain name has no stem", possessiveStem("Brandan"), null);
+  // Not every trailing apostrophe is a plural possessive.
+  check("nor does a word ending in a bare apostrophe", possessiveStem("rock'n'"), null);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

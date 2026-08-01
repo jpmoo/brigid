@@ -2,6 +2,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { dictionaryWords, settings } from "@brigid/db";
+import { foldApostrophes } from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
@@ -33,10 +34,13 @@ async function loadDictionary(): Promise<{ aff: string; dic: string }> {
 }
 
 /**
- * Case folding is the uniqueness key. A name added as "Maren" should settle
- * "maren" too — nobody wants to teach it the same word three times.
+ * The uniqueness key: case, and the shape of the apostrophe.
+ *
+ * "Maren" should settle "maren", and "Brandan’s" should settle "Brandan's" —
+ * the manuscript holds the typeset apostrophe and a keyboard produces the
+ * straight one, and nobody wants to teach the same word twice for that.
  */
-const fold = (word: string) => word.toLocaleLowerCase("en");
+const fold = (word: string) => foldApostrophes(word).toLocaleLowerCase("en");
 
 /** One word: no spaces, and nothing that isn't part of a word. */
 const wordSchema = z
