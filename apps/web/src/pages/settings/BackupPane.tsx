@@ -290,6 +290,7 @@ function RestorePanel({
   const [workId, setWorkId] = useState<string>("");
   const [understood, setUnderstood] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -314,13 +315,20 @@ function RestorePanel({
     try {
       const what: RestoreRequest = everything ? { everything: true } : { workId };
       const result = await api.restoreBackup(file.name, what);
-      await onDone(
-        `Restored ${result.restored.join(", ")}. The state before this was saved as ${result.safety}.`,
-      );
-      if (everything) window.location.reload();
+      // Said on the button that was held, before the panel closes under it. A
+      // restore is silent by nature — the page looks the same either way — so
+      // without this there is nothing to tell you it happened.
+      setBusy(false);
+      setDone(true);
+      window.setTimeout(() => {
+        void onDone(
+          `Restored ${result.restored.join(", ")}. The state before this was saved as ${result.safety}.`,
+        );
+        if (everything) window.location.reload();
+      }, 1100);
+      return;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : (err as Error).message);
-    } finally {
       setBusy(false);
     }
   }
@@ -387,8 +395,8 @@ function RestorePanel({
       <div className="be-line">
         <HoldToConfirm
           seconds={3}
-          disabled={!understood || busy || !chosenAnything}
-          label={busy ? "Restoring…" : "Hold to restore"}
+          disabled={done || !understood || busy || !chosenAnything}
+          label={done ? "Restored!" : busy ? "Restoring…" : "Hold to restore"}
           holdingLabel="Keep holding to restore…"
           onConfirm={() => void restore()}
         />

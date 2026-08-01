@@ -172,12 +172,21 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
 
     const url = requireDatabaseUrl();
 
-    if (body.everything) {
-      const safety = await restoreEverything(url, name);
-      return { restored: ["everything"], safety };
-    }
-    if (!body.workId) throw badRequest("nothing was chosen to restore");
+    if (!body.everything && !body.workId) throw badRequest("nothing was chosen to restore");
 
-    return restoreWork(url, name, body.workId);
+    // A restore that fails has to say why. Left to the default handler this is
+    // a bare 500 reading "internal error", which on the one screen someone
+    // opens when things have gone wrong is no help at all — the message is kept
+    // and the detail goes to the log.
+    try {
+      if (body.everything) {
+        const safety = await restoreEverything(url, name);
+        return { restored: ["everything"], safety };
+      }
+      return await restoreWork(url, name, body.workId as string);
+    } catch (err) {
+      req.log.error(err);
+      throw badRequest(`restore failed: ${(err as Error).message}`);
+    }
   });
 }
