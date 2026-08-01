@@ -10,6 +10,12 @@
 
 export const STRUCTURE_PRINCIPLES = `You are judging how well a manuscript fits each of seven narrative structure models.
 
+THE MANUSCRIPT IS PROBABLY UNFINISHED. This is a draft in progress, not a published book, and it is the single most likely reason a model appears not to fit. Before recording a gap, ask whether the element is ABSENT or merely NOT WRITTEN YET.
+- Every one of these models makes claims about the ending. A manuscript that stops partway has no resolution, no return, no catastrophe, no ketsu — and that is not evidence against any framework. It is evidence of an unfinished draft.
+- Positions are computed as a fraction of WHAT EXISTS SO FAR, not of the finished book. If the draft breaks off mid-story, an event at "90%" may be nowhere near the ending the model has in mind. Say so rather than treating the last written scene as a climax.
+- Signs a manuscript is unfinished: it ends without resolving its central question; the last sections are shorter or thinner than the rest; late positions contain setup rather than payoff; a stated goal is never answered.
+- When you judge a manuscript to be incomplete, say so plainly in the overview, and do NOT lower a fit rating for elements that would fall in the unwritten part. Rate what the written portion supports and name the elements you could not assess. "Cannot yet be judged — the draft stops before this would appear" is a better finding than a bad fit.
+
 TREAT THIS MANUSCRIPT AS AN UNPUBLISHED, ORIGINAL WORK YOU HAVE NEVER SEEN.
 
 Even if the text resembles a work you recognize, you must not use any outside knowledge of it. Do not draw on remembered plot, remembered characters, published criticism, or any received reading. If you find yourself recognizing the work, that recognition is a source of error: what you remember may differ from what is actually on this page, and this writer may have changed it deliberately. Every statement you make must be supported by the material given to you in this request and nothing else.
@@ -180,4 +186,57 @@ export const MODEL_LABELS: Record<(typeof MODEL_KEYS)[number], string> = {
   "story-circle": "The Story Circle",
   kishotenketsu: "Kishōtenketsu",
   "seven-point": "Seven-Point Structure",
+};
+
+/**
+ * A sentence on each framework, for the panel.
+ *
+ * Shown above the model's findings so the verdict can be read against what the
+ * framework actually claims. Someone told their book is a "low fit" for
+ * kishotenketsu is owed the information that kishotenketsu is not a conflict
+ * structure — otherwise the rating is a grade with no rubric attached.
+ */
+export const MODEL_BLURBS: Record<(typeof MODEL_KEYS)[number], string> = {
+  "heros-journey":
+    "A round trip. The hero leaves an ordinary world for a strange one, is taught, endures a symbolic death, and returns changed with something the community needs. Wants two worlds, a mentor, and a second climax near the end.",
+  freytag:
+    "A pyramid, from classical tragedy. Its distinguishing claim is that the climax sits in the MIDDLE, with a long fall afterwards tracing the consequences. A story that peaks at the end is not Freytag, whatever its vocabulary.",
+  "three-act":
+    "Setup, confrontation, resolution, in roughly a 1:2:1 proportion, turning at the quarter and three-quarter marks. Driven by a protagonist with a goal meeting escalating opposition. The default shape of commercial fiction and film.",
+  "save-the-cat":
+    "Three-Act with fifteen timed beats and a thematic spine: a theme stated early, a B story that carries it, mirrored opening and closing images, and a midpoint false victory that inverts into an all-is-lost. Genre fiction's recipe.",
+  "story-circle":
+    "Eight steps around a circle: comfort, want, descent into the unfamiliar, adaptation, getting the thing, paying dearly for it, return, change. The price is not optional — attainment always costs — and the ending mirrors the opening.",
+  kishotenketsu:
+    "A four-part East Asian structure in which CONFLICT IS NOT THE ENGINE. It builds by accumulation rather than escalation, then turns on a twist that recontextualizes everything before it, and closes by integration rather than victory.",
+  "seven-point":
+    "Built backwards from the ending. The opening is engineered as the inverse of the resolution; the midpoint flips the protagonist from reacting to acting; two pinches bracket it; and a late turn hands over the missing piece.",
+};
+
+/**
+ * A sentence on each axis, for the spider graph.
+ *
+ * These are functions, not job titles — the commonest misreading of a radar
+ * chart is to take "Shadow 4" as "villain", and a line of definition at the
+ * point of reading is worth more than a reference document nobody opens.
+ */
+export const AXIS_BLURBS: Record<(typeof AXIS_KEYS)[number], string> = {
+  hero: "The transforming centre. The story's question is answered through them; they make the climactic choice and pay for it. Not merely the point-of-view character — a narrator who watches someone else change is not the Hero.",
+  mentor:
+    "Teaches, equips, or emboldens, then typically cannot finish the journey for them. Includes gift-givers who test before giving, and dark mentors whose lesson must be outgrown.",
+  shadow:
+    "The opposition, and at its strongest the focal character's own dark potential — what they could become or refuse to acknowledge. Wants the hero's fall, not merely the prize.",
+  shapeshifter:
+    "The axis of doubt. Their loyalty or identity is a live question with plot consequences. Complexity alone doesn't count — someone must actually wonder whose side they are on.",
+  trickster:
+    "Breaks frames and deflates authority, productively. Being funny isn't enough; this measures disruption. A witty mentor is still a mentor.",
+  ally: "Shares the road, the labour, and the risk out of loyalty — the one who stays. A peer, where the mentor stands developmentally ahead.",
+  guardian:
+    "Tests, blocks, or filters at a threshold that must be passed. Their resistance is local and usually impersonal; they'd stop anyone. Classically they yield or join once passed.",
+  rival:
+    "Competes for the same prize in the same arena — the other candidate, the other suitor. Wants to win, where the Shadow wants the hero to lose. At its extreme, claims the hero's achievement.",
+  beloved:
+    "What the quest is for. Sought, protected, or returned to; orients the hero's choices even when absent. A rich, active character can still carry this function.",
+  sacrifice:
+    "The one the story spends. Their loss purchases something traceable — an escape, an awakening, a proof. If nothing is bought, it is a death, not a sacrifice.",
 };

@@ -28,9 +28,12 @@ function point(index: number, count: number, value: number): [number, number] {
 export function SpiderGraph({
   profile,
   labels,
+  blurbs,
 }: {
   profile: CharacterAnalysis;
   labels: Record<string, string>;
+  /** One line on what each axis measures — a function, not a job title. */
+  blurbs?: Record<string, string>;
 }) {
   const [openAxis, setOpenAxis] = useState<string | null>(null);
   const axes = profile.axes;
@@ -62,6 +65,9 @@ export function SpiderGraph({
               <line className="spider-spoke" x1={CENTRE} y1={CENTRE} x2={x} y2={y} />
               <text
                 className={`spider-label${openAxis === axis.axis ? " open" : ""}`}
+                // The commonest misreading of a radar chart is taking an axis
+                // for a job title; a definition on hover costs nothing.
+                aria-label={blurbs?.[axis.axis] ? `${labels[axis.axis] ?? axis.axis}: ${blurbs[axis.axis]}` : undefined}
                 x={lx}
                 y={ly}
                 textAnchor={lx < CENTRE - 4 ? "end" : lx > CENTRE + 4 ? "start" : "middle"}
@@ -98,6 +104,13 @@ export function SpiderGraph({
             {labels[selected.axis] ?? selected.axis}
             <span className="spider-detail-score">{selected.score} of 5</span>
           </h6>
+
+          {/* What the axis measures, before what it scored. These are story
+              functions rather than identities, and the difference is exactly
+              what a bare number hides. */}
+          {blurbs?.[selected.axis] ? (
+            <p className="axis-blurb">{blurbs[selected.axis]}</p>
+          ) : null}
 
           <p className="axis-head">Most aligned actions</p>
           {selected.aligned.length > 0 ? (

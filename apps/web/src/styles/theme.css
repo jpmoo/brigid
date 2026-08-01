@@ -4095,3 +4095,16 @@ mark.hit.active {
   font-size: 12.5px;
   color: var(--text-muted);
 }
+
+/* What a framework or an axis actually claims. Set apart from the model's
+   findings so the two are never mistaken for each other: this is the rubric,
+   what follows is the mark. */
+.fit-blurb,
+.axis-blurb {
+  margin: 0 0 10px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-strong);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

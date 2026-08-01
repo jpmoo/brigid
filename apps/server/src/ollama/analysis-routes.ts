@@ -13,7 +13,7 @@ import {
   characterProgressOf,
   queueCharacterRun,
 } from "./profile-worker.js";
-import { AXIS_LABELS, MODEL_LABELS } from "./frameworks.js";
+import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
 
 /**
@@ -191,6 +191,10 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       // copy of the frameworks' names that could drift from this one.
       axisLabels: AXIS_LABELS,
       modelLabels: MODEL_LABELS,
+      // What each framework and axis actually claims, so a rating can be read
+      // against its rubric rather than taken as a bare grade.
+      axisBlurbs: AXIS_BLURBS,
+      modelBlurbs: MODEL_BLURBS,
       reports: stored.map((row) => ({
         kind: row.kind,
         subject: row.subject,

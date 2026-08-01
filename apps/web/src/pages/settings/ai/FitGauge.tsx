@@ -29,11 +29,14 @@ const REACH: Record<Exclude<FitRating, "na">, number> = {
 export function FitGauge({
   fit,
   label,
+  blurb,
   onOpen,
   open,
 }: {
   fit: ModelFit;
   label: string;
+  /** What the framework claims — shown above the findings, not instead of them. */
+  blurb?: string;
   onOpen: () => void;
   open: boolean;
 }) {
@@ -81,6 +84,9 @@ export function FitGauge({
 
       {open ? (
         <div className="fit-detail">
+          {/* The framework first, then the verdict on it. A rating is a grade
+              with no rubric attached unless you know what was being asked. */}
+          {blurb ? <p className="fit-blurb">{blurb}</p> : null}
           <p className="fit-summary">{fit.summary}</p>
 
           {fit.evidence.length > 0 ? (

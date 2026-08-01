@@ -124,6 +124,7 @@ export function AiPane({ workId }: { workId: string }) {
             <StructurePane
               report={structure}
               labels={bundle.modelLabels}
+              blurbs={bundle.modelBlurbs}
               busy={busy === "structure"}
               onRun={() => void start("structure")}
             />
@@ -257,11 +258,13 @@ function Stale({ drift }: { drift?: AnalysisDrift }) {
 function StructurePane({
   report,
   labels,
+  blurbs,
   busy,
   onRun,
 }: {
   report: AnalysisBundle["reports"][number] | undefined;
   labels: Record<string, string>;
+  blurbs: Record<string, string>;
   busy: boolean;
   onRun: () => void;
 }) {
@@ -305,6 +308,7 @@ function StructurePane({
               key={fit.model}
               fit={fit}
               label={labels[fit.model] ?? fit.model}
+              blurb={blurbs[fit.model]}
               open={open === fit.model}
               onOpen={() => setOpen(open === fit.model ? null : fit.model)}
             />
@@ -422,7 +426,7 @@ function CharactersPane({
                 perspective &mdash; the same character reads differently against a different
                 focal point.
               </p>
-              <SpiderGraph profile={shown} labels={bundle.axisLabels} />
+              <SpiderGraph profile={shown} labels={bundle.axisLabels} blurbs={bundle.axisBlurbs} />
 
               <h4 className="tpl-section">The shape</h4>
               <p className="fit-overview">{shown.summary}</p>

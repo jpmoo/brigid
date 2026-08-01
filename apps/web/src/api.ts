@@ -140,6 +140,9 @@ export interface AnalysisBundle {
   roster: RosterEntry[];
   axisLabels: Record<string, string>;
   modelLabels: Record<string, string>;
+  /** What each framework and axis claims, so a rating reads against its rubric. */
+  axisBlurbs: Record<string, string>;
+  modelBlurbs: Record<string, string>;
   reports: {
     kind: "structure" | "character" | "framework";
     subject: string | null;
