@@ -4221,3 +4221,58 @@ mark.hit.active {
 .fit-head-bar {
   margin-top: 18px;
 }
+
+/* --- Characters too thin to profile -------------------------------------- */
+
+/* A finding rather than an omission, but a quiet one — set apart from the cast
+   and shut until asked for. */
+.thin-cast {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.thin-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.thin-head[aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}
+
+.thin-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.thin-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.thin-list li {
+  padding: 5px 0;
+  font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+
+.thin-list li:first-child {
+  border-top: 0;
+}
+
+.thin-reason {
+  color: var(--text-muted);
+  /* The name and its reason read as one sentence, so keep them on one line
+     where there is room and let the reason wrap under it where there isn't. */
+  margin-left: 7px;
+}

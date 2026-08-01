@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ChevronsDownUp, ChevronsUpDown, Play, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Play,
+  RefreshCw,
+} from "lucide-react";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -385,6 +392,7 @@ function CharactersPane({
   const judgeable = bundle.roster.filter((r) => r.judgeable);
   const thin = bundle.roster.filter((r) => !r.judgeable);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showThin, setShowThin] = useState(false);
 
   /**
    * Most prominent first, and stably so.
@@ -516,6 +524,47 @@ function CharactersPane({
             })}
           </div>
         </>
+      ) : null}
+
+      {/* Not an omission but a finding, and one worth being able to put away:
+          the rubric requires citable events for any score of 2 or higher, so a
+          character with four recorded actions can only ever produce a flat row
+          of noughts and ones. Spending a model on that reaches a conclusion
+          already known. Shut by default — this is the answer to a question
+          nobody has asked yet. */}
+      {thin.length > 0 ? (
+        <div className="thin-cast">
+          <button
+            type="button"
+            className="thin-head"
+            aria-expanded={showThin}
+            onClick={() => setShowThin(!showThin)}
+          >
+            <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
+            <span className="thin-title">
+              {thin.length} {thin.length === 1 ? "character was" : "characters were"} not
+              profiled
+            </span>
+          </button>
+
+          {showThin ? (
+            <>
+              <p className="tpl-note">
+                Every score of 2 or higher has to rest on events that can be pointed at, so
+                these appear too little for a profile to say anything a flat row of noughts
+                wouldn&rsquo;t. Writing them further and re-reading will bring them in.
+              </p>
+              <ul className="thin-list">
+                {thin.map((entry) => (
+                  <li key={entry.name}>
+                    <strong>{entry.name}</strong>
+                    {entry.reason ? <span className="thin-reason">{entry.reason}</span> : null}
+                  </li>
+                ))}
+              </ul>
+            </>
+          ) : null}
+        </div>
       ) : null}
     </>
   );
