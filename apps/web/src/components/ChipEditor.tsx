@@ -387,9 +387,37 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     }
 
     const attr = mark === "smallCaps" ? "data-sc" : "data-caps";
+    const other = mark === "smallCaps" ? "data-caps" : "data-sc";
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
     const range = selection.getRangeAt(0);
+
+    /**
+     * Turning one on turns the other off.
+     *
+     * A letter is either a small capital or a full one. Both at once is a
+     * contradiction, and one the renderer settles silently — it uppercases for
+     * all caps and then asks for small capitals of text that no longer has a
+     * lowercase letter in it, so the small caps do nothing and the writer is
+     * left with a button that says it is on.
+     */
+    const unwrap = (node: Element) => {
+      const parent = node.parentNode;
+      while (node.firstChild) parent?.insertBefore(node.firstChild, node);
+      parent?.removeChild(node);
+    };
+    const dropOther = (within: Node) => {
+      const start =
+        within.nodeType === Node.ELEMENT_NODE ? (within as HTMLElement) : within.parentElement;
+      const above = start?.closest(`[${other}]`);
+      if (above) unwrap(above);
+      const below =
+        within.nodeType === Node.ELEMENT_NODE
+          ? (within as HTMLElement).querySelectorAll(`[${other}]`)
+          : [];
+      for (const el of Array.from(below)) unwrap(el);
+    };
+    dropOther(range.commonAncestorContainer);
 
     if (range.collapsed) {
       const span = document.createElement("span");
@@ -414,6 +442,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         const span = document.createElement("span");
         span.setAttribute(attr, "1");
         span.appendChild(range.extractContents());
+        for (const el of Array.from(span.querySelectorAll(`[${other}]`))) unwrap(el);
         range.insertNode(span);
       }
     }
