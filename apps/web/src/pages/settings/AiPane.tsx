@@ -497,8 +497,7 @@ function CharactersPane({
                       {report && !report.current ? <Stale drift={report.drift} /> : null}
 
                       <p className="tpl-note">
-                        Scored against <strong>{profile.focal}</strong>&rsquo;s arc. One chart
-                        is one perspective. Click a spoke for what the score rested on.
+                        Scored against <strong>{profile.focal}</strong>&rsquo;s arc.
                       </p>
 
                       <p className="fit-overview">{profile.summary}</p>
