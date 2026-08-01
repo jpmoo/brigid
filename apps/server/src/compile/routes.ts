@@ -6,8 +6,6 @@ import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { notFound } from "../lib/errors.js";
 import { compileManuscript } from "./plan.js";
-import { toDocx } from "./docx.js";
-import { toPdf } from "./pdf.js";
 
 /**
  * What lands in someone's downloads: Lastname_Shortitle_Manuscript.docx.
@@ -86,8 +84,19 @@ export async function compileRoutes(app: FastifyInstance): Promise<void> {
       },
     );
 
+    /**
+      * Loaded when asked for, not at boot.
+      *
+      * These two pull in a Word writer and a PDF engine, and a PDF engine
+      * carries a font library behind it. None of that has any business being
+      * between the server and its first request: if one of them cannot load on
+      * a given machine, the answer should be that compiling to that format
+      * failed, not that Brigid is down.
+      */
     const file =
-      body.format === "docx" ? await toDocx(manuscript) : await toPdf(manuscript);
+      body.format === "docx"
+        ? await (await import("./docx.js")).toDocx(manuscript)
+        : await (await import("./pdf.js")).toPdf(manuscript);
 
     reply.header(
       "Content-Type",
