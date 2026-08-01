@@ -73,6 +73,13 @@ export interface WorkLevel {
   counterRestart: "continuous" | "under-parent";
 }
 
+/** How the writer likes to be shown their work. Small, and they accumulate. */
+export interface Preferences {
+  /** A multiplier, not an index — the ladder of sizes can change. */
+  textScale?: number;
+  viewMode?: "book" | "manuscript";
+}
+
 export interface DictionaryWord {
   id: string;
   word: string;
@@ -298,6 +305,13 @@ export const api = {
   moveBlock: (id: string, parentId: string | null, afterId: string | null) =>
     post<{ block: Block }>(`/blocks/${id}/move`, { parentId, afterId }),
   deleteBlock: (id: string) => request<{ ok: true }>(`/blocks/${id}`, { method: "DELETE" }),
+
+  getPreferences: () => request<{ preferences: Preferences }>("/preferences"),
+  savePreferences: (patch: Preferences) =>
+    request<{ preferences: Preferences }>("/preferences", {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
 
   getSpelling: () => request<{ enabled: boolean; words: DictionaryWord[] }>("/spelling"),
   setSpellcheckEnabled: (enabled: boolean) =>

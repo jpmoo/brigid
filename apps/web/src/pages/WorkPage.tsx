@@ -36,6 +36,39 @@ const wordFmt = new Intl.NumberFormat();
 const MODE_KEY = "brigid.view.mode";
 const SCALE_KEY = "brigid.text.scale";
 const SCALE_STEPS = [0.8, 0.9, 1, 1.1, 1.25, 1.4, 1.6];
+const DEFAULT_SCALE = 1;
+
+/**
+ * The size the writer set, as a multiplier.
+ *
+ * The server holds it — one writer, one decision, and it should hold across
+ * their machines and outlive clearing site data. The browser keeps a copy only
+ * so the first paint is the right size rather than the default one for as long
+ * as the request takes.
+ *
+ * Stored as the multiplier rather than as a position in the ladder above, so
+ * changing the ladder doesn't silently resize everyone's manuscript.
+ */
+function cachedScale(): number {
+  const raw = localStorage.getItem(SCALE_KEY);
+  // Deliberately not Number(raw): Number(null) is 0, which is a perfectly good
+  // number and passed every check a stored value would — so a browser that had
+  // never set one was told the size was zero-point-eight and the default was
+  // never reached.
+  if (raw === null) return DEFAULT_SCALE;
+  const value = Number.parseFloat(raw);
+  return Number.isFinite(value) && value >= 0.5 && value <= 3 ? value : DEFAULT_SCALE;
+}
+
+/** The nearest rung to a saved multiplier, so the buttons still step evenly. */
+function stepForScale(scale: number): number {
+  let best = 0;
+  for (let i = 1; i < SCALE_STEPS.length; i += 1) {
+    const step = SCALE_STEPS[i] ?? 1;
+    if (Math.abs(step - scale) < Math.abs((SCALE_STEPS[best] ?? 1) - scale)) best = i;
+  }
+  return best;
+}
 
 interface AddRequest {
   relativeTo: string | null;
@@ -68,10 +101,7 @@ export function WorkPage() {
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
   const [editingFormat, setEditingFormat] = useState<Block | null>(null);
   const [editingOptions, setEditingOptions] = useState<Block | null>(null);
-  const [scaleIndex, setScaleIndex] = useState(() => {
-    const stored = Number(localStorage.getItem(SCALE_KEY));
-    return Number.isInteger(stored) && stored >= 0 && stored < SCALE_STEPS.length ? stored : 2;
-  });
+  const [scaleIndex, setScaleIndex] = useState(() => stepForScale(cachedScale()));
   const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -141,8 +171,33 @@ export function WorkPage() {
     localStorage.setItem(MODE_KEY, mode);
   }, [mode]);
 
+  // Written both places: the browser so the next first paint is right, the
+  // server so it is right on every other machine too. Held back until the
+  // server's own answer has arrived, or the default would overwrite it in the
+  // moment between the first render and the response.
+  const scaleLoaded = useRef(false);
+
   useEffect(() => {
-    localStorage.setItem(SCALE_KEY, String(scaleIndex));
+    void (async () => {
+      try {
+        const { preferences } = await api.getPreferences();
+        if (preferences.textScale !== undefined) {
+          setScaleIndex(stepForScale(preferences.textScale));
+        }
+      } finally {
+        scaleLoaded.current = true;
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!scaleLoaded.current) return;
+    const scale = SCALE_STEPS[scaleIndex] ?? DEFAULT_SCALE;
+    localStorage.setItem(SCALE_KEY, String(scale));
+    void api.savePreferences({ textScale: scale }).catch(() => {
+      // The browser's copy still holds; a failed save is not worth interrupting
+      // the writing for.
+    });
   }, [scaleIndex]);
 
   // Escape leaves zen, so there's always a way back without hunting for a

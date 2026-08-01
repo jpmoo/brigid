@@ -14,6 +14,7 @@ import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
 import { importRoutes } from "./import/routes.js";
 import { HttpError } from "./lib/errors.js";
+import { preferencesRoutes } from "./preferences/routes.js";
 import { setupRoutes } from "./setup/routes.js";
 import { spellingRoutes } from "./spelling/routes.js";
 import { templatesRoutes } from "./templates/routes.js";
@@ -70,6 +71,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(templatesRoutes);
       await scope.register(importRoutes);
       await scope.register(spellingRoutes);
+      await scope.register(preferencesRoutes);
     },
     { prefix: "/api" },
   );
