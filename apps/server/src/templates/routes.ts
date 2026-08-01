@@ -22,12 +22,14 @@ const typography = z
 const breakSettings = z.object({
   suppressOnFirstChild: z.boolean(),
   indentFirstParagraph: z.boolean().optional(),
+  smartPunctuation: z.boolean().optional(),
   typography,
 });
 
 const formatSettings = z.object({
   countsTowardWordCount: z.boolean(),
   structural: z.boolean(),
+  smartPunctuation: z.boolean().optional(),
   typography,
   sectionStart: z
     .object({

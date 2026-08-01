@@ -113,6 +113,8 @@ export interface BreakTemplateSettings {
    * already did.
    */
   indentFirstParagraph?: boolean;
+  /** Typewriter marks become typeset ones — see `smartenText`. */
+  smartPunctuation?: boolean;
   /** Applied in manuscript mode only. */
   typography?: Typography;
 }
@@ -207,6 +209,8 @@ export interface BlockFormatSettings {
    * matter opt out, so a title page at depth 0 doesn't inherit the part break.
    */
   structural: boolean;
+  /** Typewriter marks become typeset ones — see `smartenText`. */
+  smartPunctuation?: boolean;
   /** Applied in manuscript mode only. */
   typography?: Typography;
   /**

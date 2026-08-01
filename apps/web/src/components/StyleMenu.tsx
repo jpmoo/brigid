@@ -112,15 +112,14 @@ export function StyleMenu({
         <div className="field">
           <label className="field-label">Line spacing</label>
           <select
-            value={String(value.lineHeight ?? 1.5)}
+            value={String(value.lineHeight ?? 1.6875)}
             onChange={(e) => set({ lineHeight: Number(e.target.value) })}
           >
-            <option value="1">Single</option>
-            <option value="1.15">1.15</option>
-            <option value="1.5">1½</option>
-            <option value="2">Double</option>
-            <option value="2.5">2½</option>
-            <option value="3">Triple</option>
+            <option value="1.125">Single</option>
+            <option value="1.4">1.25</option>
+            <option value="1.6875">1½</option>
+            <option value="2.25">Double</option>
+            <option value="3.375">Triple</option>
           </select>
         </div>
         <div className="field">

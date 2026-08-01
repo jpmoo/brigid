@@ -1,4 +1,5 @@
 import { formatNumber } from "./numbering.js";
+import { smartenText } from "./punctuation.js";
 import { buildOutline, computeCounters } from "./outline.js";
 import type { BlockNode, LevelLike, OutlineEntry, TemplateLike } from "./outline.js";
 import type {
@@ -98,6 +99,12 @@ export type DocumentItem<B extends BlockNode = BlockNode> =
       formatDetached: boolean;
       /** Manuscript-mode typography, from the block's format template. */
       typography: Typography | null;
+      /**
+       * Whether this block's prose should be shown with typeset punctuation.
+       * The prose itself is rendered by the view, so the decision travels with
+       * the block rather than being applied here.
+       */
+      smartPunctuation: boolean;
       /** Set when this block starts a new numbering / running-head section. */
       sectionStart: SectionStart | null;
       /**
@@ -143,6 +150,8 @@ const defaultUnresolved = (name: VariableName): string => `[${VARIABLES[name].la
 
 interface SpanContext {
   render: RenderContext;
+  /** Whether the governing format asked for typeset punctuation. */
+  smart: boolean;
   counter: number | null;
   levelTitle: string | null;
   blockWordCount: number;
@@ -159,7 +168,9 @@ function resolveInline(inline: TemplateInline, ctx: SpanContext): ResolvedSpan |
   if (inline.smallCaps) marks.smallCaps = true;
   if (inline.allCaps) marks.allCaps = true;
 
-  if (inline.type === "text") return { text: inline.text, ...marks };
+  if (inline.type === "text") {
+    return { text: ctx.smart ? smartenText(inline.text) : inline.text, ...marks };
+  }
 
   const def = VARIABLES[inline.name];
   const unresolved = ctx.render.unresolved ?? defaultUnresolved;
@@ -278,10 +289,16 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
 export function previewBody(
   nodes: readonly TemplateNode[],
   work: WorkMeta,
-  options: { counter?: number; levelTitle?: string; totalWordCount?: number } = {},
+  options: {
+    counter?: number;
+    levelTitle?: string;
+    totalWordCount?: number;
+    smart?: boolean;
+  } = {},
 ): ResolvedNode[] {
   return resolveBody(nodes, {
     render: { work, totalWordCount: options.totalWordCount ?? 0 },
+    smart: options.smart ?? false,
     counter: options.counter ?? 1,
     levelTitle: options.levelTitle ?? null,
     blockWordCount: 0,
@@ -348,8 +365,10 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
   for (const entry of entries) {
     const format = templates.get(entry.block.formatId);
 
+    const smart = format?.formatSettings?.smartPunctuation ?? false;
     const ctx: SpanContext = {
       render,
+      smart,
       counter: counters.get(entry.block.id) ?? null,
       levelTitle: entry.block.label,
       blockWordCount: entry.block.wordCount,
@@ -372,7 +391,10 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
           templateName: source ? `${source.name} (edited)` : "Edited break",
           detached: true,
           typography: source?.breakSettings?.typography ?? null,
-          nodes: resolveBody(entry.block.breakBody.nodes, ctx),
+          nodes: resolveBody(entry.block.breakBody.nodes, {
+            ...ctx,
+            smart: source?.breakSettings?.smartPunctuation ?? false,
+          }),
         });
       } else {
         const level = levelByDepth.get(entry.depth);
@@ -389,7 +411,10 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
             templateName: breakTemplate.name,
             detached: false,
             typography: breakTemplate.breakSettings?.typography ?? null,
-            nodes: resolveBody(breakTemplate.body.nodes, ctx),
+            nodes: resolveBody(breakTemplate.body.nodes, {
+              ...ctx,
+              smart: breakTemplate.breakSettings?.smartPunctuation ?? false,
+            }),
           });
         }
       }
@@ -420,6 +445,7 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
       // A block's own type wins over its format's, the same way its own body
       // does — one paragraph can be set differently without disturbing the rest.
       typography: entry.block.formatTypography ?? format?.formatSettings?.typography ?? null,
+      smartPunctuation: smart,
       sectionStart: sectionFor(entry.block, format?.formatSettings?.sectionStart ?? null),
       firstLineIndent,
     });

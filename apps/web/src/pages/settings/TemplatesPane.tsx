@@ -229,6 +229,16 @@ function TemplateEditor({
               Indent the paragraph it opens <em>— usually flush</em>
             </span>
           </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={brk.smartPunctuation ?? false}
+              onChange={(e) => setBrk({ ...brk, smartPunctuation: e.target.checked })}
+            />
+            <span>
+              Typeset punctuation <em>— curly quotes, en and em dashes, ellipses</em>
+            </span>
+          </label>
         </div>
       ) : (
         <div className="stack">
@@ -248,6 +258,16 @@ function TemplateEditor({
             />
             <span>
               Takes part in levels and breaks <em>— front matter opts out</em>
+            </span>
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={fmt.smartPunctuation ?? false}
+              onChange={(e) => setFmt({ ...fmt, smartPunctuation: e.target.checked })}
+            />
+            <span>
+              Typeset punctuation <em>— curly quotes, en and em dashes, ellipses</em>
             </span>
           </label>
         </div>

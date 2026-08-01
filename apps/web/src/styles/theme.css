@@ -7,6 +7,9 @@
 :root {
   --paper: #ecebe6;
   --surface: #fcfdfc;
+  /* The panel sits over the manuscript in zen and beside it otherwise; frosted
+     rather than solid, so the page is felt behind it either way. */
+  --surface-veil: rgba(252, 253, 252, 0.72);
   --surface-sunken: #e5e4de;
   --border: rgba(19, 70, 37, 0.16);
   --border-strong: rgba(19, 70, 37, 0.3);
@@ -36,6 +39,7 @@
 :root[data-theme="dark"] {
     --paper: #0f1712;
     --surface: #16211a;
+    --surface-veil: rgba(22, 33, 26, 0.74);
     --surface-sunken: #0b110d;
     --border: rgba(153, 182, 164, 0.16);
     --border-strong: rgba(153, 182, 164, 0.32);
@@ -551,7 +555,9 @@ input::placeholder {
   width: 336px;
   flex: 0 0 336px;
   border-right: 1px solid var(--border);
-  background: var(--surface);
+  background: var(--surface-veil);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
   overflow-y: auto;
   transition: transform 0.16s ease, opacity 0.16s ease;
 }
@@ -586,7 +592,7 @@ input::placeholder {
   height: 100%;
   display: grid;
   place-items: center;
-  background: var(--surface);
+  background: var(--surface-veil);
   border-right: 1px solid var(--border);
   color: var(--text-faint);
   font-size: 14px;
@@ -607,7 +613,9 @@ input::placeholder {
   align-items: center;
   gap: 6px;
   padding: 8px 12px 8px 14px;
-  background: var(--surface);
+  background: var(--surface-veil);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
   border-bottom: 1px solid var(--border);
   font-size: 11px;
   font-weight: 700;
@@ -1193,6 +1201,51 @@ input::placeholder {
   border-color: color-mix(in srgb, var(--accent) 34%, transparent);
 }
 
+/* --- Dragging a block ------------------------------------------------- */
+
+/* The card under the cursor and everything beneath it in the tree: children
+   hang off their parent's id, so a chapter's scenes go where the chapter goes.
+   Fading the whole subtree is what says so before the drop, rather than after. */
+.outline-item.lifted {
+  opacity: 0.42;
+}
+
+/* The one being carried is also outlined, so it stays distinguishable from the
+   children following it. */
+.outline-item.dragging {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+/* While a drag is live the cards stop reacting to the pointer: hover borders
+   lighting up under the cursor competed with the drop rail for attention. */
+.outline-list.dragging-block .outline-item:hover {
+  border-color: color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+/* Where it will land. A full-width bar in the accent, indented to the level it
+   will sit at, with a cap at the left end — the earlier hairline on a card's
+   edge was easy to miss and ambiguous about which side it meant. */
+.outline-drop-rail {
+  position: relative;
+  height: 4px;
+  margin: 3px 0 5px;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.outline-drop-rail::before {
+  content: "";
+  position: absolute;
+  left: -3px;
+  top: -3px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 /* A break belongs to the block it precedes and travels with it, so it is drawn
    as a cap over the top of that block's entry rather than as a separate row.
    Only the cap is shaded — shading the whole entry made every block with a
@@ -1263,7 +1316,9 @@ input::placeholder {
   align-items: center;
   gap: 2px;
   padding: 7px 10px;
-  background: var(--surface);
+  background: var(--surface-veil);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
   border-top: 1px solid var(--border);
 }
 
@@ -2450,9 +2505,8 @@ mark.hit.active {
 
 /* --- Editor selects --------------------------------------------------- */
 
-/* Small enough that face/size sit on one line and spacing, justification and
-   vertical placement on the next — three to a row rather than two and an
-   orphan. The labels are short for the same reason. */
+/* Small enough that face, size, spacing, justification and vertical placement
+   all sit on a single row. The labels are short for the same reason. */
 .be-spacing,
 .te-bar.borders select {
   width: auto;
@@ -2464,6 +2518,17 @@ mark.hit.active {
 
 .be-line {
   gap: 4px;
+}
+
+/* The setting row never wraps: the selects narrow instead. A clipped label
+   still reads at a glance; a control pushed onto a hidden second row doesn't. */
+.be-line-setting {
+  flex-wrap: nowrap;
+}
+
+.be-line-setting .be-spacing {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .te-bar.borders {

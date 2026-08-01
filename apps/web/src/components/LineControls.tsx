@@ -3,6 +3,22 @@ import type { TemplateAlign, TemplateMarks } from "@brigid/shared";
 import { ChipTools } from "./ChipEditor.js";
 import type { ChipEditorHandle } from "./ChipEditor.js";
 
+/**
+ * CSS line-height multiplies the font size; a word processor's "double" is
+ * twice the font's own natural line, which for Courier and Times is about
+ * 1.125 of the font size. So "Double" is 2.25 — 2 is visibly tight.
+ */
+const SPACINGS = [1.125, 1.4, 1.6875, 2.25, 3.375];
+
+/** Values set before this scale existed still land on the right option. */
+function nearestSpacing(value: number | undefined): string {
+  if (value === undefined) return "";
+  const match = SPACINGS.reduce((best, n) =>
+    Math.abs(n - value) < Math.abs(best - value) ? n : best,
+  );
+  return Math.abs(match - value) < 0.2 ? String(match) : "";
+}
+
 export interface LineStyle {
   fontFamily?: string | undefined;
   fontSizePt?: number | undefined;
@@ -19,7 +35,9 @@ export interface LineStyle {
  * rather than two sets that drift.
  *
  * Reading down: what acts on the words and what can be dropped among them,
- * then what they are set in, then how the line as a whole sits.
+ * then everything about the line's setting on one row — face, size, spacing,
+ * placement. Split across two rows these read as unrelated pairs, and in a
+ * narrow table column the second row was what got pushed out of sight.
  */
 export function LineControls({
   marks,
@@ -55,7 +73,7 @@ export function LineControls({
         <ChipTools editor={editor} />
       </div>
 
-      <div className="be-line">
+      <div className="be-line be-line-setting">
         <select
           className="be-spacing"
           title="Face for this line"
@@ -84,23 +102,20 @@ export function LineControls({
             </option>
           ))}
         </select>
-      </div>
-
-      <div className="be-line">
         <select
           className="be-spacing"
           title="Line spacing"
-          value={String(style.lineHeight ?? "")}
+          value={nearestSpacing(style.lineHeight)}
           onChange={(e) =>
             onStyle({ lineHeight: e.target.value ? Number(e.target.value) : undefined })
           }
         >
           <option value="">Spacing</option>
-          <option value="1">Single</option>
-          <option value="1.15">1.15</option>
-          <option value="1.5">1½</option>
-          <option value="2">Double</option>
-          <option value="3">Triple</option>
+          <option value="1.125">Single</option>
+          <option value="1.4">1.25</option>
+          <option value="1.6875">1½</option>
+          <option value="2.25">Double</option>
+          <option value="3.375">Triple</option>
         </select>
         <select
           className="be-spacing"

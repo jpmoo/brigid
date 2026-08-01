@@ -98,6 +98,53 @@ export function OutlinePanel(props: OutlinePanelProps) {
   }
   const visible = entries.filter((e) => !hidden.has(e.block.id));
 
+  /**
+   * A block never travels alone: its children hang off its id, so moving a
+   * chapter carries its scenes. The drag says so — the whole subtree lifts,
+   * not just the card under the cursor.
+   */
+  const lifted = new Set<string>();
+  if (dragging) {
+    lifted.add(dragging);
+    for (const entry of entries) {
+      if (entry.ancestors.includes(dragging)) lifted.add(entry.block.id);
+    }
+  }
+
+  /**
+   * Where the line is drawn, as a visible entry to draw it beneath — null
+   * meaning above everything.
+   *
+   * Not simply the edge of the card being hovered. Dropping *after* a chapter
+   * puts the block after that chapter's scenes as well, since they sit between
+   * the two in the outline; a line at the chapter's own bottom edge would
+   * promise a landing spot several cards above the real one. So the target is
+   * resolved first and the line follows the answer.
+   */
+  const dropLine = (() => {
+    if (!over || !dragging || !canDrop(over.id)) return null;
+    const target = resolveDrop(over.id, over.before);
+    if (!target) return null;
+    if (target.afterId === dragging) return null;
+    if (target.afterId === null) return { afterVisible: null, depth: depthOf(over.id) };
+
+    // Past the last of its descendants that is actually on screen.
+    const start = visible.findIndex((e) => e.block.id === target.afterId);
+    if (start === -1) return null;
+    let last = start;
+    while (
+      last + 1 < visible.length &&
+      visible[last + 1]?.ancestors.includes(target.afterId as string)
+    ) {
+      last += 1;
+    }
+    return { afterVisible: visible[last]?.block.id ?? null, depth: depthOf(over.id) };
+  })();
+
+  const dropRail = (depth: number) => (
+    <div className="outline-drop-rail" style={{ marginLeft: depth * 16 }} aria-hidden="true" />
+  );
+
   if (entries.length === 0) {
     return (
       <div className="outline-empty">
@@ -111,13 +158,14 @@ export function OutlinePanel(props: OutlinePanelProps) {
   }
 
   return (
-    <div className="outline-list">
+    <div className={`outline-list${dragging ? " dragging-block" : ""}`}>
+      {dropLine && dropLine.afterVisible === null ? dropRail(dropLine.depth) : null}
       {visible.map((entry) => (
+        <div key={entry.block.id}>
         <OutlineCard
-          key={entry.block.id}
           draggable={structural(entry.block.id)}
           isDragging={dragging === entry.block.id}
-          dropEdge={over?.id === entry.block.id ? (over.before ? "before" : "after") : null}
+          isLifted={lifted.has(entry.block.id)}
           onDragStart={() => setDragging(entry.block.id)}
           onDragEnd={() => {
             setDragging(null);
@@ -148,6 +196,8 @@ export function OutlinePanel(props: OutlinePanelProps) {
           selected={entry.block.id === selectedId}
           isCollapsed={collapsed.has(entry.block.id)}
         />
+        {dropLine && dropLine.afterVisible === entry.block.id ? dropRail(dropLine.depth) : null}
+        </div>
       ))}
       <button className="outline-add" type="button" onClick={() => props.onAdd(null, "root")}>
         <Plus size={14} />
@@ -167,7 +217,8 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   isCollapsed: boolean;
   draggable: boolean;
   isDragging: boolean;
-  dropEdge: "before" | "after" | null;
+  /** The card itself or something under it: the whole subtree moves together. */
+  isLifted: boolean;
   onDragStart: () => void;
   onDragEnd: () => void;
   /** Returns whether the drop would be accepted, so the cursor can say so. */
@@ -190,7 +241,7 @@ function OutlineCard(props: CardProps) {
         "outline-item",
         props.breakChip ? "has-break" : "",
         props.isDragging ? "dragging" : "",
-        props.dropEdge ? `drop-${props.dropEdge}` : "",
+        props.isLifted ? "lifted" : "",
       ]
         .filter(Boolean)
         .join(" ")}

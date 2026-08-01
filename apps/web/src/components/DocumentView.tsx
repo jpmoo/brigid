@@ -2,6 +2,7 @@ import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
+import { smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import type { DocumentItem, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
@@ -79,6 +80,7 @@ function Nodes({
   search,
   activeIndex,
   counter,
+  smart = false,
 }: {
   nodes: ResolvedNode[];
   prose?: string;
@@ -88,6 +90,7 @@ function Nodes({
   search: string;
   activeIndex: number | null;
   counter: { n: number };
+  smart?: boolean;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -185,7 +188,7 @@ function Nodes({
           case "content":
             return prose ? (
               <Fragment key={i}>
-                {prose.split(/\n{2,}/).map((para, j) => (
+                {(smart ? smartenText(prose) : prose).split(/\n{2,}/).map((para, j) => (
                   <p
                     className={j === 0 && !indentFirst ? "prose flush" : "prose"}
                     key={j}
@@ -355,6 +358,7 @@ export function DocumentView({
                 activeMatch?.blockId === item.block.id ? activeMatch.indexInBlock : null
               }
               counter={{ n: 0 }}
+              smart={item.smartPunctuation}
             />
           </div>
         ),

@@ -74,6 +74,9 @@ export function WorkPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+  // Set when the index moved because the page scrolled, so the effect that
+  // scrolls to the active hit doesn't chase it back.
+  const fromScroll = useRef(false);
   const [activeBookmark, setActiveBookmark] = useState<string | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
@@ -130,6 +133,11 @@ export function WorkPage() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zen]);
+
+  // Outside zen the outline is always shown; inside zen it retracts to an edge
+  // and slides back out when the pointer reaches it. Declared here because the
+  // effects below depend on it.
+  const showPanel = !zen || panelOpen;
 
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const entries = useMemo(() => buildOutline(blocks), [blocks]);
@@ -271,9 +279,32 @@ export function WorkPage() {
       }
 
       setSelectedId((current) => (current === next ? current : next));
+
+      // The active result follows the reading position: whichever hit is
+      // highest in view is the one you are on, so stepping onward from there
+      // means the next one down the page rather than wherever you last clicked.
+      // Marks render in the same order the matches were found, so the nth mark
+      // in the document is the nth match.
+      if (!query.trim()) return;
+      const marks = pane.querySelectorAll("mark.hit");
+      for (let i = 0; i < marks.length; i += 1) {
+        const mark = marks[i];
+        if (!mark) continue;
+        if (mark.getBoundingClientRect().top >= rect.top) {
+          fromScroll.current = true;
+          setMatchIndex((current) => (current === i ? current : i));
+          break;
+        }
+      }
     };
 
-    const onScroll = () => {
+    const onScroll = (event: Event) => {
+      // Only the manuscript moving means the reading position changed. This
+      // listener is on the document, so it also hears the outline scrolling
+      // itself to follow — which must not be read back as the document moving,
+      // or the two chase each other.
+      const target = event.target;
+      if (target instanceof Node && target !== pane && !target.contains(pane)) return;
       if (!frame) frame = window.requestAnimationFrame(update);
     };
 
@@ -296,11 +327,40 @@ export function WorkPage() {
   }, [items]);
 
   // Centre the current block in the outline, so there is always context above
-  // and below it rather than it sitting against an edge.
+  // and below it rather than it sitting against an edge. Also runs when the
+  // panel comes back into view: it can't scroll while it's retracted, so it
+  // would otherwise reappear showing wherever it was left.
   useEffect(() => {
-    if (!selectedId) return;
-    outlineRefs.current.get(selectedId)?.scrollIntoView({ block: "center", behavior: "smooth" });
-  }, [selectedId]);
+    if (!selectedId || !showPanel) return;
+    const card = outlineRefs.current.get(selectedId);
+    if (!card) return;
+
+    // Deliberately not `scrollIntoView`. That scrolls *every* scrollable
+    // ancestor, including the window — which moves the manuscript pane the
+    // tracker measures from, so following the document changed what the
+    // document appeared to be showing. Its smooth animation was the other half
+    // of the trouble: a continuous scroll changes the current block every few
+    // hundred milliseconds, and each call cancelled the last one mid-flight, so
+    // the panel spent its time animating toward positions already stale.
+    //
+    // Setting scrollTop on the panel alone has neither problem: nothing else
+    // moves, and each update lands before the next arrives.
+    let panel: HTMLElement | null = card.parentElement;
+    while (panel) {
+      const overflow = window.getComputedStyle(panel).overflowY;
+      if ((overflow === "auto" || overflow === "scroll") && panel.scrollHeight > panel.clientHeight) {
+        break;
+      }
+      panel = panel.parentElement;
+    }
+    if (!panel) return;
+
+    const cardBox = card.getBoundingClientRect();
+    const panelBox = panel.getBoundingClientRect();
+    const delta = cardBox.top + cardBox.height / 2 - (panelBox.top + panelBox.height / 2);
+    if (Math.abs(delta) < 1) return;
+    panel.scrollTop += delta;
+  }, [selectedId, showPanel]);
 
   // Something is always current. The observer only speaks when a block crosses
   // its band, which never happens on first load — so the first block takes the
@@ -345,6 +405,10 @@ export function WorkPage() {
    */
   useEffect(() => {
     if (!activeMatch) return;
+    if (fromScroll.current) {
+      fromScroll.current = false;
+      return;
+    }
     const id = window.requestAnimationFrame(() => {
       paneRef.current
         ?.querySelector("mark.hit.active")
@@ -418,9 +482,7 @@ export function WorkPage() {
   if (loading) return <div className="loading">Opening…</div>;
   if (!work) return <div className="loading">{error ?? "Not found."}</div>;
 
-  // Outside zen the outline is always shown; inside zen it retracts to an edge
-  // and slides back out when the pointer reaches it.
-  const showPanel = !zen || panelOpen;
+
 
   return (
     <div className={`work-shell${zen ? " zen" : ""}`}>

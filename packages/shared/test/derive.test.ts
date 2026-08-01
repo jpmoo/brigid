@@ -311,5 +311,23 @@ check(
   true,
 );
 
+// --- typeset punctuation -----------------------------------------------------
+{
+  const { smartenText } = await import("@brigid/shared");
+  check(
+    "quotes turn the right way and apostrophes stay apostrophes",
+    smartenText(`"Don't," she said. "It's the '90s."`),
+    "“Don’t,” she said. “It’s the ’90s.”",
+  );
+  check("double hyphen is an en dash, triple an em", smartenText("a--b---c"), "a–b—c");
+  check("three dots become an ellipsis", smartenText("wait..."), "wait…");
+  check(
+    "a quote opening after an em dash still opens",
+    smartenText(`—"Yes."`),
+    "—“Yes.”",
+  );
+}
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
+
