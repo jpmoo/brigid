@@ -158,6 +158,8 @@ export function WorkPage() {
   const [editingProse, setEditingProse] = useState<{
     id: string;
     selection: { anchor: number; focus: number };
+    /** Set when a misspelled word was clicked, so the editor opens on it. */
+    askAbout?: string;
   } | null>(null);
   const spelling = useSpelling();
 
@@ -829,9 +831,9 @@ export function WorkPage() {
             activeMatch={activeMatch}
             speller={spelling.speller}
             editingId={editingProse?.id ?? null}
-            onEditProse={(blockId, selection) => {
+            onEditProse={(blockId, selection, askAbout) => {
               setSelectedId(blockId);
-              setEditingProse({ id: blockId, selection });
+              setEditingProse({ id: blockId, selection, ...(askAbout ? { askAbout } : {}) });
             }}
             editor={(layout) =>
               editingProse ? (
@@ -844,6 +846,7 @@ export function WorkPage() {
                   key={editingProse.id}
                   blockId={editingProse.id}
                   initialSelection={editingProse.selection}
+                  askAbout={editingProse.askAbout}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}

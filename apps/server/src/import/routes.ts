@@ -138,7 +138,8 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
               align: "center" as const,
               content: [{ type: "text" as const, text: line }],
             })),
-            { type: "pageBreak" as const },
+            // No page break at the end. The chapter break that follows already
+            // opens a page, so one here makes a blank one between them.
           ],
         };
         const [titleFormat] = await tx

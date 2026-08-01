@@ -490,6 +490,8 @@ export interface ProseEditorProps {
   initialSelection: { anchor: number; focus: number };
   /** The paragraph setting to match, so clicking in doesn't reflow the block. */
   layout: ProseLayout;
+  /** A word to open the suggestions on, when that is what was clicked. */
+  askAbout?: string | undefined;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
@@ -507,6 +509,7 @@ export function ProseEditor({
   blockId,
   initialSelection,
   layout,
+  askAbout,
   content,
   fallbackText,
   speller,
@@ -558,6 +561,14 @@ export function ProseEditor({
     el.focus({ preventScroll: true });
     setSelection(el, initialSelection.anchor, initialSelection.focus);
     setWords(countWords(el.textContent ?? ""));
+
+    // The word that was clicked, already underlined in what was just rendered.
+    if (!askAbout) return;
+    for (const span of el.querySelectorAll(".misspelled")) {
+      if ((span.getAttribute("data-word") ?? span.textContent) !== askAbout) continue;
+      setMenu(placeSpellMenu(askAbout, span.getBoundingClientRect()));
+      break;
+    }
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps

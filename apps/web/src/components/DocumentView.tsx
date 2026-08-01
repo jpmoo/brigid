@@ -161,7 +161,7 @@ function Nodes({
   speller?: Speller | null;
   editing?: boolean;
   editor?: (layout: ProseLayout) => ReactNode;
-  onEditProse?: (selection: { anchor: number; focus: number }) => void;
+  onEditProse?: (selection: { anchor: number; focus: number }, askAbout?: string) => void;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -303,7 +303,14 @@ function Nodes({
               // The block beneath has its own click; writing where the pointer
               // is should not also be a click on the block.
               event.stopPropagation();
-              onEditProse(selectionIn(event.currentTarget, event.clientX, event.clientY));
+              // Clicking an underlined word is a question about that word, so
+              // the editor opens with the suggestions already showing rather
+              // than making the writer find and click it a second time.
+              const flagged = (event.target as HTMLElement).closest(".misspelled");
+              onEditProse(
+                selectionIn(event.currentTarget, event.clientX, event.clientY),
+                flagged?.textContent ?? undefined,
+              );
             };
 
             return written ? (
@@ -415,7 +422,12 @@ export interface DocumentViewProps {
    * content node — a title page is composed of template lines and is edited in
    * its format, not on the page.
    */
-  onEditProse: (blockId: string, selection: { anchor: number; focus: number }) => void;
+  onEditProse: (
+    blockId: string,
+    selection: { anchor: number; focus: number },
+    /** Set when the click landed on an underlined word, which asks about it. */
+    askAbout?: string,
+  ) => void;
   /**
    * Given the paragraph setting of the block being edited, since only the
    * renderer knows it — it depends on the view mode and on the break above.
@@ -544,7 +556,9 @@ export function DocumentView({
               prose={item.block.contentText}
               editing={editingId === item.block.id}
               editor={editor}
-              onEditProse={(selection) => onEditProse(item.block.id, selection)}
+              onEditProse={(selection, askAbout) =>
+                onEditProse(item.block.id, selection, askAbout)
+              }
               indentFirst={item.firstLineIndent}
               mode={mode}
               typography={item.typography}
