@@ -141,9 +141,6 @@ export function OutlinePanel(props: OutlinePanelProps) {
           entry={entry}
           levelName={levels.find((l) => l.depth === entry.depth)?.name ?? `Level ${entry.depth + 1}`}
           formatName={templates.get(entry.block.formatId)?.name ?? "Unknown format"}
-          rendersInDocument={
-            templates.get(entry.block.formatId)?.formatSettings?.rendersInDocument ?? true
-          }
           structural={templates.get(entry.block.formatId)?.formatSettings?.structural ?? true}
           {...props}
           breakChip={breaks.get(entry.block.id) ?? null}
@@ -164,7 +161,6 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   entry: OutlineEntry<Block>;
   levelName: string;
   formatName: string;
-  rendersInDocument: boolean;
   /** False for a title page or a note: it isn't part of the level structure. */
   structural: boolean;
   selected: boolean;
@@ -240,7 +236,7 @@ function OutlineCard(props: CardProps) {
       ) : null}
 
     <div
-      className={`outline-card${selected ? " selected" : ""}${props.rendersInDocument ? "" : " note"}`}
+      className={`outline-card${selected ? " selected" : ""}`}
     >
       {/* Two numbers when a block contains others: the whole of it on top, its
           own prose beneath. A leaf has only one, so it shows one. */}

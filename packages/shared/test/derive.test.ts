@@ -13,19 +13,18 @@ function check(label: string, actual: unknown, expected: unknown) {
   }
 }
 
-const fmt = (id: string, counts: boolean, structural: boolean, renders: boolean): TemplateLike => ({
+const fmt = (id: string, counts: boolean, structural: boolean): TemplateLike => ({
   id,
   category: "block-format",
   name: id,
   body: { nodes: [{ type: "content" }] },
   breakSettings: null,
-  formatSettings: { countsTowardWordCount: counts, structural, rendersInDocument: renders },
+  formatSettings: { countsTowardWordCount: counts, structural },
 });
 
 const templates: TemplateLike[] = [
-  fmt("regular", true, true, true),
-  fmt("titlepage", false, false, true),
-  fmt("note", false, false, false),
+  fmt("regular", true, true),
+  fmt("titlepage", false, false),
   {
     id: "chapbreak",
     category: "break",
@@ -71,7 +70,6 @@ const blocks = [
   b("s2", "ch1", "b1", "regular", 200),
   b("ch2", null, "a2", "regular", 20),
   b("s3", "ch2", "b0", "regular", 300),
-  b("scratch", null, "a3", "note", 999),
 ];
 
 const doc = deriveDocument({
@@ -92,7 +90,6 @@ check(
   shape.slice(0, 2),
   ["block:title", "break:chapbreak>ch1"],
 );
-check("note is excluded from the document", shape.includes("block:scratch"), false);
 check(
   "first scene under a chapter suppresses the ornament",
   shape.filter((s) => s.endsWith(">s1")),
@@ -243,7 +240,7 @@ const withPageVar = deriveDocument({
         ],
       },
       breakSettings: null,
-      formatSettings: { countsTowardWordCount: false, structural: false, rendersInDocument: true },
+      formatSettings: { countsTowardWordCount: false, structural: false },
     },
   ],
   work: { title: "T", subtitle: null, authorFirstName: null, authorLastName: null },
@@ -271,7 +268,7 @@ const noSubtitle = deriveDocument({
         ],
       },
       breakSettings: null,
-      formatSettings: { countsTowardWordCount: false, structural: false, rendersInDocument: true },
+      formatSettings: { countsTowardWordCount: false, structural: false },
     },
   ],
   work: { title: "The Salt Road", subtitle: null, authorFirstName: null, authorLastName: null },

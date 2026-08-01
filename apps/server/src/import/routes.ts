@@ -150,7 +150,6 @@ export async function importRoutes(app: FastifyInstance): Promise<void> {
             formatSettings: {
               countsTowardWordCount: false,
               structural: false,
-              rendersInDocument: true,
             },
           })
           .returning({ id: templates.id });

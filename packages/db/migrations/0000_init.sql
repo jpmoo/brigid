@@ -125,7 +125,7 @@ INSERT INTO templates (category, name, builtin_key, body, format_settings) VALUE
     'Regular text',
     'regular-text',
     '{"nodes":[{"type":"content"}]}'::jsonb,
-    '{"countsTowardWordCount":true,"structural":true,"rendersInDocument":true}'::jsonb
+    '{"countsTowardWordCount":true,"structural":true}'::jsonb
   ),
   (
     'block-format',
@@ -145,7 +145,7 @@ INSERT INTO templates (category, name, builtin_key, body, format_settings) VALUE
           {"type":"variable","name":"authorLastName"}]},
         {"type":"pageBreak"}
       ]}'::jsonb,
-    '{"countsTowardWordCount":false,"structural":false,"rendersInDocument":true}'::jsonb
+    '{"countsTowardWordCount":false,"structural":false}'::jsonb
   );
 
 INSERT INTO templates (category, name, builtin_key, body, break_settings) VALUES

@@ -20,7 +20,6 @@ const EMPTY_BREAK: BreakTemplateSettings = { suppressOnFirstChild: false, indent
 const EMPTY_FORMAT: BlockFormatSettings = {
   countsTowardWordCount: true,
   structural: true,
-  rendersInDocument: true,
 };
 
 export function TemplatesPane({ templates, onReload }: { templates: Template[]; onReload: () => void }) {
@@ -249,16 +248,6 @@ function TemplateEditor({
             />
             <span>
               Takes part in levels and breaks <em>— front matter opts out</em>
-            </span>
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={fmt.rendersInDocument}
-              onChange={(e) => setFmt({ ...fmt, rendersInDocument: e.target.checked })}
-            />
-            <span>
-              Appears in the document <em>— notes don&rsquo;t</em>
             </span>
           </label>
         </div>

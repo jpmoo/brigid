@@ -2450,11 +2450,20 @@ mark.hit.active {
 
 /* --- Editor selects --------------------------------------------------- */
 
+/* Small enough that face/size sit on one line and spacing, justification and
+   vertical placement on the next — three to a row rather than two and an
+   orphan. The labels are short for the same reason. */
 .be-spacing,
 .te-bar.borders select {
   width: auto;
-  padding: 4px 6px;
-  font-size: 12px;
+  max-width: 116px;
+  padding: 2px 4px;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.be-line {
+  gap: 4px;
 }
 
 .te-bar.borders {

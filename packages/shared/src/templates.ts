@@ -207,8 +207,6 @@ export interface BlockFormatSettings {
    * matter opt out, so a title page at depth 0 doesn't inherit the part break.
    */
   structural: boolean;
-  /** False for notes: present in the outline, absent from the document. */
-  rendersInDocument: boolean;
   /** Applied in manuscript mode only. */
   typography?: Typography;
   /**

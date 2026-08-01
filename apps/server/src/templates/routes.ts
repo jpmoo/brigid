@@ -28,7 +28,6 @@ const breakSettings = z.object({
 const formatSettings = z.object({
   countsTowardWordCount: z.boolean(),
   structural: z.boolean(),
-  rendersInDocument: z.boolean(),
   typography,
   sectionStart: z
     .object({

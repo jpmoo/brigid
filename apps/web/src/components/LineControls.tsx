@@ -62,7 +62,7 @@ export function LineControls({
           value={style.fontFamily ?? ""}
           onChange={(e) => onStyle({ fontFamily: e.target.value || undefined })}
         >
-          <option value="">Font: inherit</option>
+          <option value="">Font</option>
           {FONT_CHOICES.map((f) => (
             <option key={f.label} value={f.stack}>
               {f.label}
@@ -77,7 +77,7 @@ export function LineControls({
             onStyle({ fontSizePt: e.target.value ? Number(e.target.value) : undefined })
           }
         >
-          <option value="">Size: inherit</option>
+          <option value="">Size</option>
           {[9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 36].map((pt) => (
             <option key={pt} value={pt}>
               {pt} pt
@@ -95,7 +95,7 @@ export function LineControls({
             onStyle({ lineHeight: e.target.value ? Number(e.target.value) : undefined })
           }
         >
-          <option value="">Spacing: inherit</option>
+          <option value="">Spacing</option>
           <option value="1">Single</option>
           <option value="1.15">1.15</option>
           <option value="1.5">1½</option>

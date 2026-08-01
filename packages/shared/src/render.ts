@@ -347,8 +347,6 @@ export function deriveDocument<B extends BlockNode>(input: DeriveInput<B>): Docu
 
   for (const entry of entries) {
     const format = templates.get(entry.block.formatId);
-    // Notes live in the outline but never reach the page.
-    if (format?.formatSettings && !format.formatSettings.rendersInDocument) continue;
 
     const ctx: SpanContext = {
       render,
