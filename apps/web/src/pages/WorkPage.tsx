@@ -787,7 +787,7 @@ export function WorkPage() {
             <Link className="btn ghost" to="/" title="Back to library">
               <ArrowLeft size={15} />
             </Link>
-            <Link className="btn ghost" to={`/settings?work=${id}`} title="Settings">
+            <Link className="btn ghost" to={`/settings?work=${id}`} title="Settings and tools">
               <Settings size={15} />
             </Link>
             <div className="spacer" />

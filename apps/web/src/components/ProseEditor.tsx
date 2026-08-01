@@ -992,7 +992,7 @@ export function ProseEditor({
               ? "Spelling is being checked"
               : spellcheckWanted
                 ? "Fetching the dictionary…"
-                : "Spelling checking is off — turn it on in Settings"
+                : "Spelling checking is off — turn it on in Settings and Tools"
           }
         >
           <SpellCheck size={13} />

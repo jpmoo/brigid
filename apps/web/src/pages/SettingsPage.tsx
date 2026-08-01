@@ -93,7 +93,7 @@ export function SettingsPage() {
         </button>
 
         <div className="page-head">
-          <h2>Settings</h2>
+          <h2>Settings and Tools</h2>
         </div>
 
         <nav className="tabs" role="tablist">
@@ -119,7 +119,7 @@ export function SettingsPage() {
                 className={tab === "project" ? "selected" : ""}
                 onClick={() => setTab("project")}
               >
-                Project Settings
+                Project Settings and Tools
               </button>
             </>
           ) : null}
@@ -136,8 +136,10 @@ export function SettingsPage() {
             workId ? (
               <>
                 <p className="card-subtitle">
-                  {work ? `Settings for “${work.title}”.` : "Settings for this manuscript."} These
-                  belong to the manuscript, not to Brigid.
+                  {work
+                    ? `Settings and tools for “${work.title}”.`
+                    : "Settings and tools for this manuscript."}{" "}
+                  These belong to the manuscript, not to Brigid.
                 </p>
 
                 <nav className="subtabs" role="tablist">

@@ -137,7 +137,7 @@ export function LibraryPage() {
         <BrandHeading />
         <div className="spacer" />
         <ThemeToggle />
-        <Link className="btn ghost" to="/settings" title="Settings">
+        <Link className="btn ghost" to="/settings" title="Settings and tools">
           <Settings size={16} />
         </Link>
         <button className="btn ghost" type="button" onClick={() => void logout()} title="Sign out">
