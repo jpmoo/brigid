@@ -3576,3 +3576,24 @@ mark.hit.active {
     padding: 6px 7px 6px 12px;
   }
 }
+
+/* Reaching the goal, and running out of time: the two moments the pill has
+   something to say rather than only something to show. */
+.session-pill.met {
+  background: var(--session);
+}
+
+.session-cheer {
+  white-space: nowrap;
+}
+
+/* Worded buttons rather than the tape-deck circles: these are a question. */
+.session-controls.wide button {
+  width: auto;
+  height: 24px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+}

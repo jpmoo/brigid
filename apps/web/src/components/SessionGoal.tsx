@@ -29,7 +29,14 @@ export interface Session {
   spent: number;
   /** When the current run began, or null while paused. */
   since: number | null;
+  /** Set once the word goal has been reached and acknowledged. */
+  celebrated?: boolean;
+  /** Set once the one extension has been spent. There is only ever one. */
+  extended?: boolean;
 }
+
+/** What a session is given when the writer asks for a little longer. */
+const EXTENSION_MINUTES = 5;
 
 export function startSession(minutes: number, words: number, total: number): Session {
   return { minutes, words, from: total, spent: 0, since: Date.now() };
@@ -47,6 +54,8 @@ export function readSession(): Session | null {
       from: parsed.from,
       spent: typeof parsed.spent === "number" ? parsed.spent : 0,
       since: typeof parsed.since === "number" ? parsed.since : null,
+      ...(parsed.celebrated ? { celebrated: true } : {}),
+      ...(parsed.extended ? { extended: true } : {}),
     };
   } catch {
     return null;
@@ -136,18 +145,78 @@ export function SessionPill({
   const done = left <= 0;
   const written = totalWords - session.from;
 
+  /**
+   * The two moments worth interrupting for.
+   *
+   * Reaching the words is the good one and can happen at any point, so it is
+   * offered while there is still time on the clock: carry on, or stop here.
+   * Running out without them is the other, and it comes with the one extension
+   * a session gets — once, or it isn't a session, it's an afternoon.
+   */
+  const met = session.words > 0 && written >= session.words;
+  const celebrating = met && session.celebrated !== true;
+  const ran_out = done && !celebrating;
+
   const pause = useCallback(() => onChange(pauseSession(session)), [session, onChange]);
   const resume = useCallback(() => onChange(resumeSession(session)), [session, onChange]);
 
+  const carryOn = () => onChange({ ...session, celebrated: true });
+  const longer = () =>
+    onChange({
+      ...session,
+      minutes: session.minutes + EXTENSION_MINUTES,
+      extended: true,
+      // The clock stopped when it ran out; more time means it runs again.
+      since: session.since ?? Date.now(),
+    });
+
   return (
     <div
-      className={`session-pill${done ? " done" : urgency(left, target)}${
-        session.since === null ? " paused" : ""
+      className={`session-pill${celebrating ? " met" : done ? " done" : urgency(left, target)}${
+        session.since === null && !celebrating ? " paused" : ""
       }`}
       role="status"
-      aria-live="off"
+      aria-live={celebrating || ran_out ? "polite" : "off"}
     >
-      <span className="session-clock">{done ? "time" : clock(left)}</span>
+      {celebrating ? (
+        <>
+          <span className="session-cheer">
+            {wordFmt.format(written)} words. That&rsquo;s the goal.
+          </span>
+          <span className="session-controls wide">
+            {/* Only if there is a session left to carry on with: reaching the
+                words on the last tick is worth saying so about, but there is
+                nothing to go back to. */}
+            {done ? null : (
+              <button type="button" onClick={carryOn}>
+                Keep going
+              </button>
+            )}
+            <button type="button" onClick={() => onChange(null)}>
+              Finish
+            </button>
+          </span>
+        </>
+      ) : ran_out ? (
+        <>
+          <span className="session-cheer">
+            Time. {wordFmt.format(written)}
+            {session.words > 0 ? ` of ${wordFmt.format(session.words)}` : ""} words.
+          </span>
+          <span className="session-controls wide">
+            {session.extended === true ? null : (
+              <button type="button" onClick={longer}>
+                {EXTENSION_MINUTES} more minutes
+              </button>
+            )}
+            <button type="button" onClick={() => onChange(null)}>
+              Finish
+            </button>
+          </span>
+        </>
+      ) : (
+        <>
+          <span className="session-clock">{clock(left)}</span>
 
       <span className="session-words">
         {/* Below zero is a real answer, and the sign says so rather than the
@@ -158,7 +227,7 @@ export function SessionPill({
       </span>
 
       <span className="session-controls">
-        {session.since === null ? (
+        {celebrating || ran_out ? null : session.since === null ? (
           <button type="button" title="Resume" aria-label="Resume" onClick={resume}>
             <Play size={12} />
           </button>
@@ -176,6 +245,8 @@ export function SessionPill({
           <Square size={12} />
         </button>
       </span>
+        </>
+      )}
     </div>
   );
 }
