@@ -3453,3 +3453,21 @@ mark.hit.active {
   font-size: 12px;
   color: var(--danger);
 }
+
+/* --- Small caps and all caps, while editing ---------------------------- */
+
+/* The editor plants a marked span and the serializer reads it back, so both
+   ends of this always worked — nothing ever drew it. What was typed looked
+   exactly like what wasn't, and the only way to see the mark had been to leave
+   the editor and look at the page.
+   The same three declarations the renderer applies, so the line under the
+   cursor is set the way the line on the page will be. */
+.chip-editor [data-sc] {
+  font-variant: small-caps;
+  letter-spacing: 0.08em;
+}
+
+.chip-editor [data-caps] {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
