@@ -33,13 +33,68 @@ export interface Session {
   celebrated?: boolean;
   /** Set once the one extension has been spent. There is only ever one. */
   extended?: boolean;
+  /**
+   * Words gained and words lost, accumulated rather than netted.
+   *
+   * The tally on the pill is a net figure and cannot tell "wrote a thousand,
+   * cut two hundred" from "wrote eight hundred". These two can, which is the
+   * only way an afternoon of revising reads as work rather than as nothing
+   * happening. Counted per save, so a sentence rewritten inside one save
+   * settles to its net before it is seen — the alternative is counting every
+   * keystroke, which would make deleting a typo a deletion.
+   */
+  added?: number;
+  removed?: number;
 }
 
-/** What a session is given when the writer asks for a little longer. */
-const EXTENSION_MINUTES = 5;
+/**
+ * A little longer, as a share of the sitting rather than a fixed number.
+ *
+ * Five minutes on top of five is a different proposition from five on top of
+ * ninety. A fifth keeps it in proportion — and below a whole minute it isn't
+ * worth offering, so it isn't.
+ */
+const EXTENSION_SHARE = 0.2;
+
+function extensionFor(minutes: number): number {
+  return Math.floor(minutes * EXTENSION_SHARE);
+}
 
 export function startSession(minutes: number, words: number, total: number): Session {
-  return { minutes, words, from: total, spent: 0, since: Date.now() };
+  return { minutes, words, from: total, spent: 0, since: Date.now(), added: 0, removed: 0 };
+}
+
+/** Records one save's worth of change, whichever way it went. */
+export function recordChange(session: Session, delta: number): Session {
+  if (delta === 0) return session;
+  return delta > 0
+    ? { ...session, added: (session.added ?? 0) + delta }
+    : { ...session, removed: (session.removed ?? 0) - delta };
+}
+
+/**
+ * How the sitting went.
+ *
+ * Words a minute is over time actually spent, so pausing to think doesn't
+ * flatter it and neither does leaving the room. "Kept" is what survived of
+ * what was written — below zero when more came out than went in, which is a
+ * real way to spend an hour and worth saying plainly.
+ */
+export function stats(session: Session, seconds: number): {
+  perMinute: number;
+  added: number;
+  removed: number;
+  kept: number | null;
+} {
+  const added = session.added ?? 0;
+  const removed = session.removed ?? 0;
+  const minutes = seconds / 60;
+  return {
+    perMinute: minutes > 0 ? Math.round(added / minutes) : 0,
+    added,
+    removed,
+    kept: added > 0 ? Math.round(((added - removed) / added) * 100) : null,
+  };
 }
 
 export function readSession(): Session | null {
@@ -56,6 +111,8 @@ export function readSession(): Session | null {
       since: typeof parsed.since === "number" ? parsed.since : null,
       ...(parsed.celebrated ? { celebrated: true } : {}),
       ...(parsed.extended ? { extended: true } : {}),
+      added: typeof parsed.added === "number" ? parsed.added : 0,
+      removed: typeof parsed.removed === "number" ? parsed.removed : 0,
     };
   } catch {
     return null;
@@ -88,6 +145,16 @@ export function resumeSession(session: Session): Session {
 function elapsed(session: Session): number {
   const running = session.since === null ? 0 : (Date.now() - session.since) / 1000;
   return session.spent + running;
+}
+
+/** The sitting in a sentence, for the end of it. */
+function summary(figures: ReturnType<typeof stats>): string {
+  const parts = [`${figures.perMinute} words a minute`];
+  if (figures.added > 0) {
+    parts.push(`${wordFmt.format(figures.added)} written, ${wordFmt.format(figures.removed)} cut`);
+    if (figures.kept !== null) parts.push(`${figures.kept}% kept`);
+  }
+  return parts.join(" · ");
 }
 
 function clock(seconds: number): string {
@@ -153,6 +220,7 @@ export function SessionPill({
    * Running out without them is the other, and it comes with the one extension
    * a session gets — once, or it isn't a session, it's an afternoon.
    */
+  const figures = stats(session, spent);
   const met = session.words > 0 && written >= session.words;
   const celebrating = met && session.celebrated !== true;
   const ran_out = done && !celebrating;
@@ -161,10 +229,11 @@ export function SessionPill({
   const resume = useCallback(() => onChange(resumeSession(session)), [session, onChange]);
 
   const carryOn = () => onChange({ ...session, celebrated: true });
+  const extension = extensionFor(session.minutes);
   const longer = () =>
     onChange({
       ...session,
-      minutes: session.minutes + EXTENSION_MINUTES,
+      minutes: session.minutes + extension,
       extended: true,
       // The clock stopped when it ran out; more time means it runs again.
       since: session.since ?? Date.now(),
@@ -182,6 +251,7 @@ export function SessionPill({
         <>
           <span className="session-cheer">
             {wordFmt.format(written)} words. That&rsquo;s the goal.
+            <em>{summary(figures)}</em>
           </span>
           <span className="session-controls wide">
             {/* Only if there is a session left to carry on with: reaching the
@@ -202,11 +272,12 @@ export function SessionPill({
           <span className="session-cheer">
             Time. {wordFmt.format(written)}
             {session.words > 0 ? ` of ${wordFmt.format(session.words)}` : ""} words.
+            <em>{summary(figures)}</em>
           </span>
           <span className="session-controls wide">
-            {session.extended === true ? null : (
+            {session.extended === true || extension < 1 ? null : (
               <button type="button" onClick={longer}>
-                {EXTENSION_MINUTES} more minutes
+                {extension} more {extension === 1 ? "minute" : "minutes"}
               </button>
             )}
             <button type="button" onClick={() => onChange(null)}>
@@ -225,6 +296,14 @@ export function SessionPill({
         {wordFmt.format(Math.abs(written))}
         {session.words > 0 ? <em> / {wordFmt.format(session.words)}</em> : null}
       </span>
+
+      {/* Only once there is enough of it to mean anything: a rate over ten
+          seconds is a number about nothing. */}
+      {spent > 30 && figures.perMinute > 0 ? (
+        <span className="session-rate" title={summary(figures)}>
+          {figures.perMinute}/min
+        </span>
+      ) : null}
 
       <span className="session-controls">
         {celebrating || ran_out ? null : session.since === null ? (

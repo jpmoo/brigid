@@ -37,6 +37,7 @@ import {
   SessionPill,
   pauseSession,
   readSession,
+  recordChange,
   resumeSession,
   writeSession,
 } from "../components/SessionGoal.js";
@@ -244,14 +245,27 @@ export function WorkPage() {
 
   const saveProse = useCallback(
     async (blockId: string, doc: ProseDoc) => {
+      // What this block was worth before the save, so the change can be counted
+      // as movement rather than only as a new total.
+      const before = blocks.find((b) => b.id === blockId)?.wordCount ?? 0;
       const { block } = await api.updateBlock(blockId, {
         content: doc as unknown as Record<string, unknown>,
       });
+
+      const delta = block.wordCount - before;
+      if (delta !== 0) {
+        setSession((current) => {
+          if (!current) return current;
+          const counted = recordChange(current, delta);
+          writeSession(counted);
+          return counted;
+        });
+      }
       // The word count is derived on the server, so the block that comes back
       // is the authority — including for the outline's totals.
       setBlocks((current) => current.map((b) => (b.id === blockId ? block : b)));
     },
-    [],
+    [blocks],
   );
 
   useEffect(() => {

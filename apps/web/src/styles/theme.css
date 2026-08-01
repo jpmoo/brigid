@@ -3597,3 +3597,19 @@ mark.hit.active {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* The rate, while it runs. Small, because it is the least of the three things
+   on the pill and shouldn't compete with the clock. */
+.session-rate {
+  font-size: 11px;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* How the sitting went, under what it came to. */
+.session-cheer em {
+  display: block;
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.75;
+}
