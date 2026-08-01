@@ -4128,6 +4128,7 @@ mark.hit.active {
 }
 
 .cast-tile {
+  position: relative;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--paper);
@@ -4285,7 +4286,8 @@ mark.hit.active {
 .cast-tile-head {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
+  /* Room for the corner control, so a long name doesn't run under it. */
+  padding-right: 30px;
 }
 
 .cast-tile-titles {
@@ -4296,8 +4298,13 @@ mark.hit.active {
   flex: 1;
 }
 
+/* Pinned to the tile's corner rather than riding along with the titles: an
+   epithet is one line or three, and a control that drifts down the card with it
+   is a control you have to look for. */
 .cast-tile-expand {
-  flex: none;
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: grid;
   place-items: center;
   width: 26px;
