@@ -365,3 +365,22 @@ export const characterRuns = pgTable("character_runs", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * The story-shape analysis, queued rather than run in the request.
+ *
+ * One call rather than a dozen, so it fitted where character profiling didn't —
+ * but only for a book the model could get through quickly, and it tied the work
+ * to a page nobody could leave. No queue here: there is one thing to do.
+ */
+export const structureRuns = pgTable("structure_runs", {
+  workId: uuid("work_id")
+    .primaryKey()
+    .references(() => works.id, { onDelete: "cascade" }),
+  status: text("status").$type<"queued" | "running" | "idle" | "failed">().notNull().default("queued"),
+  digestFingerprint: text("digest_fingerprint"),
+  lastError: text("last_error"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});

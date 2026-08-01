@@ -243,3 +243,11 @@ export interface CharacterRunProgress {
   /** Rough seconds left, from what this run has actually cost. Null early on. */
   etaSeconds: number | null;
 }
+
+/** Whether the story-shape analysis is under way. */
+export interface StructureRunProgress {
+  status: "queued" | "running" | "idle" | "failed";
+  lastError: string | null;
+  /** Seconds it has been going, so a long wait can say so. */
+  elapsedSeconds: number | null;
+}

@@ -12,6 +12,8 @@ import {
   cancelCharacterRun,
   characterProgressOf,
   queueCharacterRun,
+  queueStructureRun,
+  structureProgressOf,
 } from "./profile-worker.js";
 import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
@@ -186,6 +188,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     return {
       progress,
       characterRun: await characterProgressOf(workId),
+      structureRun: await structureProgressOf(workId),
       roster: buildRoster(sections),
       // Labels travel with the findings so the web app doesn't keep a second
       // copy of the frameworks' names that could drift from this one.
@@ -212,28 +215,19 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   app.post("/works/:workId/analysis/structure", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const work = await workOr404(workId);
-    const config = await reader();
+    await workOr404(workId);
+    // Checked here so a misconfigured host fails at the button rather than
+    // silently in a worker twenty seconds later.
+    await reader();
     const sections = await readyDigest(workId);
 
-    const { result, ms } = await analyseStructure({
-      ...config,
-      title: work.title,
-      totalWords: sections.reduce((sum, s) => sum + s.words, 0),
-      sections,
-    });
-
-    await store(
-      workId,
-      "structure",
-      null,
-      config.model,
-      fingerprint(sections),
-      snapshot(sections),
-      result,
-      ms,
-    );
-    return { result, ms };
+    /**
+     * Queued, not run. One call rather than a dozen, so this used to fit inside
+     * the request — but only for a book the model could get through quickly,
+     * and it tied the analysis to a page nobody could leave.
+     */
+    await queueStructureRun(workId, fingerprint(sections));
+    return { progress: await structureProgressOf(workId) };
   });
 
   /**

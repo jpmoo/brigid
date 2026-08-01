@@ -4,6 +4,7 @@ import type {
   AnalysisDrift,
   BlockFormatSettings,
   CharacterRunProgress,
+  StructureRunProgress,
   BreakTemplateSettings,
   CharacterAnalysis,
   DigestProgress,
@@ -137,6 +138,8 @@ export interface AnalysisBundle {
   progress: DigestProgress;
   /** A queued run of character profiles, if there has ever been one. */
   characterRun: CharacterRunProgress | null;
+  /** Whether the story-shape analysis is under way. */
+  structureRun: StructureRunProgress | null;
   roster: RosterEntry[];
   axisLabels: Record<string, string>;
   modelLabels: Record<string, string>;
@@ -506,8 +509,9 @@ export const api = {
   getDigestProgress: (workId: string) =>
     request<DigestProgress>(`/works/${workId}/digest/progress`),
   getAnalysis: (workId: string) => request<AnalysisBundle>(`/works/${workId}/analysis`),
+  /** Queues it and returns at once; watch `structureRun` for progress. */
   runStructureAnalysis: (workId: string) =>
-    post<{ result: StructureAnalysis }>(`/works/${workId}/analysis/structure`),
+    post<{ progress: StructureRunProgress | null }>(`/works/${workId}/analysis/structure`),
   /** Queues the run and returns at once; watch `characterRun` for progress. */
   runCharacterAnalysis: (workId: string, body: { name?: string; focal?: string }) =>
     post<{ queued: string[]; progress: CharacterRunProgress | null }>(

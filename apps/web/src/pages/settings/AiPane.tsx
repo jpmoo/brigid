@@ -16,6 +16,7 @@ import type {
   ModelFit,
   PlacedDigest,
   StructureAnalysis,
+  StructureRunProgress,
 } from "@brigid/shared";
 import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
@@ -57,8 +58,11 @@ export function AiPane({ workId }: { workId: string }) {
    * page left open shouldn't keep a server busy all afternoon.
    */
   const run = bundle?.characterRun ?? null;
+  const shapeRun = bundle?.structureRun ?? null;
   const profiling = run?.status === "queued" || run?.status === "running";
-  const walking = bundle ? !bundle.progress.ready || profiling : false;
+  const shaping = shapeRun?.status === "queued" || shapeRun?.status === "running";
+  // Anything happening on the server is a reason to keep looking.
+  const walking = bundle ? !bundle.progress.ready || profiling || shaping : false;
   useEffect(() => {
     if (!walking) return;
     const id = setInterval(() => void reload(), 5000);
@@ -134,6 +138,7 @@ export function AiPane({ workId }: { workId: string }) {
               report={structure}
               labels={bundle.modelLabels}
               blurbs={bundle.modelBlurbs}
+              run={shapeRun}
               busy={busy === "structure"}
               onRun={() => void start("structure")}
             />
@@ -268,12 +273,14 @@ function StructurePane({
   report,
   labels,
   blurbs,
+  run,
   busy,
   onRun,
 }: {
   report: AnalysisBundle["reports"][number] | undefined;
   labels: Record<string, string>;
   blurbs: Record<string, string>;
+  run: StructureRunProgress | null;
   busy: boolean;
   onRun: () => void;
 }) {
@@ -291,16 +298,31 @@ function StructurePane({
       return next;
     });
   const allOpen = (result?.models.length ?? 0) > 0 && open.size >= (result?.models.length ?? 0);
+  const working = run?.status === "queued" || run?.status === "running";
 
   return (
     <>
       <div className="be-line" style={{ marginTop: 12 }}>
-        <button className="btn" type="button" disabled={busy} onClick={onRun}>
+        <button className="btn" type="button" disabled={busy || working} onClick={onRun}>
           {result ? <RefreshCw size={14} /> : <Play size={14} />}
-          {busy ? "Reading the shape…" : result ? "Run again" : "Analyse the story's shape"}
+          {working ? "Reading the shape…" : result ? "Run again" : "Analyse the story's shape"}
         </button>
-        {busy ? <span className="muted">This takes a few minutes.</span> : null}
+        {working ? (
+          <span className="muted">
+            Running on the server &mdash; you can leave this page
+            {run?.elapsedSeconds && run.elapsedSeconds > 45
+              ? `, ${humanDuration(run.elapsedSeconds)} so far`
+              : ""}
+            .
+          </span>
+        ) : null}
       </div>
+
+      {run?.status === "failed" && run.lastError ? (
+        <div className="alert error">
+          <AlertTriangle size={14} /> The analysis stopped: {run.lastError}
+        </div>
+      ) : null}
 
       {!result ? (
         <p className="tpl-note">

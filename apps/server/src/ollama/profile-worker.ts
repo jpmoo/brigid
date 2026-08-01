@@ -1,8 +1,13 @@
 import { and, eq, isNull } from "drizzle-orm";
-import { analyses, characterRuns, settings, works } from "@brigid/db";
-import type { CharacterAnalysis, CharacterRunProgress, PlacedDigest } from "@brigid/shared";
+import { analyses, characterRuns, settings, structureRuns, works } from "@brigid/db";
+import type {
+  CharacterAnalysis,
+  CharacterRunProgress,
+  PlacedDigest,
+  StructureRunProgress,
+} from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
-import { analyseCharacter, reconcilePrimacy } from "./analysis.js";
+import { analyseCharacter, analyseStructure, reconcilePrimacy } from "./analysis.js";
 import { placedDigests } from "./worker.js";
 
 /**
@@ -189,6 +194,105 @@ async function reconcile(workId: string): Promise<void> {
   }
 }
 
+/** Queue the story-shape analysis. One thing to do, so no list. */
+export async function queueStructureRun(workId: string, fingerprint: string): Promise<void> {
+  const row = {
+    workId,
+    status: "queued" as const,
+    digestFingerprint: fingerprint,
+    lastError: null,
+    startedAt: new Date(),
+    finishedAt: null,
+    updatedAt: new Date(),
+  };
+  await db
+    .insert(structureRuns)
+    .values(row)
+    .onConflictDoUpdate({ target: structureRuns.workId, set: row });
+  kick();
+}
+
+export async function structureProgressOf(workId: string): Promise<StructureRunProgress | null> {
+  const [row] = await db.select().from(structureRuns).where(eq(structureRuns.workId, workId)).limit(1);
+  if (!row) return null;
+  const live = row.status === "queued" || row.status === "running";
+  return {
+    status: row.status,
+    lastError: row.lastError,
+    elapsedSeconds:
+      live && row.startedAt ? Math.round((Date.now() - row.startedAt.getTime()) / 1000) : null,
+  };
+}
+
+/** The story-shape analysis, if one is waiting. */
+async function drainStructure(workId: string, signal: AbortSignal): Promise<void> {
+  const [row] = await db.select().from(structureRuns).where(eq(structureRuns.workId, workId)).limit(1);
+  if (!row || (row.status !== "queued" && row.status !== "running")) return;
+
+  const config = await reader();
+  if (!config) return;
+
+  const [work] = await db
+    .select({ title: works.title })
+    .from(works)
+    .where(eq(works.id, workId))
+    .limit(1);
+  if (!work) return;
+
+  const sections = await placedDigests(workId);
+  if (sections.length === 0) return;
+
+  await db
+    .update(structureRuns)
+    .set({ status: "running", updatedAt: new Date() })
+    .where(eq(structureRuns.workId, workId));
+
+  try {
+    const { result, ms } = await analyseStructure({
+      url: config.url,
+      model: config.model,
+      numCtx: config.numCtx,
+      thinks: config.thinks,
+      title: work.title,
+      totalWords: sections.reduce((sum, sec) => sum + sec.words, 0),
+      sections,
+      signal,
+    });
+
+    const shot = snapshot(sections);
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(analyses)
+        .where(and(eq(analyses.workId, workId), eq(analyses.kind, "structure")));
+      await tx.insert(analyses).values({
+        workId,
+        kind: "structure",
+        subject: null,
+        model: config.model,
+        digestFingerprint: row.digestFingerprint ?? "",
+        digestSnapshot: shot,
+        result: result as unknown as Record<string, unknown>,
+        ms,
+      });
+    });
+
+    await db
+      .update(structureRuns)
+      .set({ status: "idle", lastError: null, finishedAt: new Date(), updatedAt: new Date() })
+      .where(eq(structureRuns.workId, workId));
+  } catch (err) {
+    await db
+      .update(structureRuns)
+      .set({
+        status: "failed",
+        lastError: err instanceof Error ? err.message : String(err),
+        finishedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(structureRuns.workId, workId));
+  }
+}
+
 /**
  * Work through one manuscript's queue.
  *
@@ -298,13 +402,15 @@ async function drainOne(workId: string, signal: AbortSignal): Promise<boolean> {
 async function sweep(signal: AbortSignal): Promise<void> {
   if (!isDbReady()) return;
 
-  const rows = await db
-    .select({ workId: characterRuns.workId })
-    .from(characterRuns)
-    .innerJoin(works, eq(works.id, characterRuns.workId))
+  const pending = await db
+    .select({ workId: works.id })
+    .from(works)
     .where(isNull(works.archivedAt));
 
-  for (const row of rows) {
+  for (const row of pending) {
+    if (signal.aborted) return;
+    // The shape first: it is one call, and it is what most people press.
+    await drainStructure(row.workId, signal);
     if (signal.aborted) return;
     // Keep going while this manuscript has queue left, so a run finishes
     // rather than trickling one character per sweep.
