@@ -34,11 +34,12 @@ async function reader() {
       url: settings.ollamaUrl,
       model: settings.inferenceModel,
       numCtx: settings.ollamaNumCtx,
+      thinks: settings.ollamaThinks,
     })
     .from(settings)
     .limit(1);
   if (!row?.url || !row.model) throw badRequest("no model is connected");
-  return { url: row.url, model: row.model, numCtx: row.numCtx };
+  return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
 }
 
 async function workOr404(workId: string) {

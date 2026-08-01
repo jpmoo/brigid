@@ -9,6 +9,7 @@
  */
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
+import { parseJson, thinksFrom } from "../src/ollama/client.js";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -125,6 +126,51 @@ try {
 } catch (err) {
   check("a host that isn't there is refused", /nothing answered/.test((err as Error).message));
 }
+
+
+
+console.log("\ndigging the answer out");
+
+// The failure that started this: an empty answer reported as "not JSON: ",
+// which told nobody anything. Each of these is a way a real model has of
+// handing back an answer that isn't bare JSON.
+function parsesTo(label: string, input: string, want: unknown): void {
+  try {
+    check(label, JSON.stringify(parseJson(input)) === JSON.stringify(want));
+  } catch (err) {
+    check(label, false, (err as Error).message);
+  }
+}
+
+parsesTo("bare JSON parses", '{"a":1}', { a: 1 });
+parsesTo("a fenced block is unwrapped", '```json\n{"a":1}\n```', { a: 1 });
+parsesTo("an unlabelled fence too", '```\n{"a":1}\n```', { a: 1 });
+parsesTo("inline reasoning is stripped", '<think>let me see</think>\n{"a":1}', { a: 1 });
+parsesTo("a sentence of preamble is skipped", 'Here is the result:\n{"a":1}', { a: 1 });
+parsesTo("reasoning wrapped around a fence", '<think>hm</think>```json\n{"a":1}```', { a: 1 });
+
+for (const [label, input] of [
+  ["nothing at all is refused", ""],
+  ["whitespace is refused", "   \n  "],
+  ["reasoning with no answer is refused", "<think>still thinking</think>"],
+  ["prose with no JSON is refused", "I could not do that."],
+] as const) {
+  try {
+    parseJson(input);
+    check(label, false, "it was accepted");
+  } catch {
+    check(label, true);
+  }
+}
+
+console.log("\nwhat the model can do");
+
+check("a thinking model is recognized", thinksFrom({ capabilities: ["completion", "thinking"] }) === true);
+check("a plain one is recognized too", thinksFrom({ capabilities: ["completion"] }) === false);
+// Null and false are not the same: `think: false` is rejected outright by
+// Ollama on a model that lacks the capability, so an unknown must not be
+// treated as a no.
+check("an Ollama that doesn't say gives null", thinksFrom({}) === null);
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

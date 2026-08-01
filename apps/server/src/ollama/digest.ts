@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import type { DigestCharacter, DigestEvent, SectionDigest } from "@brigid/shared";
-import { charBudget, generate, parseJson } from "./client.js";
+import { charBudget, generateJson } from "./client.js";
 
 /**
  * Reading one section.
@@ -178,6 +178,8 @@ export interface DigestRequest {
   url: string;
   model: string;
   numCtx: number | null;
+  /** Whether the model thinks, so the working can be switched off. */
+  thinks?: boolean | null;
   /** What the outline calls this section, if anything. Context, not content. */
   label: string | null;
   text: string;
@@ -199,10 +201,11 @@ export async function digestSection(
     const ofN =
       parts.length > 1 ? `(part ${index + 1} of ${parts.length} of this section)\n` : "";
 
-    const result = await generate({
+    const result = await generateJson<Partial<SectionDigest>>({
       url: req.url,
       model: req.model,
       numCtx: req.numCtx,
+      thinks: req.thinks ?? null,
       system: SYSTEM,
       format: SCHEMA as unknown as Record<string, unknown>,
       prompt: `${heading}${ofN}\n${part}`,
@@ -210,7 +213,7 @@ export async function digestSection(
     });
 
     ms += result.ms;
-    digests.push(normalize(parseJson<Partial<SectionDigest>>(result.text)));
+    digests.push(normalize(result.value));
   }
 
   return { digest: digests.length === 1 ? digests[0]! : mergeDigests(digests), ms };

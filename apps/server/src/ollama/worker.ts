@@ -55,17 +55,23 @@ async function sectionsOf(workId: string) {
 }
 
 /** Which model is configured, if the walk can run at all. */
-async function reader(): Promise<{ url: string; model: string; numCtx: number | null } | null> {
+async function reader(): Promise<{
+  url: string;
+  model: string;
+  numCtx: number | null;
+  thinks: boolean | null;
+} | null> {
   const [row] = await db
     .select({
       url: settings.ollamaUrl,
       model: settings.inferenceModel,
       numCtx: settings.ollamaNumCtx,
+      thinks: settings.ollamaThinks,
     })
     .from(settings)
     .limit(1);
   if (!row?.url || !row.model) return null;
-  return { url: row.url, model: row.model, numCtx: row.numCtx };
+  return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
 }
 
 /**
@@ -182,13 +188,22 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
     for (const section of stale) {
       if (signal.aborted) break;
 
+      // Which section failed matters: one chapter the model chokes on reads
+      // very differently from a host that has gone away, and the panel shows
+      // whatever this says.
+      const where = section.label ? `“${section.label}”` : "an untitled section";
       const { digest, ms } = await digestSection({
         url: config.url,
         model: config.model,
         numCtx: config.numCtx,
+        thinks: config.thinks,
         label: section.label,
         text: section.text,
         signal,
+      }).catch((err: unknown) => {
+        throw new Error(
+          `reading ${where}: ${err instanceof Error ? err.message : String(err)}`,
+        );
       });
 
       // The prose may have moved on while the model was reading. Storing the

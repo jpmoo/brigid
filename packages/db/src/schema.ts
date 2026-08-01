@@ -65,6 +65,13 @@ export const settings = pgTable("settings", {
    * 4k unless asked otherwise, and the excess is silently dropped.
    */
   ollamaNumCtx: integer("ollama_num_ctx"),
+  /**
+   * Whether the model reports a thinking capability. Reading a chapter is
+   * transcription, not reasoning, so thinking is switched off where it can be —
+   * but Ollama rejects the field on models that don't support it, so this is
+   * detected rather than assumed. Null means Ollama didn't say.
+   */
+  ollamaThinks: boolean("ollama_thinks"),
   /** How the writer likes to work, not anything about a particular manuscript. */
   spellcheckEnabled: boolean("spellcheck_enabled").notNull().default(true),
   /** The nightly backup: whether, when on the server's own clock, and how many. */

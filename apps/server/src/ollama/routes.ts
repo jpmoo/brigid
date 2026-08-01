@@ -5,7 +5,7 @@ import { settings } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest } from "../lib/errors.js";
-import { contextLengthOf } from "./client.js";
+import { inspectModel } from "./client.js";
 import { placedDigests, progressOf } from "./worker.js";
 
 /**
@@ -67,6 +67,7 @@ async function current() {
       url: settings.ollamaUrl,
       analysisModel: settings.inferenceModel,
       numCtx: settings.ollamaNumCtx,
+      thinks: settings.ollamaThinks,
     })
     .from(settings)
     .limit(1);
@@ -74,6 +75,7 @@ async function current() {
     url: row?.url ?? null,
     analysisModel: row?.analysisModel ?? null,
     numCtx: row?.numCtx ?? null,
+    thinks: row?.thinks ?? null,
   };
 }
 
@@ -165,9 +167,12 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
       null;
     const model = (patch.inferenceModel as string | null | undefined) ?? null;
     if (model && target) {
-      patch.ollamaNumCtx = await contextLengthOf(target, model).catch(() => null);
+      const seen = await inspectModel(target, model).catch(() => ({ numCtx: null, thinks: null }));
+      patch.ollamaNumCtx = seen.numCtx;
+      patch.ollamaThinks = seen.thinks;
     } else if (body.analysisModel === null || body.url === null) {
       patch.ollamaNumCtx = null;
+      patch.ollamaThinks = null;
     }
 
     await db.update(settings).set(patch).where(eq(settings.id, row.id));

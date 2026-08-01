@@ -4,7 +4,7 @@ import type {
   RosterEntry,
   StructureAnalysis,
 } from "@brigid/shared";
-import { generate, parseJson } from "./client.js";
+import { generateJson } from "./client.js";
 import {
   AXES,
   AXES_PRINCIPLES,
@@ -190,6 +190,7 @@ export async function analyseStructure(opts: {
   url: string;
   model: string;
   numCtx: number | null;
+  thinks?: boolean | null;
   title: string;
   totalWords: number;
   sections: PlacedDigest[];
@@ -209,17 +210,18 @@ For each: the fit rating, the distinctive elements you found with the events ins
 
 Then name the single best-fitting model in "bestFit" using one of those keys — or leave it empty if the manuscript follows rhetorical or associative logic and fits no beat model well, which is a legitimate finding. Explain in "bestFitWhy". In "overview", give a few sentences on the manuscript's shape overall.`;
 
-  const answer = await generate({
+  const answer = await generateJson<Partial<StructureAnalysis>>({
     url: opts.url,
     model: opts.model,
     numCtx: opts.numCtx,
+    thinks: opts.thinks ?? null,
     system: STRUCTURE_PRINCIPLES,
     format: STRUCTURE_SCHEMA as unknown as Record<string, unknown>,
     prompt,
     ...(opts.signal ? { signal: opts.signal } : {}),
   });
 
-  const raw = parseJson<Partial<StructureAnalysis>>(answer.text);
+  const raw = answer.value;
   const found = new Map((raw.models ?? []).map((m) => [m.model, m]));
 
   // Every model gets a bar, whether or not the judge remembered it. A missing
@@ -277,6 +279,7 @@ export async function analyseCharacter(opts: {
   url: string;
   model: string;
   numCtx: number | null;
+  thinks?: boolean | null;
   title: string;
   name: string;
   /** Whose arc to score against — one chart, one perspective. */
@@ -305,17 +308,18 @@ Then: "summary", a one- or two-sentence reading of the SHAPE of the profile (for
 
 A flat or near-zero profile is a valid result. Do not inflate.`;
 
-  const answer = await generate({
+  const answer = await generateJson<Partial<CharacterAnalysis>>({
     url: opts.url,
     model: opts.model,
     numCtx: opts.numCtx,
+    thinks: opts.thinks ?? null,
     system: AXES_PRINCIPLES,
     format: CHARACTER_SCHEMA as unknown as Record<string, unknown>,
     prompt,
     ...(opts.signal ? { signal: opts.signal } : {}),
   });
 
-  const raw = parseJson<Partial<CharacterAnalysis>>(answer.text);
+  const raw = answer.value;
   const found = new Map((raw.axes ?? []).map((a) => [a.axis, a]));
 
   // A radar chart with a missing spoke is not a shape, so every axis is
