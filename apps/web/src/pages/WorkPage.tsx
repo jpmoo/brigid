@@ -231,6 +231,13 @@ export function WorkPage() {
   // effects below depend on it.
   const showPanel = zen || phone ? panelOpen : true;
 
+  // Rotating a phone, or narrowing a window, must not strand the writer in a
+  // mode whose only exits are a key they haven't got and a control no longer
+  // offered.
+  useEffect(() => {
+    if (phone && zen) setZen(false);
+  }, [phone, zen]);
+
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const entries = useMemo(() => buildOutline(blocks), [blocks]);
 
@@ -667,14 +674,20 @@ export function WorkPage() {
 
         <ThemeToggle />
 
-        <button
-          className="btn ghost"
-          type="button"
-          title="Zen — hide everything but the manuscript (Esc to leave)"
-          onClick={() => setZen(true)}
-        >
-          <Maximize2 size={16} />
-        </button>
+        {/* Not offered on a phone. Zen trades chrome for manuscript, and a
+            phone has almost no chrome to trade — the header is already the
+            whole of it, and Escape, which is how you leave, is a key it
+            hasn't got. */}
+        {phone ? null : (
+          <button
+            className="btn ghost"
+            type="button"
+            title="Zen — hide everything but the manuscript (Esc to leave)"
+            onClick={() => setZen(true)}
+          >
+            <Maximize2 size={16} />
+          </button>
+        )}
       </header>
 
       {error ? <div className="alert error work-error">{error}</div> : null}
