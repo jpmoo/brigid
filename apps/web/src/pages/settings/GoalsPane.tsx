@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Play, Square } from "lucide-react";
-import type { Block } from "../../api.js";
+import { ApiError, api } from "../../api.js";
+import type { Block, Work, WorkLevel } from "../../api.js";
+import { useSavedFlash } from "../../useSavedFlash.js";
 import { readSession, startSession, writeSession } from "../../components/SessionGoal.js";
 
 const wordFmt = new Intl.NumberFormat();
@@ -13,8 +15,58 @@ const wordFmt = new Intl.NumberFormat();
  * the next hour rather than about the book, which is why it is started rather
  * than saved: it begins when you say so and it is over when it is over.
  */
-export function GoalsPane({ blocks }: { blocks: Block[] }) {
+export function GoalsPane({
+  workId,
+  work,
+  blocks,
+  levels,
+  onSaved,
+}: {
+  workId: string;
+  work: Work | null;
+  blocks: Block[];
+  levels: WorkLevel[];
+  onSaved: () => void;
+}) {
   const total = blocks.reduce((sum, b) => sum + b.wordCount, 0);
+
+  const [total_goal, setTotalGoal] = useState<number | null>(work?.totalWordGoal ?? null);
+  const [goals, setGoals] = useState<Record<number, number | null>>(() =>
+    Object.fromEntries(levels.map((l) => [l.depth, l.wordGoal ?? null])),
+  );
+  const [saving, setSaving] = useState(false);
+  const [saved, flash] = useSavedFlash();
+  const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Both at once, because they are one decision.
+   *
+   * The levels go back as a whole list — that is how they are stored, an
+   * ordered set rather than rows to be patched — so the goal travels with the
+   * rest of each level rather than as a separate thing that could disagree.
+   */
+  async function saveGoals() {
+    setSaving(true);
+    setError(null);
+    try {
+      await api.updateWork(workId, { totalWordGoal: total_goal && total_goal > 0 ? total_goal : null });
+      await api.saveLevels(
+        workId,
+        levels.map((l) => ({
+          name: l.name,
+          breakTemplateId: l.breakTemplateId,
+          counterRestart: l.counterRestart,
+          wordGoal: goals[l.depth] && (goals[l.depth] ?? 0) > 0 ? goals[l.depth] : null,
+        })),
+      );
+      flash();
+      onSaved();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not save that");
+    } finally {
+      setSaving(false);
+    }
+  }
   const [running, setRunning] = useState(() => readSession() !== null);
   const [minutes, setMinutes] = useState(25);
   const [words, setWords] = useState(500);
@@ -87,12 +139,70 @@ export function GoalsPane({ blocks }: { blocks: Block[] }) {
       )}
 
       <h4 className="tpl-section">Standing goals</h4>
-      <p className="card-subtitle" style={{ marginBottom: 0 }}>
-        A target length for the whole manuscript, and one for its sections &mdash; the outline
-        shading a section red until it is met and green once it is. One of each: a single
-        total, and a single length per level, so a chapter and a scene can each have their own
-        but neither can have two. Not built yet; the session above is.
+      <p className="tpl-note">
+        A length to aim at. The outline shades a section red until it is met and green once
+        it is, so the shape of the book is visible without opening anything. One total, and
+        one length per level &mdash; a chapter and a scene can each have their own.
       </p>
+
+      <div className="be-line be-line-setting" style={{ marginTop: 8 }}>
+        <label className="bk-field">
+          <span>The whole manuscript</span>
+          <input
+            type="number"
+            min={0}
+            step={1000}
+            placeholder="No goal"
+            value={total_goal ?? ""}
+            onChange={(e) => setTotalGoal(e.target.value ? Number(e.target.value) : null)}
+          />
+          <span>words</span>
+        </label>
+        {total_goal === null ? null : (
+          <button className="btn ghost" type="button" onClick={() => setTotalGoal(null)}>
+            Clear
+          </button>
+        )}
+      </div>
+
+      {levels.map((level) => (
+        <div className="be-line be-line-setting" key={level.id}>
+          <label className="bk-field">
+            <span>Each {level.name.toLowerCase()}</span>
+            <input
+              type="number"
+              min={0}
+              step={500}
+              placeholder="No goal"
+              value={goals[level.depth] ?? ""}
+              onChange={(e) =>
+                setGoals({
+                  ...goals,
+                  [level.depth]: e.target.value ? Number(e.target.value) : null,
+                })
+              }
+            />
+            <span>words</span>
+          </label>
+          {goals[level.depth] == null ? null : (
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={() => setGoals({ ...goals, [level.depth]: null })}
+            >
+              Clear
+            </button>
+          )}
+        </div>
+      ))}
+
+      <div className="be-line" style={{ marginTop: 10 }}>
+        <button className="btn" type="button" disabled={saving} onClick={() => void saveGoals()}>
+          {saving ? "Saving…" : "Save goals"}
+        </button>
+        {saved ? <span className="saved-flash">Saved</span> : null}
+        {error ? <span className="compile-warn">{error}</span> : null}
+      </div>
     </div>
   );
 }

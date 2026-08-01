@@ -51,18 +51,20 @@ export function SettingsPage() {
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [levels, setLevels] = useState<WorkLevel[]>([]);
 
-  useEffect(() => {
+  const reloadWork = useCallback(async () => {
     if (!workId) return;
-    void (async () => {
-      const [{ work: w, levels: ls }, { blocks: bs }] = await Promise.all([
-        api.getWork(workId),
-        api.listBlocks(workId),
-      ]);
-      setWork(w);
-      setLevels(ls);
-      setBlocks(bs);
-    })();
+    const [{ work: w, levels: ls }, { blocks: bs }] = await Promise.all([
+      api.getWork(workId),
+      api.listBlocks(workId),
+    ]);
+    setWork(w);
+    setLevels(ls);
+    setBlocks(bs);
   }, [workId]);
+
+  useEffect(() => {
+    void reloadWork();
+  }, [reloadWork]);
 
   const loadTemplates = useCallback(async () => {
     const { templates: rows } = await api.listTemplates();
@@ -166,9 +168,15 @@ export function SettingsPage() {
                 {projectTab === "levels" ? (
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
                 ) : projectTab === "goals" ? (
-                  <GoalsPane blocks={blocks} />
+                  <GoalsPane
+                    workId={workId}
+                    work={work}
+                    blocks={blocks}
+                    levels={levels}
+                    onSaved={() => void reloadWork()}
+                  />
                 ) : projectTab === "stats" ? (
-                  <StatsPane blocks={blocks} levels={levels} />
+                  <StatsPane blocks={blocks} levels={levels} templates={templates} />
                 ) : (
                   <CompilePane
                     workId={workId}

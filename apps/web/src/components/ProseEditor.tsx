@@ -562,6 +562,31 @@ export function ProseEditor({
     setSelection(el, initialSelection.anchor, initialSelection.focus);
     setWords(countWords(el.textContent ?? ""));
 
+    /**
+     * The gesture that opened this editor isn't over.
+     *
+     * A drag in the rendered manuscript ends with a pointer release, which is
+     * what swapped the paragraphs for this element — but the browser still has
+     * a `click` to deliver from the same gesture, and it lands here, on an
+     * element that didn't exist when the gesture began. A click on a
+     * contenteditable collapses the selection to the point clicked, which threw
+     * away the passage that had just been carried across.
+     *
+     * So the selection is put back once, if that click arrives promptly. A
+     * click a moment later is the writer's own and means what it says.
+     */
+    if (initialSelection.anchor !== initialSelection.focus) {
+      const restore = () => {
+        setSelection(el, initialSelection.anchor, initialSelection.focus);
+      };
+      el.addEventListener("click", restore, { once: true, capture: true });
+      const give_up = window.setTimeout(() => {
+        el.removeEventListener("click", restore, { capture: true });
+      }, 400);
+      // Cleared on unmount by the effect's own teardown below.
+      void give_up;
+    }
+
     // The word that was clicked, already underlined in what was just rendered.
     if (!askAbout) return;
     for (const span of el.querySelectorAll(".misspelled")) {

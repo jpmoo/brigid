@@ -6,7 +6,7 @@ import {
   subtreeWordCounts,
   wordFrequency,
 } from "@brigid/shared";
-import type { Block, WorkLevel } from "../../api.js";
+import type { Block, Template, WorkLevel } from "../../api.js";
 
 const fmt = new Intl.NumberFormat();
 
@@ -18,14 +18,29 @@ const fmt = new Intl.NumberFormat();
  * of it is worked out in the browser from prose already loaded, so it costs a
  * request to nobody and is as current as the page.
  */
-export function StatsPane({ blocks, levels }: { blocks: Block[]; levels: WorkLevel[] }) {
+export function StatsPane({
+  blocks,
+  levels,
+  templates,
+}: {
+  blocks: Block[];
+  levels: WorkLevel[];
+  templates: Template[];
+}) {
   const [ownWords, setOwnWords] = useState(true);
 
   const stats = useMemo(() => {
+    const formats = new Map(templates.map((t) => [t.id, t.formatSettings]));
+    /** A title page is not a section, and an epigraph is not prose. */
+    const counts = (block: Block) => formats.get(block.formatId)?.countsTowardWordCount !== false;
+    const structural = (block: Block) => formats.get(block.formatId)?.structural !== false;
+
     const entries = buildOutline(blocks);
     const totals = subtreeWordCounts(entries);
 
-    const sections = entries.map((entry) => ({
+    const sections = entries
+      .filter((entry) => structural(entry.block))
+      .map((entry) => ({
       depth: entry.depth,
       label: entry.block.label || "Untitled",
       // A chapter is as long as its scenes; counting only what was typed
@@ -33,15 +48,21 @@ export function StatsPane({ blocks, levels }: { blocks: Block[]; levels: WorkLev
       words: totals.get(entry.block.id) ?? entry.block.wordCount,
     }));
 
-    const prose = blocks.map((b) => b.contentText).join("\n\n");
+    // Only what the manuscript counts as its own words. A title page's lines
+    // and anything a format leaves out of the tally would otherwise show up in
+    // the sentence lengths and, worse, in the commonest words.
+    const prose = blocks
+      .filter((b) => counts(b) && structural(b))
+      .map((b) => b.contentText)
+      .join("\n\n");
 
     return {
       levels: levelStats(sections, levels),
       sentences: sentenceStats(prose),
       words: wordFrequency(prose, { withoutFunctionWords: ownWords, limit: 100 }),
-      total: blocks.reduce((sum, b) => sum + b.wordCount, 0),
+      total: blocks.filter(counts).reduce((sum, b) => sum + b.wordCount, 0),
     };
-  }, [blocks, levels, ownWords]);
+  }, [blocks, levels, templates, ownWords]);
 
   if (blocks.length === 0) return <p className="tpl-empty">Nothing written yet.</p>;
 

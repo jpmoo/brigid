@@ -92,6 +92,8 @@ export const works = pgTable("works", {
   authorFirstName: text("author_first_name"),
   authorLastName: text("author_last_name"),
   pageSetup: jsonb("page_setup").$type<PageSetup>().notNull(),
+  /** A length to aim at for the whole manuscript. Null means none. */
+  totalWordGoal: integer("total_word_goal"),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -119,6 +121,8 @@ export const workLevels = pgTable(
       onDelete: "set null",
     }),
     counterRestart: text("counter_restart").$type<CounterRestart>().notNull().default("continuous"),
+    /** A length to aim at for each section at this depth. Null means none. */
+    wordGoal: integer("word_goal"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },

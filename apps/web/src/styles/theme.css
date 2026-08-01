@@ -3719,3 +3719,23 @@ mark.hit.active {
     white-space: nowrap;
   }
 }
+
+/* --- Sections against their goal --------------------------------------- */
+
+/* The shape of the book at a glance: short of its goal, or past it. Tinted
+   rather than coloured — these sit behind chapter titles that still have to be
+   read, and the break cap above already owns the accent green, so this is a
+   cooler one that won't be mistaken for it. */
+.outline-item.short .outline-card {
+  background: color-mix(in srgb, var(--misspelled) 7%, transparent);
+}
+
+.outline-item.met .outline-card {
+  background: color-mix(in srgb, #3fa06a 12%, transparent);
+}
+
+/* Selected still wins: where you are matters more than how long it is. */
+.outline-item.short .outline-card.selected,
+.outline-item.met .outline-card.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}

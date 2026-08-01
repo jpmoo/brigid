@@ -70,7 +70,7 @@ export interface OutlinePanelProps {
   breaks: Map<string, BreakChip>;
   onSelectBreak: (blockId: string) => void;
   templates: Map<string, Template>;
-  levels: { depth: number; name: string }[];
+  levels: { depth: number; name: string; wordGoal?: number | null }[];
   selectedId: string | null;
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
@@ -233,6 +233,18 @@ export function OutlinePanel(props: OutlinePanelProps) {
           {...props}
           breakChip={breaks.get(entry.block.id) ?? null}
           words={totals.get(entry.block.id) ?? entry.block.wordCount}
+          /**
+           * Against its level's goal, when the level has one.
+           *
+           * Measured on the same total the card shows — the section and
+           * everything under it — so the shading and the number agree. Only
+           * structural blocks: a title page has no length to fall short of.
+           */
+          goal={
+            structural(entry.block.id)
+              ? (levels.find((l) => l.depth === entry.depth)?.wordGoal ?? null)
+              : null
+          }
           selected={entry.block.id === selectedId}
           isCollapsed={collapsed.has(entry.block.id)}
         />
@@ -253,6 +265,8 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   formatName: string;
   /** False for a title page or a note: it isn't part of the level structure. */
   structural: boolean;
+  /** The length this section is aiming at, or null when it isn't. */
+  goal: number | null;
   selected: boolean;
   isCollapsed: boolean;
   draggable: boolean;
@@ -282,6 +296,7 @@ function OutlineCard(props: CardProps) {
         props.breakChip ? "has-break" : "",
         props.isDragging ? "dragging" : "",
         props.isLifted ? "lifted" : "",
+        props.goal ? (props.words >= props.goal ? "met" : "short") : "",
       ]
         .filter(Boolean)
         .join(" ")}

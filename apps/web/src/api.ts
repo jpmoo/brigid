@@ -57,6 +57,8 @@ export interface Work {
   subtitle: string | null;
   authorFirstName: string | null;
   authorLastName: string | null;
+  /** A length to aim at for the whole manuscript. Null means none. */
+  totalWordGoal: number | null;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -73,6 +75,8 @@ export interface WorkLevel {
   name: string;
   breakTemplateId: string | null;
   counterRestart: "continuous" | "under-parent";
+  /** A length to aim at for each section at this depth. Null means none. */
+  wordGoal: number | null;
 }
 
 export interface BackupSchedule {
@@ -191,6 +195,8 @@ export const api = {
     authorLastName?: string | null;
   }) => post<{ work: Work }>("/works", input),
   getWork: (id: string) => request<{ work: Work; levels: WorkLevel[] }>(`/works/${id}`),
+  updateWork: (id: string, patch: { totalWordGoal?: number | null }) =>
+    request<{ work: Work }>(`/works/${id}`, { method: "PATCH", body: JSON.stringify(patch) }),
   archiveWork: (id: string, archived: boolean) =>
     post<{ work: Work }>(`/works/${id}/archive`, { archived }),
   deleteWork: (id: string) =>
@@ -304,7 +310,12 @@ export const api = {
   listLevels: (workId: string) => request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`),
   saveLevels: (
     workId: string,
-    levels: { name: string; breakTemplateId: string | null; counterRestart: "continuous" | "under-parent" }[],
+    levels: {
+      name: string;
+      breakTemplateId: string | null;
+      counterRestart: "continuous" | "under-parent";
+      wordGoal?: number | null;
+    }[],
   ) =>
     request<{ levels: WorkLevel[] }>(`/works/${workId}/levels`, {
       method: "PUT",

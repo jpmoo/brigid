@@ -145,6 +145,9 @@ export async function templatesRoutes(app: FastifyInstance): Promise<void> {
               name: z.string().min(1).max(120),
               breakTemplateId: z.string().uuid().nullable(),
               counterRestart: z.enum(["continuous", "under-parent"]),
+              // Null cancels the goal for this level; there is only ever one
+              // per level, so setting it is also replacing it.
+              wordGoal: z.number().int().min(1).max(10000000).nullable().optional(),
             }),
           )
           .min(1)
@@ -163,6 +166,7 @@ export async function templatesRoutes(app: FastifyInstance): Promise<void> {
             name: level.name,
             breakTemplateId: level.breakTemplateId,
             counterRestart: level.counterRestart,
+            wordGoal: level.wordGoal ?? null,
           })),
         )
         .returning();
