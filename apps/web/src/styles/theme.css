@@ -575,10 +575,13 @@ input::placeholder {
 }
 
 /* Retracted, a visible strip stays behind as the hover target — 10px was a mean
-   thing to ask anyone to aim at. */
+   thing to ask anyone to aim at.
+
+   Deliberately not faded. Fading the panel fades the strip that caps it too, and
+   a translucent cap over the panel's own cards let their right edge read
+   through. The strip carries whatever subtlety is wanted itself. */
 .panel-hidden .outline-panel.floating {
   transform: translateX(calc(-100% + 18px));
-  opacity: 0.6;
 }
 
 /* The strip left behind when the panel retracts: a plain edge with a single
@@ -592,7 +595,10 @@ input::placeholder {
   height: 100%;
   display: grid;
   place-items: center;
-  background: var(--surface-veil);
+  /* Opaque, unlike the panel it caps. This strip is what remains on screen when
+     the panel retracts, and it sits over the panel's own cards — frosted, their
+     right edge read straight through it. */
+  background: var(--surface);
   border-right: 1px solid var(--border);
   color: var(--text-faint);
   font-size: 14px;
@@ -2764,8 +2770,19 @@ mark.hit.active {
 
 /* --- Writing prose ----------------------------------------------------- */
 
+:root {
+  /* The style bar's exact height, and the gap under it. The editor is pulled up
+     by the sum, so these two are the only numbers that have to agree. */
+  --prose-bar: 32px;
+  --prose-bar-gap: 6px;
+}
+
 .prose-editor {
   position: relative;
+  /* The bar sits in the flow, so that it can stick — and the editor is pulled
+     up by exactly the room the bar takes, so the prose stays on the line the
+     rendered paragraphs were on. Clicking into a block moves nothing. */
+  margin-top: calc(-1 * (var(--prose-bar) + var(--prose-bar-gap)));
 }
 
 /* The surface inherits the manuscript's type: what is being typed has to look
@@ -2789,15 +2806,20 @@ mark.hit.active {
 /* The toolbar carries only what belongs to the words themselves. Spacing,
    alignment and face are the format's business and are deliberately absent.
 
-   It floats above the block rather than sitting in the flow: a click on a
-   paragraph puts the caret where the click landed, and a toolbar that pushed
-   the text down would move the words out from under the finger between the
-   press and the caret arriving. */
+   Sticky, not merely floating: a block can run for pages, and controls that
+   scrolled away with the top of it would be out of reach for most of the time
+   spent writing in it. It rides at the top of the manuscript until the block
+   itself is done. */
 .prose-toolbar {
-  position: absolute;
-  bottom: 100%;
-  left: -12px;
-  margin-bottom: 4px;
+  position: sticky;
+  /* Zero against the pane's own top padding, which puts the bar level with
+     where the manuscript begins rather than jammed into the very edge. */
+  top: 0;
+  height: var(--prose-bar);
+  margin-bottom: var(--prose-bar-gap);
+  /* So the declared height is the height, whatever the padding and border. */
+  box-sizing: border-box;
+  width: fit-content;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -2808,8 +2830,9 @@ mark.hit.active {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  /* Never scaled with the manuscript: it is app furniture, not the page. */
-  zoom: 1;
+  /* Scaled along with the sheet, since `zoom` on an ancestor cannot be undone
+     from inside it. Harmless: the bar's height and the pull-up above are both
+     in the same scaled units, so they still cancel exactly. */
   font-family: var(--sans);
   white-space: nowrap;
   z-index: 4;

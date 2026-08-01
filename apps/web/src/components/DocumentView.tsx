@@ -22,6 +22,7 @@ function spanStyle(span: ResolvedSpan): CSSProperties {
   return {
     fontWeight: span.bold ? 700 : undefined,
     fontStyle: span.italic ? "italic" : undefined,
+    textDecoration: span.underline ? "underline" : undefined,
     fontVariant: span.smallCaps ? "small-caps" : undefined,
     textTransform: span.allCaps ? "uppercase" : undefined,
     letterSpacing: span.smallCaps || span.allCaps ? "0.08em" : undefined,
@@ -239,10 +240,15 @@ function Nodes({
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
                       const marked = highlight(text, search, counter, activeIndex);
-                      if (!hasMark(run, "strong") && !hasMark(run, "em")) {
+                      if (
+                        !hasMark(run, "strong") &&
+                        !hasMark(run, "em") &&
+                        !hasMark(run, "underline")
+                      ) {
                         return <Fragment key={k}>{marked}</Fragment>;
                       }
-                      const inner = hasMark(run, "em") ? <em>{marked}</em> : marked;
+                      const underlined = hasMark(run, "underline") ? <u>{marked}</u> : marked;
+                      const inner = hasMark(run, "em") ? <em>{underlined}</em> : underlined;
                       return hasMark(run, "strong") ? (
                         <strong key={k}>{inner}</strong>
                       ) : (

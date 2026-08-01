@@ -365,6 +365,32 @@ check(
   });
   const runs = merged.content[0]?.content ?? [];
   check("runs with the same marks fuse", [runs.length, runs[0]?.text], [2, "soon"]);
+}
+
+{
+  // Underline is a mark like the other two, and must not fuse with them.
+  const kept = normalizeProse({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: "plain " },
+          { type: "text", text: "under", marks: [{ type: "underline" }] },
+          { type: "text", text: "lined", marks: [{ type: "underline" }] },
+          { type: "text", text: " and ", marks: [{ type: "em" }] },
+        ],
+      },
+    ],
+  });
+  const runs = kept.content[0]?.content ?? [];
+  check("underlined runs fuse with each other", [runs.length, runs[1]?.text], [3, "underlined"]);
+  check(
+    "but not with differently marked neighbours",
+    runs.map((r) => (r.marks ?? []).map((m) => m.type).join("+")),
+    ["", "underline", "em"],
+  );
+  check("underline survives a round trip", asProseDoc(kept), kept);
   check("empty runs are dropped", runs.every((r) => r.text.length > 0), true);
 }
 

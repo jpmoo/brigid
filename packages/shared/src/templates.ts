@@ -20,6 +20,7 @@ export type TemplateAlign = "left" | "center" | "right";
 export interface TemplateMarks {
   bold?: boolean;
   italic?: boolean;
+  underline?: boolean;
   smallCaps?: boolean;
   allCaps?: boolean;
 }

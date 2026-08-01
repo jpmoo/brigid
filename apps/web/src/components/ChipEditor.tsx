@@ -60,6 +60,7 @@ function markOpen(m: TemplateMarks): string {
   return (
     (m.bold ? "<b>" : "") +
     (m.italic ? "<i>" : "") +
+    (m.underline ? "<u>" : "") +
     (m.smallCaps ? '<span data-sc="1">' : "") +
     (m.allCaps ? '<span data-caps="1">' : "")
   );
@@ -69,6 +70,7 @@ function markClose(m: TemplateMarks): string {
   return (
     (m.allCaps ? "</span>" : "") +
     (m.smallCaps ? "</span>" : "") +
+    (m.underline ? "</u>" : "") +
     (m.italic ? "</i>" : "") +
     (m.bold ? "</b>" : "")
   );
@@ -100,6 +102,7 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
 const sameMarks = (a: TemplateMarks, b: TemplateMarks) =>
   !!a.bold === !!b.bold &&
   !!a.italic === !!b.italic &&
+  !!a.underline === !!b.underline &&
   !!a.smallCaps === !!b.smallCaps &&
   !!a.allCaps === !!b.allCaps;
 
@@ -130,6 +133,7 @@ function htmlToInlines(root: HTMLElement, multiline: boolean): TemplateInline[] 
     const here: TemplateMarks = { ...marks };
     if (tag === "B" || tag === "STRONG") here.bold = true;
     if (tag === "I" || tag === "EM") here.italic = true;
+    if (tag === "U") here.underline = true;
     if (node.dataset.sc) here.smallCaps = true;
     if (node.dataset.caps) here.allCaps = true;
 
@@ -243,6 +247,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
         const tag = node.tagName;
         if (tag === "B" || tag === "STRONG") found.bold = true;
         if (tag === "I" || tag === "EM") found.italic = true;
+        if (tag === "U") found.underline = true;
         if (node.dataset.sc) found.smallCaps = true;
         if (node.dataset.caps) found.allCaps = true;
       }
@@ -374,7 +379,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     if (!el) return;
     restoreSelection();
 
-    if (mark === "bold" || mark === "italic") {
+    if (mark === "bold" || mark === "italic" || mark === "underline") {
       document.execCommand(mark, false);
       emit();
       reportMarks();

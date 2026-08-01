@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bold, Italic, Redo2, SpellCheck, Undo2 } from "lucide-react";
+import { Bold, Italic, Redo2, SpellCheck, Underline, Undo2 } from "lucide-react";
 import {
   asProseDoc,
   autocorrectKeystroke,
@@ -60,7 +60,8 @@ function runsToHtml(runs: ProseText[], speller: Speller | null): string {
   return runs
     .map((run) => {
       const inner = speller ? markMisspellings(run.text, speller) : escapeHtml(run.text);
-      const em = hasMark(run, "em") ? `<em>${inner}</em>` : inner;
+      const underlined = hasMark(run, "underline") ? `<u>${inner}</u>` : inner;
+      const em = hasMark(run, "em") ? `<em>${underlined}</em>` : underlined;
       return hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
     })
     .join("");
@@ -141,13 +142,14 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
 
   const readParagraph = (node: Node): ProseText[] => {
     const runs: ProseText[] = [];
-    const walk = (current: Node, strong: boolean, em: boolean) => {
+    const walk = (current: Node, strong: boolean, em: boolean, underline: boolean) => {
       if (current.nodeType === Node.TEXT_NODE) {
         const text = (current.textContent ?? "").replace(new RegExp(ZWSP, "g"), "");
         if (!text) return;
         const marks = [
           ...(strong ? [{ type: "strong" as const }] : []),
           ...(em ? [{ type: "em" as const }] : []),
+          ...(underline ? [{ type: "underline" as const }] : []),
         ];
         runs.push(marks.length ? { type: "text", text, marks } : { type: "text", text });
         return;
@@ -158,9 +160,10 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
       if (tag === "BR") return;
       const nextStrong = strong || tag === "STRONG" || tag === "B" || isBold(el);
       const nextEm = em || tag === "EM" || tag === "I" || isItalic(el);
-      for (const child of Array.from(el.childNodes)) walk(child, nextStrong, nextEm);
+      const nextUnderline = underline || tag === "U" || isUnderlined(el);
+      for (const child of Array.from(el.childNodes)) walk(child, nextStrong, nextEm, nextUnderline);
     };
-    for (const child of Array.from(node.childNodes)) walk(child, false, false);
+    for (const child of Array.from(node.childNodes)) walk(child, false, false, false);
     return runs;
   };
 
@@ -199,6 +202,12 @@ function isBold(el: HTMLElement): boolean {
 
 function isItalic(el: HTMLElement): boolean {
   return el.style.fontStyle === "italic";
+}
+
+function isUnderlined(el: HTMLElement): boolean {
+  // Not `includes`: line-through and overline also live in this property, and
+  // neither of them is an underline.
+  return /\bunderline\b/.test(el.style.textDecoration || el.style.textDecorationLine);
 }
 
 // --- The caret, as a character offset -----------------------------------
@@ -429,7 +438,7 @@ export function ProseEditor({
   const historyAt = useRef(-1);
   /** Set while an undo is being applied, so it isn't recorded as a new edit. */
   const restoring = useRef(false);
-  const [marks, setMarks] = useState({ strong: false, em: false });
+  const [marks, setMarks] = useState({ strong: false, em: false, underline: false });
   const [menu, setMenu] = useState<{ word: string; x: number; y: number } | null>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -568,10 +577,11 @@ export function ProseEditor({
     setMarks({
       strong: document.queryCommandState("bold"),
       em: document.queryCommandState("italic"),
+      underline: document.queryCommandState("underline"),
     });
   }, []);
 
-  const applyMark = (kind: "bold" | "italic") => {
+  const applyMark = (kind: "bold" | "italic" | "underline") => {
     remember();
     document.execCommand(kind);
     refreshMarks();
@@ -645,6 +655,11 @@ export function ProseEditor({
       if (key === "i") {
         event.preventDefault();
         applyMark("italic");
+        return;
+      }
+      if (key === "u") {
+        event.preventDefault();
+        applyMark("underline");
         return;
       }
     }
@@ -766,6 +781,16 @@ export function ProseEditor({
           onClick={() => applyMark("italic")}
         >
           <Italic size={13} />
+        </button>
+        <button
+          type="button"
+          className={`be-mark${marks.underline ? " on" : ""}`}
+          aria-pressed={marks.underline}
+          title="Underline"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => applyMark("underline")}
+        >
+          <Underline size={13} />
         </button>
         <span className="be-gap" />
         <button

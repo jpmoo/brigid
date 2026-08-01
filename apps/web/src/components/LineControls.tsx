@@ -56,7 +56,7 @@ export function LineControls({
   return (
     <>
       <div className="be-line">
-        {(["bold", "italic", "smallCaps", "allCaps"] as const).map((key) => (
+        {(["bold", "italic", "underline", "smallCaps", "allCaps"] as const).map((key) => (
           <button
             key={key}
             type="button"
@@ -66,7 +66,15 @@ export function LineControls({
             onClick={() => editor.current?.toggleMark(key)}
             title={key}
           >
-            {key === "bold" ? "B" : key === "italic" ? "I" : key === "smallCaps" ? "Sc" : "AA"}
+            {key === "bold"
+              ? "B"
+              : key === "italic"
+                ? "I"
+                : key === "underline"
+                  ? "U"
+                  : key === "smallCaps"
+                    ? "Sc"
+                    : "AA"}
           </button>
         ))}
         <span className="be-gap" />

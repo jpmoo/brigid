@@ -12,7 +12,7 @@
  * and what the server's word counter already walks.
  */
 
-export type ProseMarkType = "strong" | "em";
+export type ProseMarkType = "strong" | "em" | "underline";
 
 export interface ProseMark {
   type: ProseMarkType;
@@ -55,7 +55,7 @@ export function asProseDoc(value: unknown): ProseDoc | null {
         if (Array.isArray(run.marks)) {
           for (const mark of run.marks) {
             const t = (mark as { type?: unknown } | null)?.type;
-            if (t === "strong" || t === "em") marks.push({ type: t });
+            if (t === "strong" || t === "em" || t === "underline") marks.push({ type: t });
           }
         }
         runs.push(marks.length ? { type: "text", text: run.text, marks } : { type: "text", text: run.text });
@@ -92,6 +92,12 @@ export function hasMark(run: ProseText, type: ProseMarkType): boolean {
   return (run.marks ?? []).some((m) => m.type === type);
 }
 
+/** Every mark a run can carry, as a comparable key. */
+const MARK_TYPES: ProseMarkType[] = ["strong", "em", "underline"];
+
+const markKey = (run: ProseText): string =>
+  MARK_TYPES.map((type) => (hasMark(run, type) ? "1" : "0")).join("");
+
 /** Drops empty runs and fuses neighbours that carry the same marks. */
 export function normalizeProse(doc: ProseDoc): ProseDoc {
   return {
@@ -101,7 +107,7 @@ export function normalizeProse(doc: ProseDoc): ProseDoc {
       for (const run of para.content ?? []) {
         if (!run.text) continue;
         const last = runs[runs.length - 1];
-        if (last && hasMark(last, "strong") === hasMark(run, "strong") && hasMark(last, "em") === hasMark(run, "em")) {
+        if (last && markKey(last) === markKey(run)) {
           last.text += run.text;
           continue;
         }
