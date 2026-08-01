@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Play, RefreshCw } from "lucide-react";
-import type { CharacterAnalysis, PlacedDigest, StructureAnalysis } from "@brigid/shared";
+import type {
+  CharacterAnalysis,
+  ModelFit,
+  PlacedDigest,
+  StructureAnalysis,
+} from "@brigid/shared";
 import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
@@ -55,7 +60,11 @@ export function AiPane({ workId }: { workId: string }) {
       else await api.runCharacterAnalysis(workId, {});
       await reload();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "the analysis did not finish");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : `the analysis did not finish: ${err instanceof Error ? err.message : String(err)}`,
+      );
     } finally {
       setBusy(null);
     }
@@ -234,7 +243,7 @@ function StructurePane({
           </p>
 
           <h4 className="tpl-section">Framework by framework</h4>
-          {result.models.map((fit) => (
+          {byFit(result.models).map((fit) => (
             <FitGauge
               key={fit.model}
               fit={fit}
@@ -247,6 +256,27 @@ function StructurePane({
       )}
     </>
   );
+}
+
+/**
+ * Best fit first.
+ *
+ * "Not applicable" sorts last rather than lowest: the framework was never
+ * asked, so it belongs after the answers rather than at the bottom of them,
+ * where it would read as the worst result. Within a band the canonical order
+ * is kept — sorting a copy, and JS sorts stably — so the seven don't reshuffle
+ * between runs that rate them the same.
+ */
+const FIT_ORDER: Record<ModelFit["fit"], number> = {
+  good: 0,
+  moderate: 1,
+  low: 2,
+  bad: 3,
+  na: 4,
+};
+
+function byFit(models: ModelFit[]): ModelFit[] {
+  return [...models].sort((a, b) => FIT_ORDER[a.fit] - FIT_ORDER[b.fit]);
 }
 
 function CharactersPane({

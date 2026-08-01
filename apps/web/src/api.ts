@@ -39,7 +39,25 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   const text = await res.text();
-  const body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+
+  /**
+   * Not every answer comes from Brigid. A proxy that gives up on a slow request
+   * — Cloudflare cuts one off at 100 seconds — answers with an HTML error page,
+   * and parsing that as JSON throws a SyntaxError that is not an ApiError, so
+   * every caller falls through to its generic "something went wrong" branch.
+   * The status is the useful part; keep it, and say where it came from.
+   */
+  let body: Record<string, unknown>;
+  try {
+    body = text ? (JSON.parse(text) as Record<string, unknown>) : {};
+  } catch {
+    throw new ApiError(
+      res.status,
+      res.status === 504 || res.status === 524 || res.status === 502
+        ? `the server took too long to answer (${res.status}) — the request may still be running`
+        : `the server answered ${res.status} with something that wasn't JSON`,
+    );
+  }
 
   if (!res.ok) {
     throw new ApiError(
