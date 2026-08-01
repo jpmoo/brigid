@@ -162,6 +162,31 @@ export function WorkPage() {
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
 
+  /**
+   * Working on the manuscript is not writing it.
+   *
+   * Renaming a section, editing a title page, setting a break, adding a block:
+   * all of it is worth doing and none of it is the thing the clock is counting.
+   * Paused rather than cancelled, and not resumed when the dialog closes —
+   * typing is what starts it again, and closing a dialog is not typing.
+   */
+  const editingSomething =
+    adding !== null ||
+    renaming !== null ||
+    editingBreak !== null ||
+    editingFormat !== null ||
+    editingOptions !== null;
+
+  useEffect(() => {
+    if (!editingSomething) return;
+    setSession((current) => {
+      if (!current || current.since === null) return current;
+      const stopped = pauseSession(current);
+      writeSession(stopped);
+      return stopped;
+    });
+  }, [editingSomething]);
+
   const blockRefs = useRef(new Map<string, HTMLDivElement>());
   /**
    * The manuscript pane, as state rather than only as a ref.
