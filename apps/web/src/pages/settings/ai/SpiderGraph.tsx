@@ -143,11 +143,7 @@ export function SpiderGraph({
             <p className="tpl-note">Nothing recorded cuts against this reading.</p>
           )}
         </div>
-      ) : (
-        <p className="tpl-note spider-hint">
-          Click an axis to see what the score rests on, and what cuts against it.
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -3914,7 +3914,6 @@ mark.hit.active {
 }
 .spider-label:hover, .spider-label.open { fill: var(--text); font-weight: 600; }
 .spider-score { font-weight: 700; fill: var(--accent); }
-.spider-hint { flex: 1; min-width: 180px; }
 
 .spider-detail {
   flex: 1;
