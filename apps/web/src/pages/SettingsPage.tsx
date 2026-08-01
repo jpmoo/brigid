@@ -25,6 +25,7 @@ type TabKey = (typeof TABS)[number]["key"] | "project";
 
 const PROJECT_TABS = [
   { key: "levels", label: "Levels" },
+  { key: "goals", label: "Goals" },
   { key: "compile", label: "Compile" },
 ] as const;
 
@@ -159,6 +160,14 @@ export function SettingsPage() {
 
                 {projectTab === "levels" ? (
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
+                ) : projectTab === "goals" ? (
+                  <>
+                    <h3 className="card-title">Goals</h3>
+                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
+                      A target length for the manuscript, and for a day&rsquo;s work — with
+                      something to show how the writing is going against them. Not built yet.
+                    </p>
+                  </>
                 ) : (
                   <CompilePane
                     workId={workId}
