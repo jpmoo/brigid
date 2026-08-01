@@ -2626,7 +2626,11 @@ mark.hit.active {
   flex-wrap: nowrap;
 }
 
-.te-bar .btn {
+/* Toolbar weight, not button weight. The bold that suits a Save button reads as
+   shouting on a row of small controls. */
+.te-bar .btn,
+.te-cellbar .btn {
   white-space: nowrap;
   gap: 4px;
+  font-weight: 400;
 }
