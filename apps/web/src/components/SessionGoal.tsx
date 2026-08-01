@@ -60,8 +60,15 @@ function extensionFor(minutes: number): number {
   return Math.floor(minutes * EXTENSION_SHARE);
 }
 
+/**
+ * A session begins paused.
+ *
+ * It is started from the settings, which is not where the writing happens — so
+ * the clock would otherwise be counting the walk back to the manuscript. Typing
+ * is what starts it, the same thing that starts it again after any other pause.
+ */
 export function startSession(minutes: number, words: number, total: number): Session {
-  return { minutes, words, from: total, spent: 0, since: Date.now(), added: 0, removed: 0 };
+  return { minutes, words, from: total, spent: 0, since: null, added: 0, removed: 0 };
 }
 
 /** Records one save's worth of change, whichever way it went. */

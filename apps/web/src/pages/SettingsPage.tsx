@@ -3,13 +3,14 @@ import type { FormEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { ApiError, api } from "../api.js";
-import type { Block, Template, Work } from "../api.js";
+import type { Block, Template, Work, WorkLevel } from "../api.js";
 import { LevelsEditor } from "../components/LevelsEditor.js";
 import { TemplatesPane } from "./settings/TemplatesPane.js";
 import { SpellingPane } from "./settings/SpellingPane.js";
 import { BackupPane } from "./settings/BackupPane.js";
 import { CompilePane } from "./settings/CompilePane.js";
 import { GoalsPane } from "./settings/GoalsPane.js";
+import { StatsPane } from "./settings/StatsPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -27,6 +28,7 @@ type TabKey = (typeof TABS)[number]["key"] | "project";
 const PROJECT_TABS = [
   { key: "levels", label: "Levels" },
   { key: "goals", label: "Goals" },
+  { key: "stats", label: "Stats" },
   { key: "compile", label: "Compile" },
 ] as const;
 
@@ -47,15 +49,17 @@ export function SettingsPage() {
   const workId = params.get("work");
   const [work, setWork] = useState<Work | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
+  const [levels, setLevels] = useState<WorkLevel[]>([]);
 
   useEffect(() => {
     if (!workId) return;
     void (async () => {
-      const [{ work: w }, { blocks: bs }] = await Promise.all([
+      const [{ work: w, levels: ls }, { blocks: bs }] = await Promise.all([
         api.getWork(workId),
         api.listBlocks(workId),
       ]);
       setWork(w);
+      setLevels(ls);
       setBlocks(bs);
     })();
   }, [workId]);
@@ -163,6 +167,8 @@ export function SettingsPage() {
                   <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
                 ) : projectTab === "goals" ? (
                   <GoalsPane blocks={blocks} />
+                ) : projectTab === "stats" ? (
+                  <StatsPane blocks={blocks} levels={levels} />
                 ) : (
                   <CompilePane
                     workId={workId}

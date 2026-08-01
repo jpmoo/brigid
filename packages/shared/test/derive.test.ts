@@ -1,7 +1,9 @@
 import {
   asProseDoc,
   autocorrectKeystroke,
+  countWords,
   currentBlockAt,
+  levelStats,
   deriveDocument,
   foldApostrophes,
   foldForSearch,
@@ -11,6 +13,9 @@ import {
   possessiveStem,
   proseFromParagraphs,
   proseToText,
+  wordFrequency,
+  sentenceStats,
+  sentences,
   serializeInlines,
 } from "@brigid/shared";
 import type { DocumentItem, LevelLike, TemplateLike } from "@brigid/shared";
@@ -506,6 +511,65 @@ check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
   check("and one after it, whose offsets all moved", slice("quietly"), "quietly");
   check("the map has an entry past the end", folded.at.length, folded.text.length + 1);
   check("which is the length of the original", folded.at[folded.text.length], prose.length);
+}
+
+// --- what the manuscript is made of ---
+
+{
+  const prose =
+    "The corsairs begin their stories with a shout. The wind flies in and out of their mouths " +
+    "before filling their sails! Is that so? A. R. Brandan thought otherwise, at 3.5 knots.";
+
+  const found = sentences(prose);
+  check("sentences are split on their endings", found.length, 4);
+  check("an exclamation ends one", found[1]?.endsWith("sails!"), true);
+  check("a question ends one", found[2], "Is that so?");
+  // The two traps: initials and decimals both look like endings.
+  check("initials do not end a sentence", found[3]?.startsWith("A. R. Brandan"), true);
+  check("nor does a decimal point", found[3]?.includes("3.5 knots"), true);
+
+  const stats = sentenceStats(prose);
+  check("they are counted", stats.count, 4);
+  check(
+    "the longest is the longest of them",
+    stats.longest?.words,
+    Math.max(...found.map((one) => countWords(one))),
+  );
+  check("the mean is words per sentence", stats.mean > 3 && stats.mean < 25, true);
+}
+
+{
+  const text = "The sea and the wind and the sea again. Brandan watched the sea.";
+  const all = wordFrequency(text);
+  check("the commonest word comes first", all[0], { word: "the", count: 4 });
+
+  const own = wordFrequency(text, { withoutFunctionWords: true });
+  check("function words can be set aside", own.some((w) => w.word === "the"), false);
+  check("leaving what the book is about", own[0], { word: "sea", count: 3 });
+  check("a limit is honoured", wordFrequency(text, { limit: 2 }).length, 2);
+  // Case folded, apostrophes kept: a word at the start of a sentence is the
+  // same word, and "don't" is one word rather than two.
+  check("case is folded", wordFrequency("Sea sea SEA")[0], { word: "sea", count: 3 });
+  check("apostrophes are kept", wordFrequency("don't don\u2019t")[0], { word: "don't", count: 2 });
+}
+
+{
+  const sections = [
+    { depth: 0, label: "One", words: 3000 },
+    { depth: 0, label: "Two", words: 5000 },
+    { depth: 0, label: "Three", words: 4000 },
+    { depth: 1, label: "A scene", words: 900 },
+  ];
+  const levels = [{ depth: 0, name: "Chapter" }, { depth: 1, name: "Scene" }];
+  const [chapters, scenes] = levelStats(sections, levels);
+
+  check("each level is reported separately", [chapters?.name, scenes?.name], ["Chapter", "Scene"]);
+  check("with how many there are", chapters?.count, 3);
+  check("their mean length", chapters?.mean, 4000);
+  check("and the middle one, which outliers cannot drag", chapters?.median, 4000);
+  check("the longest is named", chapters?.longest, { label: "Two", words: 5000 });
+  check("and the shortest", chapters?.shortest, { label: "One", words: 3000 });
+  check("a level with one section still reports", scenes?.count, 1);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
