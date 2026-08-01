@@ -3,6 +3,7 @@ import { blocks, digestState, sectionDigests, settings, templates, works } from 
 import type { DigestProgress, PlacedDigest } from "@brigid/shared";
 import { buildOutline } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
+import { inspectModel } from "./client.js";
 import { digestSection, hashContent } from "./digest.js";
 
 /**
@@ -71,6 +72,25 @@ async function reader(): Promise<{
     .from(settings)
     .limit(1);
   if (!row?.url || !row.model) return null;
+
+  /**
+   * A model chosen before these were detected — or by a version of Brigid that
+   * didn't detect them — leaves nulls here, and a null `num_ctx` means Ollama
+   * serves its own small default and silently truncates every chapter. Rather
+   * than require the writer to re-save the model to fix something they were
+   * never told about, the walk asks once and remembers.
+   */
+  if (row.numCtx === null || row.thinks === null) {
+    const seen = await inspectModel(row.url, row.model).catch(() => null);
+    if (seen && (seen.numCtx !== null || seen.thinks !== null)) {
+      await db
+        .update(settings)
+        .set({ ollamaNumCtx: seen.numCtx, ollamaThinks: seen.thinks, updatedAt: new Date() })
+        .where(eq(settings.id, 1));
+      return { url: row.url, model: row.model, numCtx: seen.numCtx, thinks: seen.thinks };
+    }
+  }
+
   return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
 }
 

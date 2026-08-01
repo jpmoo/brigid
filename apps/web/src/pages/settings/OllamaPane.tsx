@@ -16,6 +16,7 @@ export function OllamaPane() {
   const [url, setUrl] = useState("");
   const [model, setModel] = useState<string | null>(null);
   const [models, setModels] = useState<string[] | null>(null);
+  const [numCtx, setNumCtx] = useState<number | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
@@ -36,6 +37,7 @@ export function OllamaPane() {
         if (!alive) return;
         setUrl(settings.url ?? "");
         setModel(settings.analysisModel);
+        setNumCtx(settings.numCtx ?? null);
         if (settings.url) {
           const { models: found } = await api.listOllamaModels(settings.url);
           if (alive) setModels(found);
@@ -77,6 +79,7 @@ export function OllamaPane() {
       });
       setUrl(next.url ?? "");
       setModel(next.analysisModel);
+      setNumCtx(next.numCtx ?? null);
       flash();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not save that");
@@ -153,6 +156,27 @@ export function OllamaPane() {
                 {models.length === 1 ? "One model" : `${models.length} models`} installed
                 on that host. This is the one Brigid will think with.
               </p>
+
+              {/* Ollama serves a small default window regardless of what the
+                  model can hold, and exceeding it truncates silently — so what
+                  was actually detected is worth showing rather than trusting. */}
+              {model ? (
+                numCtx ? (
+                  <p className="tpl-note">
+                    Using its full context window of{" "}
+                    <strong>{numCtx.toLocaleString()} tokens</strong>. Ollama would
+                    otherwise serve a fraction of that and quietly cut off the rest of
+                    each chapter.
+                  </p>
+                ) : (
+                  <p className="tpl-note">
+                    This host didn&rsquo;t report the model&rsquo;s context window, so
+                    Ollama&rsquo;s default applies &mdash; which is small, and truncates
+                    long sections without saying so. Brigid will ask again as it reads;
+                    if it keeps saying this, the host may be an older Ollama.
+                  </p>
+                )
+              ) : null}
             </>
           )}
         </>
