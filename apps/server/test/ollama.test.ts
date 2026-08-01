@@ -10,6 +10,7 @@
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { parseJson, thinksFrom } from "../src/ollama/client.js";
+import { foldName } from "../src/ollama/analysis.js";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -171,6 +172,21 @@ check("a plain one is recognized too", thinksFrom({ capabilities: ["completion"]
 // Ollama on a model that lacks the capability, so an unknown must not be
 // treated as a no.
 check("an Ollama that doesn't say gives null", thinksFrom({}) === null);
+
+console.log("\nfolding two spellings of one name");
+
+// The reported case: one section counts them, the next doesn't.
+check("a counting word is dropped", foldName("Two French brothers") === foldName("French brothers"));
+check("so is an article", foldName("The housekeeper") === foldName("housekeeper"));
+check("and stacked ones", foldName("Some other servants") === foldName("servants"));
+check("punctuation and case don't matter", foldName("Mr. Darcy") === foldName("mr darcy"));
+
+// The error worth avoiding is the opposite one. A duplicate is untidy; a merge
+// is wrong, and these are two different people.
+check("honorifics are kept", foldName("Mr Bennet") !== foldName("Mrs Bennet"));
+check("distinct names stay distinct", foldName("Jane") !== foldName("Jane Fairfax"));
+// A name that is only a counting word must survive being folded.
+check("a bare noise word is left alone", foldName("The Two") !== "");
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

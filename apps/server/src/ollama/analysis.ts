@@ -72,12 +72,70 @@ function isRealCharacter(name: string): boolean {
   return !NOT_A_CHARACTER.has(name.trim().toLowerCase());
 }
 
+/**
+ * Words that only ever count or point, and never identify.
+ *
+ * A digest naming the same people twice is the commonest way the roster grows a
+ * duplicate: one section writes "Two French brothers", the next writes "French
+ * brothers", and they arrive as two characters with half a record each. Folding
+ * these off the front settles it.
+ *
+ * Deliberately short, and deliberately not including honorifics. Dropping "Mr"
+ * would fold Mr Bennet and Mrs Bennet into one person, which is a far worse
+ * error than the one being fixed — a duplicate is untidy, a merge is wrong.
+ */
+const LEADING_NOISE = new Set([
+  "a",
+  "an",
+  "the",
+  "some",
+  "several",
+  "many",
+  "few",
+  "both",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "another",
+  "other",
+  "various",
+  "assorted",
+  "unnamed",
+  "unknown",
+]);
+
+/**
+ * The key two spellings of one name have in common.
+ *
+ * Lowercased, stripped of punctuation, and with counting words taken off the
+ * front. Conservative on purpose: it merges what is plainly the same phrase and
+ * leaves anything else alone.
+ */
+export function foldName(name: string): string {
+  const words = name
+    .toLowerCase()
+    .replace(/[.,''"()\[\]]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  let start = 0;
+  while (start < words.length - 1 && LEADING_NOISE.has(words[start]!)) start += 1;
+
+  return words.slice(start).join(" ");
+}
+
 export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
   const byKey = new Map<string, RosterEntry>();
   const aliasTo = new Map<string, string>();
 
   const keyFor = (name: string) => {
-    const folded = name.trim().toLowerCase();
+    const folded = foldName(name);
     return aliasTo.get(folded) ?? folded;
   };
 
@@ -89,7 +147,7 @@ export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
       // Bind this section's aliases to the identity, so a later section using
       // only the nickname lands on the same person.
       for (const alias of character.aliases ?? []) {
-        const folded = alias.trim().toLowerCase();
+        const folded = foldName(alias);
         if (folded && !aliasTo.has(folded)) aliasTo.set(folded, key);
       }
 
@@ -105,6 +163,10 @@ export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
         });
         continue;
       }
+      // Keep the plainest spelling seen: "French brothers" over "Two French
+      // brothers", since the counting word was never part of the name.
+      const seen = character.name.trim();
+      if (seen && seen.length < held.name.length) held.name = seen;
       held.sections += 1;
       held.actions += character.actions.length;
       held.span.last = Math.max(held.span.last, section.end);
