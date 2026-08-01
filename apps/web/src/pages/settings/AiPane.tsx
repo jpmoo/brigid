@@ -406,6 +406,18 @@ function CharactersPane({
         <>
           {shownReport && !shownReport.current ? <Stale drift={shownReport.drift} /> : null}
 
+          {/* Readable now, but not yet final: the rule that only one character
+              ordinarily carries a 5 on an axis can only be applied once there
+              is a whole cast to compare, so a score read mid-run may drop. */}
+          {working ? (
+            <p className="tpl-note">
+              These are readable as they land, but not settled &mdash; a score of 5 means
+              &ldquo;the story&rsquo;s primary carrier of this&rdquo;, and only one character
+              can hold it. That comparison runs when the cast is complete, so a 5 here may
+              become a 4.
+            </p>
+          ) : null}
+
           <div className="cast-chips">
             {profiles.map((p) => (
               <button
