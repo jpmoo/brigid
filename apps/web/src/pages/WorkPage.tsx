@@ -79,6 +79,10 @@ export function WorkPage() {
   // Set when the index moved because the page scrolled, so the effect that
   // scrolls to the active hit doesn't chase it back.
   const fromScroll = useRef(false);
+  // The tracker below runs off a listener bound once, so it reads the current
+  // index here rather than closing over a stale one.
+  const matchIndexRef = useRef(0);
+  matchIndexRef.current = matchIndex;
   const [activeBookmark, setActiveBookmark] = useState<string | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
@@ -323,13 +327,25 @@ export function WorkPage() {
 
       setSelectedId((current) => (current === next ? current : next));
 
-      // The active result follows the reading position: whichever hit is
-      // highest in view is the one you are on, so stepping onward from there
-      // means the next one down the page rather than wherever you last clicked.
-      // Marks render in the same order the matches were found, so the nth mark
-      // in the document is the nth match.
+      // The active result follows the reading position, so stepping onward
+      // means the next one down the page rather than one back from wherever you
+      // last clicked. Marks render in the order the matches were found, so the
+      // nth mark in the document is the nth match.
       if (!query.trim()) return;
       const marks = pane.querySelectorAll("mark.hit");
+
+      // While the current result is still on screen it stays the current one.
+      // Without this the two rules fought: stepping centred a hit, this then
+      // re-anchored to whichever hit was highest in view — an earlier one, when
+      // several sit close together — and Next walked backwards for ever. The
+      // reader can see the match they are on; nothing is gained by moving off it.
+      const active = marks[matchIndexRef.current];
+      if (active) {
+        const box = active.getBoundingClientRect();
+        if (box.bottom >= rect.top && box.top <= rect.bottom) return;
+      }
+
+      // Scrolled away from it: pick up again at the first one in view.
       for (let i = 0; i < marks.length; i += 1) {
         const mark = marks[i];
         if (!mark) continue;
@@ -715,9 +731,10 @@ export function WorkPage() {
             }
           />
           {zen ? (
-            // Fades in together with the exit control: in zen the only things
-            // worth reaching for are the size of the type and the way out.
-            <div className="zen-controls">
+            // One cluster that fades in together, rather than controls scattered
+            // down the page. Held open while a search is running: the results
+            // count is part of what you are reading at that moment.
+            <div className={`zen-controls${searchOpen ? " revealed" : ""}`}>
               <div className="segmented compact" role="group" aria-label="View mode">
                 <button
                   type="button"

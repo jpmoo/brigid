@@ -517,7 +517,11 @@ export function ProseEditor({
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
     el.innerHTML = docToHtml(doc, speller, layoutRef.current);
-    el.focus();
+    // Focusing an element scrolls it into view, and the writer has just clicked
+    // on the very words they want to stay put — so the page shifted under the
+    // caret at the moment it arrived. The caret is placed by offset, which
+    // needs no scrolling of its own.
+    el.focus({ preventScroll: true });
     setCaret(el, initialCaret);
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.

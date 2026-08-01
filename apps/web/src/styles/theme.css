@@ -858,6 +858,12 @@ input::placeholder {
   overflow-y: auto;
   padding: 32px 20px 200px;
   background: var(--surface-sunken);
+  /* Clicking into a block swaps its rendered paragraphs for the editor, and the
+     browser's scroll anchoring answers that by adjusting scrollTop to hold its
+     chosen anchor still — which, when the thing that changed *is* what you are
+     looking at, moves the page instead of steadying it. Every scroll here is
+     deliberate; nothing needs guessing on our behalf. */
+  overflow-anchor: none;
 }
 
 /* The retracted panel floats above the document rather than taking a column, so
@@ -1006,32 +1012,61 @@ input::placeholder {
   pointer-events: none;
 }
 
-/* Invisible until the pointer finds it, overlapping the corner of the sheet
-   rather than reserving a row across the top — zen should be nothing but the
-   manuscript. Escape leaves too, so this is a convenience, not the only way. */
-.zen-exit {
+/* Every zen control in one cluster, invisible until the pointer finds it and
+   overlapping the corner of the sheet rather than reserving a row across the
+   top — zen should be nothing but the manuscript. Only the way out was ever
+   given a position, so the rest fell into the flow and piled up under the
+   document. Escape leaves too, so none of this is the only way. */
+.zen-controls {
   position: fixed;
   top: 10px;
   right: 12px;
   z-index: 20;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  background: var(--surface);
-  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 7px;
+  background: var(--surface-veil);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  backdrop-filter: blur(14px) saturate(1.4);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  cursor: pointer;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-/* Opacity leaves it hit-testable, so hovering the empty corner reveals it. */
+/* Opacity rather than visibility, so the empty corner stays hit-testable and
+   hovering it brings the cluster back. Focus counts as well: tabbing to a
+   control, or typing in the search box, must not make it disappear. */
+.zen-controls:hover,
+.zen-controls:focus-within,
+.zen-controls.revealed {
+  opacity: 1;
+}
+
+.zen-words {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.zen-exit {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+
 .zen-exit:hover,
 .zen-exit:focus-visible {
-  opacity: 1;
+  background: var(--surface-sunken);
+  color: var(--text);
 }
 
 /* --- Breaks as editable objects between blocks ------------------------ */
