@@ -620,9 +620,22 @@ input::placeholder {
   z-index: 9;
 }
 
-.outline-head-bar {
+/* Bookmarks and the outline's title, held at the top of the panel together.
+   Stacked separately they would each have to know the other's height, and the
+   bookmark strip's changes as it opens and closes. */
+.outline-top {
   position: sticky;
   top: 0;
+  z-index: 3;
+  /* Denser than the panel's own veil. This one has chapters passing beneath it
+     rather than a manuscript, and a chapter title reading through a heading is
+     not frosting, it is a smudge. */
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(1.6);
+  backdrop-filter: blur(16px) saturate(1.6);
+}
+
+.outline-head-bar {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -636,7 +649,6 @@ input::placeholder {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-faint);
-  z-index: 2;
 }
 
 .outline-list {
@@ -2242,9 +2254,11 @@ input::placeholder {
 
 /* --- Bookmarks -------------------------------------------------------- */
 
+/* Indented to the same left edge as the outline's title below it, so the two
+   headings line up rather than nearly lining up. */
 .bm-strip {
   border-bottom: 1px solid var(--border);
-  padding: 8px 10px 10px;
+  padding: 8px 12px 10px 14px;
 }
 
 .bm-head {
@@ -2262,7 +2276,8 @@ input::placeholder {
   background: none;
   border: 0;
   font: inherit;
-  font-size: 10px;
+  /* The same heading as OUTLINE, because it is the same kind of thing. */
+  font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;

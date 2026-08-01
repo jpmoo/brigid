@@ -5,6 +5,7 @@ import {
   deriveDocument,
   foldApostrophes,
   foldForSearch,
+  foldForSearchMapped,
   normalizeProse,
   parseInlines,
   possessiveStem,
@@ -481,26 +482,30 @@ check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
 // --- searching a typeset manuscript with a plain keyboard ---
 
 {
-  const prose = "Abbot Brandan\u2019s absence \u2014 and \u201cthe North,\u201d he said.";
+  const prose = "Abbot Brandan\u2019s absence \u2014 and \u201cthe North,\u201d he said\u2026 quietly.";
 
-  // What a keyboard produces has to find what the page holds.
   const find = (needle: string) => foldForSearch(prose).indexOf(foldForSearch(needle));
   check("a straight apostrophe finds a typeset one", find("Brandan's") >= 0, true);
-  check("a typeset apostrophe still finds itself", find("Brandan\u2019s") >= 0, true);
   check("a straight quote finds a curled one", find('"the North,"') >= 0, true);
   check("a hyphen finds an em dash", find("absence - and") >= 0, true);
-  check("and nonsense still finds nothing", find("Brandanx"), -1);
+  // The one that needed a map: three dots for a character that is one.
+  check("three dots find an ellipsis", find("said... quietly") >= 0, true);
+  check("and the ellipsis finds itself", find("said\u2026 quietly") >= 0, true);
+  check("nonsense still finds nothing", find("Brandanx"), -1);
 
-  // The highlight slices the original text at the offset matching reports, so
-  // any fold that changed a length would move every match after it.
-  check("folding never changes the length", foldForSearch(prose).length, prose.length);
-  check(
-    "an offset means the same thing in both",
-    prose.slice(find("Brandan's"), find("Brandan's") + 9),
-    "Brandan\u2019s",
-  );
-  // "..." is three characters and the ellipsis is one, so it is left alone.
-  check("the ellipsis is not folded", foldForSearch("\u2026").length, 1);
+  // The fold changes length now, so the map is what points a match at the real
+  // characters. A folded range [a, b) is the real range [at[a], at[b]).
+  const folded = foldForSearchMapped(prose);
+  const slice = (needle: string) => {
+    const n = foldForSearch(needle);
+    const found = folded.text.indexOf(n);
+    return prose.slice(folded.at[found] as number, folded.at[found + n.length] as number);
+  };
+  check("a match maps back to the typeset text", slice("Brandan's"), "Brandan\u2019s");
+  check("including one that spans the ellipsis", slice("said... quietly"), "said\u2026 quietly");
+  check("and one after it, whose offsets all moved", slice("quietly"), "quietly");
+  check("the map has an entry past the end", folded.at.length, folded.text.length + 1);
+  check("which is the length of the original", folded.at[folded.text.length], prose.length);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

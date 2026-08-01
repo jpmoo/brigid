@@ -91,6 +91,9 @@ export function useSpelling(): SpellingState {
   const [generation, setGeneration] = useState(0);
   const ignored = useRef(new Set<string>());
   const loading = useRef(false);
+  // Kept, because nspell cannot forget a word: taking one back means building
+  // the checker again from the files it came from.
+  const files = useRef<{ aff: string; dic: string } | null>(null);
 
   const reload = useCallback(async () => {
     const { enabled: on, words: rows } = await api.getSpelling();
@@ -110,6 +113,7 @@ export function useSpelling(): SpellingState {
     void (async () => {
       try {
         const { aff, dic } = await api.getDictionary();
+        files.current = { aff, dic };
         setChecker(nspell(aff, dic));
       } finally {
         loading.current = false;
@@ -170,12 +174,31 @@ export function useSpelling(): SpellingState {
     setGeneration((n) => n + 1);
   }, []);
 
-  const removeWord = useCallback(async (id: string) => {
-    await api.deleteDictionaryWord(id);
-    setCustomWords((current) => current.filter((w) => w.id !== id));
-    // nspell has no remove, so the word stays known until the page is next
-    // loaded. Saying so in the list would be noise; it corrects itself.
-  }, []);
+  /**
+   * Takes a word back.
+   *
+   * nspell can be taught but not untaught, so the checker is built again from
+   * the dictionary files and re-taught everything that remains. Half a
+   * megabyte of word list is a moment's work, and this happens when someone
+   * deletes a word — not while they are writing. The alternative was a word
+   * that stayed accepted until the page was next loaded, which is a checker
+   * quietly disagreeing with the list the writer is looking at.
+   */
+  const removeWord = useCallback(
+    async (id: string) => {
+      await api.deleteDictionaryWord(id);
+      const remaining = customWords.filter((w) => w.id !== id);
+      setCustomWords(remaining);
+
+      const source = files.current;
+      if (!source) return;
+      const rebuilt = nspell(source.aff, source.dic);
+      for (const row of remaining) teach(rebuilt, row.word);
+      setChecker(rebuilt);
+      setGeneration((n) => n + 1);
+    },
+    [customWords],
+  );
 
   const setEnabled = useCallback(async (next: boolean) => {
     const { enabled: saved } = await api.setSpellcheckEnabled(next);

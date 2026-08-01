@@ -92,11 +92,6 @@ export const works = pgTable("works", {
   authorFirstName: text("author_first_name"),
   authorLastName: text("author_last_name"),
   pageSetup: jsonb("page_setup").$type<PageSetup>().notNull(),
-  /** Running heads and feet, composed from the variable library. */
-  headerVerso: jsonb("header_verso").$type<TemplateBody>(),
-  headerRecto: jsonb("header_recto").$type<TemplateBody>(),
-  footerVerso: jsonb("footer_verso").$type<TemplateBody>(),
-  footerRecto: jsonb("footer_recto").$type<TemplateBody>(),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

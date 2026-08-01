@@ -2,7 +2,13 @@ import { Fragment, useState } from "react";
 import type { ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
-import { asProseDoc, foldForSearch, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
+import {
+  asProseDoc,
+  foldForSearchMapped,
+  hasMark,
+  proseParagraphs,
+  smartenText,
+} from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import { offsetOfPoint, offsetOfPosition } from "./ProseEditor.js";
 import type { ProseLayout } from "./ProseEditor.js";
@@ -54,26 +60,37 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
 function highlight(text: string, needle: string, counter: { n: number }, activeIndex: number | null) {
   if (!needle) return text;
   const parts: ReactNode[] = [];
-  // Searched folded, sliced unfolded: the reader keeps the typeset punctuation
-  // while the match is found however it was typed. Safe only because every
-  // substitution is one character for one.
-  const lower = foldForSearch(text);
-  let from = 0;
+
+  // Searched folded, shown unfolded: the reader keeps the typeset punctuation
+  // while the match is found however it was typed. The fold carries a note of
+  // where each character came from, because one of the substitutions — the
+  // ellipsis, one character standing for three — moves every offset after it.
+  const folded = foldForSearchMapped(text);
+  let searched = 0;
+  let shown = 0;
+
   for (;;) {
-    const at = lower.indexOf(needle, from);
-    if (at === -1) break;
-    if (at > from) parts.push(text.slice(from, at));
+    const found = folded.text.indexOf(needle, searched);
+    if (found === -1) break;
+
+    const start = folded.at[found] ?? text.length;
+    const end = folded.at[found + needle.length] ?? text.length;
+    if (start > shown) parts.push(text.slice(shown, start));
+
     const ordinal = counter.n;
     counter.n += 1;
     parts.push(
-      <mark className={ordinal === activeIndex ? "hit active" : "hit"} key={`${at}-${ordinal}`}>
-        {text.slice(at, at + needle.length)}
+      <mark className={ordinal === activeIndex ? "hit active" : "hit"} key={`${start}-${ordinal}`}>
+        {text.slice(start, end)}
       </mark>,
     );
-    from = at + needle.length;
+
+    searched = found + needle.length;
+    shown = end;
   }
+
   if (parts.length === 0) return text;
-  if (from < text.length) parts.push(text.slice(from));
+  if (shown < text.length) parts.push(text.slice(shown));
   return parts;
 }
 

@@ -725,6 +725,11 @@ export function WorkPage() {
           onMouseEnter={() => zen && !phone && setPanelOpen(true)}
           onMouseLeave={() => zen && !phone && setPanelOpen(false)}
         >
+          {/* Bookmarks and the outline's own title travel together at the top
+              of the panel. Two sticky elements stacked would each need to know
+              the other's height, and the bookmark strip's changes as it opens
+              and closes — so they are one block that sticks. */}
+          <div className="outline-top">
           <BookmarkStrip
             bookmarks={bookmarks}
             activeId={activeBookmark}
@@ -752,6 +757,7 @@ export function WorkPage() {
             {/* Kept clear of the panel's right edge: retracted, that edge is the
                 only strip still on screen, and the count would show through. */}
             <span className="outline-words">{wordFmt.format(totalWords)} words</span>
+          </div>
           </div>
           <OutlinePanel
             entries={entries}

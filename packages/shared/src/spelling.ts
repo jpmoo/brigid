@@ -39,16 +39,16 @@ export function possessiveStem(word: string): string | null {
 /**
  * The form a word is searched in.
  *
- * A manuscript is full of typeset punctuation — curled quotes, real dashes —
- * and a keyboard produces none of it. Someone hunting for "Brandan's" types the
- * straight apostrophe, and without this it matches nothing, which is the same
- * mismatch that stopped the checker recognising words it had been taught.
+ * A manuscript is full of typeset punctuation — curled quotes, real dashes, a
+ * single-character ellipsis — and a keyboard produces none of it. Someone
+ * hunting for "Brandan's" types the straight apostrophe and someone hunting for
+ * a trailing "..." types three dots; without this neither finds anything.
  *
- * Every substitution is one character for one, deliberately. Matching reports
- * offsets into the text, and the highlight slices the original at them, so a
- * fold that changed any length would move every match after it. That rules out
- * the ellipsis — "..." is three characters and "…" is one — which is left
- * alone rather than quietly shifting the results.
+ * Most substitutions are one character for one. The ellipsis is not: it is one
+ * character standing for three, so folding it moves every offset after it. That
+ * is what `foldForSearchMapped` is for — it keeps a note of where each folded
+ * character came from, so a match found in the folded text can be pointed at
+ * the right characters of the real one.
  */
 const SEARCH_FOLD: Record<string, string> = {
   "‘": "'",
@@ -58,8 +58,38 @@ const SEARCH_FOLD: Record<string, string> = {
   "”": '"',
   "–": "-",
   "—": "-",
+  "…": "...",
 };
 
+/** The folded text, for counting and comparing. */
 export function foldForSearch(text: string): string {
-  return text.replace(/[‘’ʼ“”–—]/g, (c) => SEARCH_FOLD[c] ?? c).toLowerCase();
+  let out = "";
+  for (const ch of text) out += (SEARCH_FOLD[ch] ?? ch).toLowerCase();
+  return out;
+}
+
+export interface FoldedText {
+  text: string;
+  /**
+   * Where each folded character came from, with one extra entry for the end —
+   * so a folded range [a, b) is the real range [at[a], at[b]).
+   */
+  at: number[];
+}
+
+/** The same fold, with a note of where every character came from. */
+export function foldForSearchMapped(text: string): FoldedText {
+  let out = "";
+  const at: number[] = [];
+  let index = 0;
+
+  for (const ch of text) {
+    const folded = (SEARCH_FOLD[ch] ?? ch).toLowerCase();
+    for (const _ of folded) at.push(index);
+    out += folded;
+    index += ch.length;
+  }
+  at.push(text.length);
+
+  return { text: out, at };
 }
