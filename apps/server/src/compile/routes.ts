@@ -4,7 +4,7 @@ import { z } from "zod";
 import { blocks, templates, workLevels, works } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
-import { notFound } from "../lib/errors.js";
+import { badRequest, notFound } from "../lib/errors.js";
 import { compileManuscript } from "./plan.js";
 
 /**
@@ -37,14 +37,17 @@ export async function compileRoutes(app: FastifyInstance): Promise<void> {
         /** Block ids to include. Everything, when absent or empty. */
         include: z.array(z.string().uuid()).optional(),
         runningHeads: z.boolean().default(true),
-        // One word. It is the running head and half the filename, and both are
-        // read at a glance.
+        // One word, and only needed when there is a head to put it in.
         shortTitle: z
           .string()
           .trim()
-          .min(1, "a short title is needed")
           .max(40)
-          .refine((v) => !/\s/.test(v), "the short title should be a single word"),
+          .refine((v) => !/\s/.test(v), "the short title should be a single word")
+          .optional(),
+      })
+      .refine((v) => !v.runningHeads || (v.shortTitle ?? "").length > 0, {
+        message: "a running head needs a short title",
+        path: ["shortTitle"],
       })
       .parse(req.body);
 
@@ -93,10 +96,19 @@ export async function compileRoutes(app: FastifyInstance): Promise<void> {
       * a given machine, the answer should be that compiling to that format
       * failed, not that Brigid is down.
       */
-    const file =
-      body.format === "docx"
-        ? await (await import("./docx.js")).toDocx(manuscript)
-        : await (await import("./pdf.js")).toPdf(manuscript);
+    // A compile that fails has to say why. Left to the default handler it is a
+    // bare 500 reading "internal error", which tells nobody which of the two
+    // writers gave up or on what.
+    let file: Buffer;
+    try {
+      file =
+        body.format === "docx"
+          ? await (await import("./docx.js")).toDocx(manuscript)
+          : await (await import("./pdf.js")).toPdf(manuscript);
+    } catch (err) {
+      req.log.error(err);
+      throw badRequest(`could not compile to ${body.format}: ${(err as Error).message}`);
+    }
 
     reply.header(
       "Content-Type",
@@ -108,7 +120,10 @@ export async function compileRoutes(app: FastifyInstance): Promise<void> {
       "Content-Disposition",
       `attachment; filename="${fileNameFor(
         work.authorLastName ?? work.authorFirstName ?? "",
-        body.shortTitle,
+        // Without a head there is no short title to have asked for, so the
+        // work's own title stands in — compacted, since the name takes no
+        // spaces.
+        body.shortTitle || work.title,
         body.format,
       )}"`,
     );

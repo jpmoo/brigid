@@ -41,7 +41,27 @@ const templates: TemplateLike[] = [
     name: "Title page",
     body: {
       nodes: [
-        { type: "paragraph", align: "center", content: [{ type: "variable", name: "manuscriptTitle" }] },
+        {
+          type: "table",
+          columns: [{ width: 50, align: "left" }, { width: 50, align: "right" }],
+          borders: { outer: false, rows: false, columns: false, widthPt: 1 },
+          rows: [
+            {
+              cells: [
+                { content: [{ type: "variable", name: "authorFullName" }], verticalAlign: "top" },
+                { content: [{ type: "variable", name: "totalWordCount" }, { type: "text", text: " words" }], align: "right", verticalAlign: "top" },
+              ],
+            },
+            {
+              cells: [
+                { content: [{ type: "variable", name: "manuscriptTitle" }], align: "center" },
+                { content: [], align: "center" },
+              ],
+            },
+          ],
+        },
+        // Deliberately here: a trailing break on the title page must not become
+        // a blank page, because the section boundary already turns the page.
         { type: "pageBreak" },
       ],
     },
@@ -111,8 +131,17 @@ const build = (options: Parameters<typeof compileManuscript>[1]) =>
 
 {
   const m = build({ runningHeads: true, shortTitle: "North" });
-  const text = (nodes: typeof m.body) =>
-    nodes.flatMap((n) => (n.kind === "line" ? n.line.runs.map((r) => r.text) : ["\f"])).join("");
+  /** Everything readable, wherever it sits — lines and table cells alike. */
+  const text = (nodes: typeof m.body): string =>
+    nodes
+      .flatMap((n) => {
+        if (n.kind === "pageBreak") return ["\f"];
+        if (n.kind === "line") return n.line.runs.map((r) => r.text);
+        return n.table.rows.flatMap((row) =>
+          row.cells.flatMap((cell) => cell.lines.flatMap((line) => line.runs.map((r) => r.text))),
+        );
+      })
+      .join("");
 
   // The title page is front matter: it is not page one and carries no head.
   check("the title page is kept apart from the body", text(m.front).includes("The Frozen North"), true);
@@ -192,6 +221,47 @@ const build = (options: Parameters<typeof compileManuscript>[1]) =>
 
   const plain = await toPdf(build({ runningHeads: false, shortTitle: "North" }));
   check("one without heads is still a PDF", plain.subarray(0, 5).toString("latin1"), "%PDF-");
+}
+
+// --- tables, and the page that shouldn't be there ---
+
+{
+  const m = build({ runningHeads: true, shortTitle: "North" });
+
+  const table = m.front.find((n) => n.kind === "table");
+  check("a title page's table stays a table", Boolean(table), true);
+  if (table && table.kind === "table") {
+    check("with its rows and columns", [table.table.rows.length, table.table.rows[0]?.cells.length], [2, 2]);
+    check("and its column widths as shares", table.table.rows[0]?.cells.map((c) => c.width), [50, 50]);
+    check("the title is in it", table.table.rows[1]?.cells[0]?.lines[0]?.runs[0]?.text, "The Frozen North");
+  }
+
+  // The section boundary turns the page; a break at either edge turns it again,
+  // and the second one arrives blank.
+  check("no page break is left at the end of the front matter", m.front[m.front.length - 1]?.kind === "pageBreak", false);
+  check("nor at the start of the body", m.body[0]?.kind === "pageBreak", false);
+  // The break between chapters is untouched — it is what separates them.
+  check("but the breaks between chapters remain", m.body.some((n) => n.kind === "pageBreak"), true);
+
+  // Without a head there is no short title to ask for.
+  const bare = build({ runningHeads: false });
+  check("a compile with no head needs no short title", bare.runningHead, null);
+}
+
+{
+  // The Word file must carry a real table, not paragraphs pretending.
+  const file = await toDocx(build({ runningHeads: true, shortTitle: "North" }));
+  const xml = strFromU8(unzipSync(new Uint8Array(file))["word/document.xml"] as Uint8Array);
+  check("Word gets a table element", xml.includes("<w:tbl>"), true);
+  check("with two rows", (xml.match(/<w:tr>/g) ?? []).length >= 2, true);
+  check("and the title inside a cell", /<w:tc>[\s\S]*?The Frozen North/.test(xml), true);
+}
+
+{
+  // The case that was throwing: a title page table, prose, marks and breaks.
+  const file = await toPdf(build({ runningHeads: true, shortTitle: "North" }));
+  check("a manuscript with a table still makes a PDF", file.subarray(0, 5).toString("latin1"), "%PDF-");
+  check("and it is complete", file.subarray(-6).toString("latin1").includes("%%EOF"), true);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

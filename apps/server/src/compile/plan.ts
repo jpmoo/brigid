@@ -34,7 +34,39 @@ export interface CompiledLine {
   spaceAfterEm: number;
 }
 
-export type CompiledNode = { kind: "line"; line: CompiledLine } | { kind: "pageBreak" };
+export interface CompiledCell {
+  lines: CompiledLine[];
+  verticalAlign: "top" | "middle" | "bottom";
+  /** A share of the table's width, as the template set it. */
+  width: number;
+}
+
+export interface CompiledTable {
+  rows: { cells: CompiledCell[] }[];
+  borders: { outer: boolean; rows: boolean; columns: boolean; widthPt: number };
+}
+
+export type CompiledNode =
+  | { kind: "line"; line: CompiledLine }
+  | { kind: "table"; table: CompiledTable }
+  | { kind: "pageBreak" };
+
+/**
+ * A page break at either end of a run of pages is a page nobody asked for.
+ *
+ * The two parts of a manuscript are separate sections, and starting a section
+ * already starts a page. A break left at the end of the title page, or at the
+ * start of the first chapter, then asks for a second one — which arrives blank.
+ * The chapter break's own page break is what puts chapter one on a fresh page;
+ * it does not also need the section to have done it.
+ */
+function trimEdgeBreaks(nodes: CompiledNode[]): CompiledNode[] {
+  let from = 0;
+  let to = nodes.length;
+  while (from < to && nodes[from]?.kind === "pageBreak") from += 1;
+  while (to > from && nodes[to - 1]?.kind === "pageBreak") to -= 1;
+  return nodes.slice(from, to);
+}
 
 export interface CompiledManuscript {
   /** The title page and anything else before the writing starts. */
@@ -56,15 +88,14 @@ export interface CompileOptions {
   include?: string[];
   runningHeads: boolean;
   /**
-   * One word, and required.
+   * One word, required only when there is a running head to put it in.
    *
-   * It goes in the running head and in the filename, and both want something
-   * short — a running head is read at a glance across the top of a page, and a
-   * filename with a whole title in it is a filename nobody can say out loud.
-   * There is no falling back to the real title, because the real title is
-   * exactly what is too long.
+   * A head is read at a glance across the top of a page, so it wants a word
+   * rather than a title — and there is no falling back to the real title,
+   * because the real title is exactly what is too long. Without heads there is
+   * nowhere for it to go, so it isn't asked for.
    */
-  shortTitle: string;
+  shortTitle?: string;
 }
 
 function runsFrom(spans: ResolvedSpan[]): CompiledRun[] {
@@ -147,22 +178,50 @@ function nodesFor(
         });
         break;
 
-      case "table":
-        for (const row of node.rows) {
-          for (const cell of row.cells) {
-            const runs = runsFrom(cell.spans);
-            if (runs.length === 0) continue;
-            out.push({
-              kind: "line",
-              line: lineFrom(runs, cell.align ?? "center", typography, {
-                ...(cell.fontFamily ? { fontFamily: cell.fontFamily } : {}),
-                ...(cell.fontSizePt ? { fontSizePt: cell.fontSizePt } : {}),
-                ...(cell.lineHeight ? { lineHeight: cell.lineHeight } : {}),
+      case "table": {
+        const total = node.columns.reduce((sum, c) => sum + (c.width || 0), 0) || 1;
+        out.push({
+          kind: "table",
+          table: {
+            borders: {
+              outer: node.borders.outer === true,
+              rows: node.borders.rows === true,
+              columns: node.borders.columns === true,
+              widthPt: node.borders.widthPt ?? 1,
+            },
+            rows: node.rows.map((row) => ({
+              cells: row.cells.map((cell, i) => {
+                // A cell's soft breaks are its lines; a table on a title page
+                // is a few short lines placed on a page, not a paragraph.
+                const lines: CompiledLine[] = [];
+                let runs: CompiledRun[] = [];
+                const flush = () => {
+                  lines.push(
+                    lineFrom(runs, cell.align ?? node.columns[i]?.align ?? "left", typography, {
+                      ...(cell.fontFamily ? { fontFamily: cell.fontFamily } : {}),
+                      ...(cell.fontSizePt ? { fontSizePt: cell.fontSizePt } : {}),
+                      ...(cell.lineHeight ? { lineHeight: cell.lineHeight } : {}),
+                    }),
+                  );
+                  runs = [];
+                };
+                for (const run of runsFrom(cell.spans)) {
+                  if (run.text === "\n") flush();
+                  else runs.push(run);
+                }
+                flush();
+
+                return {
+                  lines,
+                  verticalAlign: cell.verticalAlign ?? "top",
+                  width: ((node.columns[i]?.width || 0) / total) * 100,
+                };
               }),
-            });
-          }
-        }
+            })),
+          },
+        });
         break;
+      }
 
       case "content": {
         if (!prose) break;
@@ -250,11 +309,11 @@ export function compileManuscript(
   }
 
   const surname = input.work.authorLastName?.trim() || input.work.authorFirstName?.trim() || "";
-  const shortTitle = options.shortTitle.trim().toLocaleUpperCase("en");
+  const shortTitle = (options.shortTitle ?? "").trim().toLocaleUpperCase("en");
 
   return {
-    front,
-    body,
+    front: trimEdgeBreaks(front),
+    body: trimEdgeBreaks(body),
     runningHead: options.runningHeads ? { surname, shortTitle } : null,
   };
 }

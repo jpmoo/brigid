@@ -1,5 +1,6 @@
 import {
   AlignmentType,
+  BorderStyle,
   Document,
   Footer,
   Header,
@@ -8,9 +9,15 @@ import {
   PageNumber,
   Packer,
   Paragraph,
+  Table,
+  TableCell,
+  TableRow,
   TextRun,
+  VerticalAlign,
+  WidthType,
 } from "docx";
-import type { CompiledLine, CompiledManuscript, CompiledNode } from "./plan.js";
+import type { CompiledManuscript, CompiledNode, CompiledTable } from "./plan.js";
+import type { CompiledLine } from "./plan.js";
 
 /**
  * The manuscript as a Word file.
@@ -75,13 +82,77 @@ function paragraphFor(line: CompiledLine, pageBreakBefore = false): Paragraph {
   });
 }
 
-function paragraphsFor(nodes: CompiledNode[]): Paragraph[] {
-  const out: Paragraph[] = [];
+const NONE = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
+
+/**
+ * A table stays a table.
+ *
+ * A title page uses one to place a few lines on a page, and flattening it to
+ * centred paragraphs loses exactly the thing it was for. Widths travel as
+ * percentages, because the page is a known width and the template thought in
+ * shares of it.
+ */
+function tableFor(table: CompiledTable): Table {
+  const rule = {
+    style: BorderStyle.SINGLE,
+    size: Math.max(1, Math.round(table.borders.widthPt * 8)),
+    color: "auto",
+  } as const;
+
+  const vertical = {
+    top: VerticalAlign.TOP,
+    middle: VerticalAlign.CENTER,
+    bottom: VerticalAlign.BOTTOM,
+  } as const;
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: {
+      top: table.borders.outer ? rule : NONE,
+      bottom: table.borders.outer ? rule : NONE,
+      left: table.borders.outer ? rule : NONE,
+      right: table.borders.outer ? rule : NONE,
+      insideHorizontal: table.borders.rows ? rule : NONE,
+      insideVertical: table.borders.columns ? rule : NONE,
+    },
+    rows: table.rows.map(
+      (row) =>
+        new TableRow({
+          children: row.cells.map(
+            (cell) =>
+              new TableCell({
+                width: { size: cell.width, type: WidthType.PERCENTAGE },
+                verticalAlign: vertical[cell.verticalAlign],
+                children: cell.lines.length
+                  ? cell.lines.map((line) => paragraphFor(line))
+                  : [new Paragraph({ children: [] })],
+              }),
+          ),
+        }),
+    ),
+  });
+}
+
+function bodyFor(nodes: CompiledNode[]): (Paragraph | Table)[] {
+  const out: (Paragraph | Table)[] = [];
   let breakPending = false;
 
   for (const node of nodes) {
     if (node.kind === "pageBreak") {
       breakPending = true;
+      continue;
+    }
+    if (node.kind === "table") {
+      // A table cannot carry a page break itself, so an empty paragraph does
+      // the breaking and the table follows it.
+      if (breakPending) {
+        out.push(new Paragraph({ children: [new PageBreak()] }));
+        breakPending = false;
+      }
+      out.push(tableFor(node.table));
+      // Word runs two adjacent tables together; a paragraph between them keeps
+      // them apart, and it is also what a following page break attaches to.
+      out.push(new Paragraph({ children: [] }));
       continue;
     }
     out.push(paragraphFor(node.line, breakPending));
@@ -123,7 +194,7 @@ export async function toDocx(manuscript: CompiledManuscript): Promise<Buffer> {
       properties: { page: { margin: margins } },
       // No head, and no number: the title page is not page one.
       footers: { default: new Footer({ children: [] }) },
-      children: paragraphsFor(manuscript.front),
+      children: bodyFor(manuscript.front),
     });
   }
 
@@ -136,7 +207,7 @@ export async function toDocx(manuscript: CompiledManuscript): Promise<Buffer> {
       },
     },
     ...(header ? { headers: { default: header } } : {}),
-    children: paragraphsFor(manuscript.body),
+    children: bodyFor(manuscript.body),
   });
 
   return Packer.toBuffer(new Document({ sections }));

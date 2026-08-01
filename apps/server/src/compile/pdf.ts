@@ -1,5 +1,5 @@
 import PDFDocument from "pdfkit";
-import type { CompiledLine, CompiledManuscript, CompiledNode } from "./plan.js";
+import type { CompiledLine, CompiledManuscript, CompiledNode, CompiledTable } from "./plan.js";
 
 /**
  * The manuscript as a PDF.
@@ -86,6 +86,10 @@ export async function toPdf(manuscript: CompiledManuscript): Promise<Buffer> {
         newPage(withHead);
         breakPending = false;
       }
+      if (node.kind === "table") {
+        drawTable(doc, node.table, cursor, () => newPage(withHead), usable, bottom);
+        continue;
+      }
       drawLine(doc, node.line, cursor, () => newPage(withHead), usable, bottom);
     }
   };
@@ -154,4 +158,70 @@ function drawLine(
   const grew = doc.y - before;
   cursor.y = before + (grew > 0 ? grew : leading) + line.spaceAfterEm * line.fontSizePt;
   if (cursor.y > bottom) nextPage();
+}
+
+/**
+ * A table, drawn as columns.
+ *
+ * A title page's table is placing a few lines on a page, so what matters is
+ * that each cell keeps its column and its vertical footing. Each row is given
+ * the height of its tallest cell, and the whole row moves to the next page
+ * rather than being split down the middle.
+ */
+function drawTable(
+  doc: PDFKit.PDFDocument,
+  table: CompiledTable,
+  cursor: Cursor,
+  nextPage: () => void,
+  usable: number,
+  bottom: number,
+): void {
+  const rule = table.borders.widthPt;
+
+  for (const row of table.rows) {
+    const heights = row.cells.map((cell) =>
+      cell.lines.reduce((sum, line) => sum + line.fontSizePt * line.lineHeight, 0),
+    );
+    const rowHeight = Math.max(...heights, 0);
+
+    if (cursor.y + rowHeight > bottom) nextPage();
+
+    const top = cursor.y;
+    let x = MARGIN;
+
+    row.cells.forEach((cell, i) => {
+      const width = (cell.width / 100) * usable;
+      const own = heights[i] ?? 0;
+      const slack = rowHeight - own;
+      const offset =
+        cell.verticalAlign === "middle" ? slack / 2 : cell.verticalAlign === "bottom" ? slack : 0;
+
+      let y = top + offset;
+      for (const line of cell.lines) {
+        const leading = line.fontSizePt * line.lineHeight;
+        // Drawn on the line's baseline rather than its box, so a cell set in a
+        // larger face still sits with the rest of its row.
+        doc.font(faceFor(line.fontFamily, false, false)).fontSize(line.fontSizePt);
+        let text = "";
+        for (const run of line.runs) text += run.text;
+        if (text) doc.text(text, x, y + (leading - line.fontSizePt), { width, align: line.align });
+        y += leading;
+      }
+
+      if (table.borders.columns && i > 0) {
+        doc.lineWidth(rule).moveTo(x, top).lineTo(x, top + rowHeight).stroke();
+      }
+      x += width;
+    });
+
+    if (table.borders.rows && cursor.y > MARGIN) {
+      doc.lineWidth(rule).moveTo(MARGIN, top).lineTo(MARGIN + usable, top).stroke();
+    }
+    cursor.y = top + rowHeight;
+  }
+
+  if (table.borders.outer) {
+    doc.lineWidth(rule).rect(MARGIN, cursor.y, usable, 0).stroke();
+  }
+  doc.y = cursor.y;
 }

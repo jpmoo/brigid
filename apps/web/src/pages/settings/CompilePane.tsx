@@ -43,7 +43,8 @@ export function CompilePane({
 
   const trimmed = shortTitle.trim();
   const oneWord = trimmed.length > 0 && !/\s/.test(trimmed);
-  const ready = oneWord && include.size > 0 && !busy;
+  // Only a running head needs one. Without heads there is nowhere to put it.
+  const ready = (!runningHeads || oneWord) && include.size > 0 && !busy;
 
   function toggle(id: string) {
     setInclude((current) => {
@@ -63,7 +64,7 @@ export function CompilePane({
         format,
         include: [...include],
         runningHeads,
-        shortTitle: trimmed,
+        ...(trimmed ? { shortTitle: trimmed } : {}),
       });
       // Handed to the browser as a download rather than opened: this is a file
       // to attach to a submission, not something to read here.
@@ -132,24 +133,35 @@ export function CompilePane({
         </label>
       </div>
 
-      <div className="be-line" style={{ marginTop: 8 }}>
-        <label className="bk-field">
-          <span>Short title</span>
-          <input
-            type="text"
-            value={shortTitle}
-            spellCheck={false}
-            placeholder="One word"
-            onChange={(e) => setShortTitle(e.target.value)}
-          />
-        </label>
-        {trimmed && !oneWord ? <span className="compile-warn">One word, no spaces.</span> : null}
-      </div>
-      <p className="tpl-note">
-        Used in the head and in the filename, so it wants to be short — a word, not the
-        whole title. {work ? <>&ldquo;{work.title}&rdquo; stays on the title page.</> : null} The
-        title page carries no head and is not page one; the writing starts the count.
-      </p>
+      {runningHeads ? (
+        <>
+          <div className="be-line" style={{ marginTop: 8 }}>
+            <label className="bk-field">
+              <span>Short title</span>
+              <input
+                type="text"
+                value={shortTitle}
+                spellCheck={false}
+                placeholder="One word"
+                onChange={(e) => setShortTitle(e.target.value)}
+              />
+            </label>
+            {trimmed && !oneWord ? (
+              <span className="compile-warn">One word, no spaces.</span>
+            ) : null}
+          </div>
+          <p className="tpl-note">
+            A head is read at a glance, so it wants a word rather than a title.{" "}
+            {work ? <>&ldquo;{work.title}&rdquo; stays on the title page.</> : null} It names
+            the file too. The title page carries no head and is not page one; the writing
+            starts the count.
+          </p>
+        </>
+      ) : (
+        <p className="tpl-note">
+          Without heads the title page still carries none, and is still not page one.
+        </p>
+      )}
 
       <h4 className="tpl-section">The file</h4>
       <div className="be-line">

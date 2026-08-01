@@ -386,7 +386,8 @@ export const api = {
       format: "docx" | "pdf";
       include: string[];
       runningHeads: boolean;
-      shortTitle: string;
+      /** Only wanted when there are heads to put it in. */
+      shortTitle?: string;
     },
   ) => {
     const res = await fetch(apiUrl(`/works/${workId}/compile`), {
