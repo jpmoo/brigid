@@ -47,6 +47,8 @@ export interface TableColumn {
 export interface TableCell {
   content: TemplateInline[];
   align?: TemplateAlign;
+  /** Where the cell's text sits within the height of its row. */
+  verticalAlign?: "top" | "middle" | "bottom";
   /** Multiple of the font size, as elsewhere. 2 is double-spaced. */
   lineHeight?: number;
   fontSizePt?: number;

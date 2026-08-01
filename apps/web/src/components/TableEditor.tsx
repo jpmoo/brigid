@@ -198,7 +198,9 @@ export function TableEditor({
                   fontSizePt: focusedCell.fontSizePt,
                   lineHeight: focusedCell.lineHeight,
                   align: focusedCell.align ?? node.columns[focused.c]?.align,
+                  verticalAlign: focusedCell.verticalAlign,
                 }}
+                vertical
                 onStyle={(patch) => patchCell(focused.r, focused.c, patch)}
               />
             </div>
@@ -212,34 +214,39 @@ export function TableEditor({
 
       <div className="te-bar">
         <span className="te-bar-label">Table</span>
-        <button className="btn secondary" type="button" onClick={addRow}>
-          <Rows3 size={13} /> Add row
+        <button className="btn secondary" type="button" title="Add a row" onClick={addRow}>
+          <Rows3 size={13} /> + Row
         </button>
-        <button className="btn secondary" type="button" onClick={addColumn}>
-          <Columns3 size={13} /> Add column
+        <button className="btn secondary" type="button" title="Add a column" onClick={addColumn}>
+          <Columns3 size={13} /> + Col
         </button>
-        <select
-          value=""
-          onChange={(e) => {
-            const [kind, index] = e.target.value.split(":");
-            if (kind === "row") removeRow(Number(index));
-            if (kind === "col") removeColumn(Number(index));
+        {/* Acts on the cell you're in, so there is nothing to pick from a list. */}
+        <button
+          className="btn secondary"
+          type="button"
+          title={focused ? `Delete row ${focused.r + 1}` : "Click a cell first"}
+          disabled={!focused || node.rows.length <= 1}
+          onClick={() => {
+            if (!focused) return;
+            removeRow(focused.r);
             setFocused(null);
-            e.target.value = "";
           }}
         >
-          <option value="">Delete a row or column…</option>
-          {node.rows.map((_, r) => (
-            <option key={`r${r}`} value={`row:${r}`}>
-              Delete row {r + 1}
-            </option>
-          ))}
-          {node.columns.map((_, c) => (
-            <option key={`c${c}`} value={`col:${c}`}>
-              Delete column {c + 1}
-            </option>
-          ))}
-        </select>
+          <Rows3 size={13} /> − Row
+        </button>
+        <button
+          className="btn secondary"
+          type="button"
+          title={focused ? `Delete column ${focused.c + 1}` : "Click a cell first"}
+          disabled={!focused || node.columns.length <= 1}
+          onClick={() => {
+            if (!focused) return;
+            removeColumn(focused.c);
+            setFocused(null);
+          }}
+        >
+          <Columns3 size={13} /> − Col
+        </button>
       </div>
 
       <div className="te-bar borders">

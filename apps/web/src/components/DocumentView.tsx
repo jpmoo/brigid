@@ -126,6 +126,7 @@ function Nodes({
                           style={{
                             textAlign: cell.align ?? node.columns[ci]?.align ?? "left",
                             borderLeft: b.columns && ci > 0 ? rule : undefined,
+                            verticalAlign: cell.verticalAlign ?? "top",
                             lineHeight: cell.lineHeight,
                             fontSize: cell.fontSizePt ? `${cell.fontSizePt}pt` : undefined,
                             fontFamily: cell.fontFamily,

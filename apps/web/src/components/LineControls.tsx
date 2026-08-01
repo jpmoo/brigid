@@ -8,6 +8,8 @@ export interface LineStyle {
   fontSizePt?: number | undefined;
   lineHeight?: number | undefined;
   align?: TemplateAlign | undefined;
+  /** Cells only: a paragraph has no row to sit within. */
+  verticalAlign?: "top" | "middle" | "bottom" | undefined;
 }
 
 /**
@@ -24,11 +26,14 @@ export function LineControls({
   editor,
   style,
   onStyle,
+  vertical = false,
 }: {
   marks: TemplateMarks;
   editor: React.RefObject<ChipEditorHandle | null>;
   style: LineStyle;
   onStyle: (patch: LineStyle) => void;
+  /** Offer vertical placement — only a table cell has a row to sit within. */
+  vertical?: boolean;
 }) {
   return (
     <>
@@ -107,6 +112,20 @@ export function LineControls({
           <option value="center">Center</option>
           <option value="right">Right</option>
         </select>
+        {vertical ? (
+          <select
+            className="be-spacing"
+            title="Vertical placement in the row"
+            value={style.verticalAlign ?? "top"}
+            onChange={(e) =>
+              onStyle({ verticalAlign: e.target.value as "top" | "middle" | "bottom" })
+            }
+          >
+            <option value="top">Top</option>
+            <option value="middle">Middle</option>
+            <option value="bottom">Bottom</option>
+          </select>
+        ) : null}
       </div>
     </>
   );

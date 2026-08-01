@@ -277,13 +277,18 @@ export function WorkPage() {
       if (!frame) frame = window.requestAnimationFrame(update);
     };
 
-    pane.addEventListener("scroll", onScroll, { passive: true });
+    // Captured on the document rather than bound to the pane. Scroll events
+    // don't bubble, but they are dispatched through the capture phase, so this
+    // hears whichever element actually scrolled — which removes the standing
+    // assumption that the pane is the scroller. If a layout change ever moves
+    // the scrolling to an ancestor, this keeps working.
+    document.addEventListener("scroll", onScroll, { capture: true, passive: true });
     window.addEventListener("resize", onScroll);
     // The first paint may not have laid the manuscript out yet.
     const settle = window.setTimeout(update, 0);
 
     return () => {
-      pane.removeEventListener("scroll", onScroll);
+      document.removeEventListener("scroll", onScroll, { capture: true });
       window.removeEventListener("resize", onScroll);
       window.clearTimeout(settle);
       if (frame) window.cancelAnimationFrame(frame);
@@ -347,6 +352,15 @@ export function WorkPage() {
     });
     return () => window.cancelAnimationFrame(id);
   }, [activeMatch]);
+
+  async function moveBlock(blockId: string, parentId: string | null, afterId: string | null) {
+    try {
+      await api.moveBlock(blockId, parentId, afterId);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not move that block");
+    }
+  }
 
   async function addBookmark(blockId: string) {
     try {
@@ -521,6 +535,7 @@ export function WorkPage() {
             }
             onDelete={(blockId) => void onDelete(blockId)}
             registerRef={registerOutlineRef}
+            onMove={(blockId, parentId, afterId) => void moveBlock(blockId, parentId, afterId)}
           />
 
           {/* Account and navigation live at the foot of the outline, out of the

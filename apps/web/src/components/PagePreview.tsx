@@ -95,6 +95,7 @@ export function PagePreview({
                             key={ci}
                             style={{
                               textAlign: cell.align ?? "left",
+                              verticalAlign: cell.verticalAlign ?? "top",
                               lineHeight: cell.lineHeight,
                               // px, not pt: on this sheet a point is a pixel.
                               fontSize: cell.fontSizePt ? `${cell.fontSizePt}px` : undefined,

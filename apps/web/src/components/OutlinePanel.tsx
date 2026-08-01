@@ -13,6 +13,8 @@ function preview(block: Block): string {
   return text.length > 180 ? `${text.slice(0, 180)}…` : text;
 }
 
+export const BLOCK_DRAG_TYPE = "application/x-brigid-block";
+
 export interface BreakChip {
   templateName: string;
   detached: boolean;
@@ -40,11 +42,54 @@ export interface OutlinePanelProps {
   onDelete: (id: string) => void;
   /** So the panel can scroll the current block into view as the document moves. */
   registerRef: (blockId: string, el: HTMLDivElement | null) => void;
+  /** Reorder within the block's own level. */
+  onMove: (blockId: string, parentId: string | null, afterId: string | null) => void;
 }
 
 export function OutlinePanel(props: OutlinePanelProps) {
   const { entries, templates, levels, selectedId, collapsed, breaks } = props;
   const totals = subtreeWordCounts(entries);
+
+  const [dragging, setDragging] = useState<string | null>(null);
+  const [over, setOver] = useState<{ id: string; before: boolean } | null>(null);
+
+  const structural = (blockId: string) =>
+    templates.get(entries.find((e) => e.block.id === blockId)?.block.formatId ?? "")?.formatSettings
+      ?.structural ?? true;
+
+  const depthOf = (blockId: string) =>
+    entries.find((e) => e.block.id === blockId)?.depth ?? -1;
+
+  /**
+   * Where a drop would put the block: the target's parent, after whichever
+   * sibling precedes the chosen gap. Levels never change, so the parent is
+   * always the target's own — a scene can move to another chapter, but it stays
+   * a scene.
+   */
+  const resolveDrop = (targetId: string, before: boolean) => {
+    const target = entries.find((e) => e.block.id === targetId);
+    if (!target) return null;
+    const parentId = target.block.parentId;
+    const siblings = entries.filter((e) => e.block.parentId === parentId);
+    const index = siblings.findIndex((e) => e.block.id === targetId);
+    if (index === -1) return null;
+
+    let afterId = before ? (siblings[index - 1]?.block.id ?? null) : targetId;
+
+    // Nothing goes above front matter: if the first sibling is a title page,
+    // the earliest position is after it.
+    const first = siblings[0];
+    if (afterId === null && first && !structural(first.block.id)) {
+      afterId = first.block.id;
+    }
+    return { parentId, afterId };
+  };
+
+  const canDrop = (targetId: string) =>
+    dragging !== null &&
+    targetId !== dragging &&
+    structural(targetId) &&
+    depthOf(targetId) === depthOf(dragging);
 
   // A collapsed block hides its whole subtree, so hidden-ness is inherited.
   const hidden = new Set<string>();
@@ -70,6 +115,29 @@ export function OutlinePanel(props: OutlinePanelProps) {
       {visible.map((entry) => (
         <OutlineCard
           key={entry.block.id}
+          draggable={structural(entry.block.id)}
+          isDragging={dragging === entry.block.id}
+          dropEdge={over?.id === entry.block.id ? (over.before ? "before" : "after") : null}
+          onDragStart={() => setDragging(entry.block.id)}
+          onDragEnd={() => {
+            setDragging(null);
+            setOver(null);
+          }}
+          onDragOverCard={(before) => {
+            if (!canDrop(entry.block.id)) return false;
+            setOver({ id: entry.block.id, before });
+            return true;
+          }}
+          onDropCard={(before) => {
+            const id = dragging;
+            setDragging(null);
+            setOver(null);
+            if (!id || !canDrop(entry.block.id)) return;
+            const target = resolveDrop(entry.block.id, before);
+            if (!target) return;
+            if (target.afterId === id) return;
+            props.onMove(id, target.parentId, target.afterId);
+          }}
           entry={entry}
           levelName={levels.find((l) => l.depth === entry.depth)?.name ?? `Level ${entry.depth + 1}`}
           formatName={templates.get(entry.block.formatId)?.name ?? "Unknown format"}
@@ -101,6 +169,14 @@ interface CardProps extends Omit<OutlinePanelProps, "collapsed"> {
   structural: boolean;
   selected: boolean;
   isCollapsed: boolean;
+  draggable: boolean;
+  isDragging: boolean;
+  dropEdge: "before" | "after" | null;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  /** Returns whether the drop would be accepted, so the cursor can say so. */
+  onDragOverCard: (before: boolean) => boolean;
+  onDropCard: (before: boolean) => void;
   breakChip: BreakChip | null;
   /** This block plus everything under it. */
   words: number;
@@ -114,9 +190,38 @@ function OutlineCard(props: CardProps) {
 
   return (
     <div
-      className={`outline-item${props.breakChip ? " has-break" : ""}`}
+      className={[
+        "outline-item",
+        props.breakChip ? "has-break" : "",
+        props.isDragging ? "dragging" : "",
+        props.dropEdge ? `drop-${props.dropEdge}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       style={{ marginLeft: entry.depth * 16 }}
       ref={(el) => props.registerRef(block.id, el)}
+      draggable={props.draggable}
+      onDragStart={(e) => {
+        e.dataTransfer.setData(BLOCK_DRAG_TYPE, block.id);
+        e.dataTransfer.effectAllowed = "move";
+        props.onDragStart();
+      }}
+      onDragEnd={props.onDragEnd}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(BLOCK_DRAG_TYPE)) return;
+        // Upper half inserts before, lower half after.
+        const box = e.currentTarget.getBoundingClientRect();
+        const before = e.clientY < box.top + box.height / 2;
+        if (!props.onDragOverCard(before)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.types.includes(BLOCK_DRAG_TYPE)) return;
+        e.preventDefault();
+        const box = e.currentTarget.getBoundingClientRect();
+        props.onDropCard(e.clientY < box.top + box.height / 2);
+      }}
     >
       {props.breakChip ? (
         <button

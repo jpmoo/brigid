@@ -48,6 +48,7 @@ export interface ResolvedSpan extends TemplateMarks {
 export interface ResolvedCell {
   spans: ResolvedSpan[];
   align?: TemplateAlign;
+  verticalAlign?: "top" | "middle" | "bottom";
   lineHeight?: number;
   fontSizePt?: number;
   fontFamily?: string;
@@ -239,6 +240,7 @@ function resolveBody(nodes: readonly TemplateNode[], ctx: SpanContext): Resolved
                 .map((inline) => resolveInline(inline, ctx))
                 .filter((s): s is ResolvedSpan => s !== null),
               ...(cell.align ? { align: cell.align } : {}),
+              ...(cell.verticalAlign ? { verticalAlign: cell.verticalAlign } : {}),
               ...(cell.lineHeight ? { lineHeight: cell.lineHeight } : {}),
               ...(cell.fontSizePt ? { fontSizePt: cell.fontSizePt } : {}),
               ...(cell.fontFamily ? { fontFamily: cell.fontFamily } : {}),

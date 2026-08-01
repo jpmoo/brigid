@@ -79,6 +79,22 @@ function extractText(doc: unknown): string {
   return parts.join(node.type === "doc" || node.type === "paragraph" ? " " : "");
 }
 
+/** How deep a block sits, walking parents to the root. */
+function depthOf(
+  parentOf: ReadonlyMap<string, string | null>,
+  id: string | null,
+): number {
+  let depth = 0;
+  let cursor = id;
+  const guard = new Set<string>();
+  while (cursor && !guard.has(cursor)) {
+    guard.add(cursor);
+    depth += 1;
+    cursor = parentOf.get(cursor) ?? null;
+  }
+  return depth;
+}
+
 /** Every descendant of `rootId`, deepest last. Used for cascade-free deletes. */
 function descendantsOf(all: readonly { id: string; parentId: string | null }[], rootId: string) {
   const byParent = new Map<string, string[]>();
@@ -292,16 +308,36 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
         .limit(1);
       if (!block) throw notFound("block");
 
+      const all = await tx
+        .select({ id: blocks.id, parentId: blocks.parentId, formatId: blocks.formatId })
+        .from(blocks)
+        .where(eq(blocks.workId, block.workId));
+      const parentOf = new Map(all.map((b) => [b.id, b.parentId]));
+
       if (body.parentId) {
-        const all = await tx
-          .select({ id: blocks.id, parentId: blocks.parentId })
-          .from(blocks)
-          .where(eq(blocks.workId, block.workId));
         // Dropping a block inside its own subtree would orphan the whole branch
         // from the root, and buildOutline would silently reparent it.
         if (body.parentId === id || descendantsOf(all, id).includes(body.parentId)) {
           throw badRequest("a block can't be moved inside itself");
         }
+      }
+
+      // A move reorders; it never re-levels. A scene stays a scene and a
+      // chapter stays a chapter, whatever the client asked for.
+      const wasAt = depthOf(parentOf, parentOf.get(id) ?? null);
+      const goingTo = depthOf(parentOf, body.parentId);
+      if (wasAt !== goingTo) {
+        throw badRequest("a block can only be moved among positions at its own level");
+      }
+
+      // Front matter sits outside the ordering entirely.
+      const [format] = await tx
+        .select({ formatSettings: templates.formatSettings })
+        .from(templates)
+        .where(eq(templates.id, all.find((b) => b.id === id)?.formatId ?? ""))
+        .limit(1);
+      if (format?.formatSettings?.structural === false) {
+        throw badRequest("that block isn't part of the structure, so it can't be reordered");
       }
 
       const siblings = (await siblingsOf(tx as unknown as typeof db, block.workId, body.parentId))

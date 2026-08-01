@@ -2620,3 +2620,13 @@ mark.hit.active {
   color: var(--text);
   box-shadow: var(--shadow);
 }
+
+/* Four controls, one line: the labels stay short and nothing wraps. */
+.te-bar {
+  flex-wrap: nowrap;
+}
+
+.te-bar .btn {
+  white-space: nowrap;
+  gap: 4px;
+}
