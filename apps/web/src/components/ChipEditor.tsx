@@ -25,6 +25,16 @@ const CHIPPABLE = VARIABLE_NAMES.filter((n) => VARIABLES[n].insertAs === "inline
  * caret always has somewhere legitimate to sit now, and these are stripped back
  * out when serializing.
  */
+/** Anything going into an attribute of a string bound for innerHTML. */
+function escapeAttr(value: string): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 const ZWSP = "\u200B";
 
 /** A numeric chip shows its format, using 3 so every option looks different. */
@@ -84,8 +94,14 @@ function inlinesToHtml(inlines: readonly TemplateInline[]): string {
         return `${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`;
       }
       if (inline.type === "variable") {
-        const fmt = inline.numberFormat ? ` data-format="${inline.numberFormat}"` : "";
-        return `${ZWSP}<span data-var="${inline.name}"${fmt} contenteditable="false">${chipLabel(
+        // Escaped like anything else going into an attribute. A template body is
+        // stored as unvalidated JSON, so these two are only ever well-formed
+        // because the app is the one writing them — which is not a property to
+        // rely on in a string being handed to innerHTML.
+        const fmt = inline.numberFormat
+          ? ` data-format="${escapeAttr(inline.numberFormat)}"`
+          : "";
+        return `${ZWSP}<span data-var="${escapeAttr(inline.name)}"${fmt} contenteditable="false">${chipLabel(
           inline.name,
           inline.numberFormat,
         )}</span>${ZWSP}`;

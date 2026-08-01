@@ -104,13 +104,7 @@ export async function restoreWork(
     backupPath(name),
   ]);
 
-  const staged = dumped
-    .split("\n")
-    .filter((line) => !line.startsWith("SELECT pg_catalog.setval"))
-    .map((line) =>
-      line.startsWith("COPY public.") ? line.replace("COPY public.", `COPY ${STAGING}.`) : line,
-    )
-    .join("\n");
+  const staged = stageOnly(dumped, tables);
 
   await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${STAGING} CASCADE`));
   await db.execute(sql.raw(`CREATE SCHEMA ${STAGING}`));
@@ -179,6 +173,73 @@ export async function restoreWork(
   } finally {
     await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${STAGING} CASCADE`));
   }
+}
+
+
+/**
+ * Rewrites a dump's data section for the staging schema, and refuses the rest.
+ *
+ * This stream is executed against the live database, and every byte of it came
+ * out of a file somebody was handed. pg_restore emits the COPY statement text
+ * stored in the archive, followed by the archive's own data bytes — neither is
+ * anything this app wrote. Rewriting the lines that begin `COPY public.` and
+ * passing everything else through meant a crafted archive could close its data
+ * section with a terminator and have whatever followed run as the database
+ * owner: rewriting the password hash, reading the other manuscripts, dropping
+ * the schema. The restore is scoped to one manuscript; the file was not.
+ *
+ * So nothing passes unless it is recognised. Outside a data section only blank
+ * lines, comments, SET, and a COPY header naming one of the tables asked for
+ * are allowed. Inside one, every line is data until the terminator, and data is
+ * never interpreted. Anything else stops the restore rather than being handed
+ * to psql to make sense of.
+ */
+export function stageOnly(dumped: string, tables: readonly string[]): string {
+  const wanted = new Set(tables);
+  const out: string[] = [];
+  let copying = false;
+
+  for (const line of dumped.split("\n")) {
+    if (copying) {
+      out.push(line);
+      // The terminator is a line of its own; a data row that looked like one
+      // would have been escaped by pg_dump on the way in.
+      if (line === "\\.") copying = false;
+      continue;
+    }
+
+    if (line.trim() === "" || line.startsWith("--")) {
+      out.push(line);
+      continue;
+    }
+
+    // Settings pg_dump writes around its data, and nothing else.
+    if (/^SET [A-Za-z_]+ = /.test(line) || /^SELECT pg_catalog\.set_config\(/.test(line)) {
+      out.push(line);
+      continue;
+    }
+
+    // Sequence positions belong to the real schema, not to a staging copy.
+    if (line.startsWith("SELECT pg_catalog.setval")) continue;
+
+    const header = /^COPY public\.("?)([A-Za-z_][A-Za-z0-9_]*)\1 \(/.exec(line);
+    if (header) {
+      const table = header[2] ?? "";
+      if (!wanted.has(table)) {
+        throw new Error(`this backup carries data for ${table}, which was not asked for`);
+      }
+      out.push(line.replace("COPY public.", `COPY ${STAGING}.`));
+      copying = true;
+      continue;
+    }
+
+    throw new Error(
+      "this backup contains statements a restore should not run — it may not be a Brigid backup",
+    );
+  }
+
+  if (copying) throw new Error("this backup ends in the middle of a table");
+  return out.join("\n");
 }
 
 /** An id from a request, going into raw SQL. */

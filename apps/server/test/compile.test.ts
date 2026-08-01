@@ -9,6 +9,8 @@ import { unzipSync, strFromU8 } from "fflate";
 import { compileManuscript } from "../src/compile/plan.js";
 import { toDocx } from "../src/compile/docx.js";
 import { toPdf } from "../src/compile/pdf.js";
+import { stageOnly } from "../src/backup/restore.js";
+import { run } from "../src/backup/store.js";
 import type { LevelLike, TemplateLike } from "@brigid/shared";
 
 let failures = 0;
@@ -331,6 +333,84 @@ const build = (options: Parameters<typeof compileManuscript>[1]) =>
   const loudRuns = loud && loud.kind === "line" ? loud.line.runs : [];
   check("all caps stays one run", loudRuns.map((r) => r.text), ["CHAPTER NINE"]);
   check("at one size", loudRuns[0]?.sizeScale, undefined);
+}
+
+// --- a dump is a file somebody was handed ---
+
+{
+  const tables = ["works", "blocks", "templates"];
+  const ok = [
+    "--",
+    "SET statement_timeout = 0;",
+    "SELECT pg_catalog.set_config('search_path', '', false);",
+    "COPY public.works (id, title) FROM stdin;",
+    "1\tThe Frozen North",
+    "\\.",
+  ].join("\n");
+
+  const staged = stageOnly(ok, tables);
+  check("a real dump is pointed at the staging schema", staged.includes("COPY brigid_restore.works"), true);
+  check("and nothing is left aimed at the live one", staged.includes("COPY public."), false);
+  check("its rows are untouched", staged.includes("The Frozen North"), true);
+
+  const refuses = (label: string, sql: string) => {
+    let threw = false;
+    try {
+      stageOnly(sql, tables);
+    } catch {
+      threw = true;
+    }
+    check(label, threw, true);
+  };
+
+  // The attack: close the data section, then say what you like. This is what
+  // used to be passed to psql verbatim.
+  refuses(
+    "a statement smuggled after the terminator is refused",
+    [
+      "COPY public.works (id) FROM stdin;",
+      "1",
+      "\\.",
+      "UPDATE public.users SET password_hash = 'x';",
+    ].join("\n"),
+  );
+  refuses("so is one before any data", "DROP SCHEMA public CASCADE;");
+  refuses(
+    "so is a table that was never asked for",
+    ["COPY public.users (id) FROM stdin;", "1", "\\."].join("\n"),
+  );
+  refuses("and a data section left open", "COPY public.works (id) FROM stdin;\n1");
+
+  // Rows are data and are never read as statements, however they look.
+  const looksAlarming = [
+    "COPY public.blocks (id, content_text) FROM stdin;",
+    "1\tDROP SCHEMA public CASCADE;",
+    "\\.",
+  ].join("\n");
+  check(
+    "prose that looks like SQL is still just prose",
+    stageOnly(looksAlarming, tables).includes("DROP SCHEMA public CASCADE;"),
+    true,
+  );
+}
+
+// --- the database password does not ride in argv ---
+
+{
+  // Any local account can read another process's command line through /proc,
+  // so the password is lifted out of the URI and handed over in the
+  // environment. Checked by running a real process and asking it what it got.
+  const args = ["--format=custom", "postgresql://brigid:s3cr3t@localhost:5432/brigid"];
+  const seen = (await run("printenv", ["PGPASSWORD"], { args })).trim();
+
+  check("the password reaches the tool", seen, "s3cr3t");
+  check("but not on the command line", args[1]?.includes("s3cr3t"), false);
+  check("the rest of the URI survives", args[1], "postgresql://brigid@localhost:5432/brigid");
+
+  // A plain argument list is left alone entirely.
+  const plain = ["--version"];
+  await run("printenv", ["PGPASSWORD"], { args: plain }).catch(() => "");
+  check("arguments with no URI are untouched", plain, ["--version"]);
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);

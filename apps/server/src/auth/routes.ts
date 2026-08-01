@@ -2,7 +2,7 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { users } from "@brigid/db";
+import { sessions, users } from "@brigid/db";
 import { env } from "../config.js";
 import { db } from "../db.js";
 import { badRequest, unauthorized } from "../lib/errors.js";
@@ -74,7 +74,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     return { username: user?.username ?? null };
   });
 
-  app.post("/auth/password", async (req) => {
+  app.post("/auth/password", async (req, reply) => {
     const userId = requireUser(req);
     const body = z
       .object({
@@ -100,6 +100,23 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       .update(users)
       .set({ passwordHash: await hashPassword(body.newPassword), updatedAt: new Date() })
       .where(eq(users.id, userId));
+
+    /**
+     * And every session with it.
+     *
+     * Changing a password is what someone does when they think a credential
+     * has got out, and it is the only thing this app offers them for it. A
+     * cookie already in someone else's hands is good for thirty days, and
+     * nothing else would ever invalidate it — so the change has to be a
+     * revocation or it is only a gesture.
+     */
+    await db.delete(sessions).where(eq(sessions.userId, userId));
+
+    // The caller stays signed in on a new one rather than being turned out of
+    // the app for having done the right thing.
+    const { token } = await createSession(userId);
+    reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies, env.basePath));
+
     return { ok: true };
   });
 }

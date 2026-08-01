@@ -1,8 +1,8 @@
-import { runMigrations } from "@brigid/db";
+import { createDb, runMigrations } from "@brigid/db";
 import { users } from "@brigid/db";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env, persistDatabaseUrl } from "../config.js";
+import { env, persistDatabaseUrl, runtimeConfig } from "../config.js";
 import { db, initDb, isDbReady } from "../db.js";
 import { assertPasswordAcceptable, hashPassword } from "../auth/password.js";
 import { SESSION_COOKIE, createSession, sessionCookieOptions } from "../auth/session.js";
@@ -45,16 +45,42 @@ const setupBody = z.object({
  * nobody to authenticate as yet — so leaving them reachable afterwards would let
  * anyone repoint the instance at their own database.
  */
+/**
+ * Whether first-run setup is still to be done.
+ *
+ * The durable fact is the stored connection string, not the state of the pool.
+ * This used to answer from `isDbReady()`, which is true only while a pool
+ * happens to be attached — so every moment the app detached its own, setup
+ * reopened to anyone who could reach the port. Restoring a backup does exactly
+ * that, deliberately, for as long as pg_restore takes: the owner pressing
+ * "restore" reopened unauthenticated account creation for minutes at a time,
+ * and `GET /setup/status` announced it.
+ *
+ * So: nothing configured, and setup is open. Configured and the pool is away,
+ * and it is closed — that is maintenance, not a fresh install. Configured,
+ * reachable, and holding no account is the one case left open, which is a
+ * first run that failed after storing the URL and deserves to be finishable.
+ * Anything else fails closed.
+ */
 async function setupIsOpen(): Promise<boolean> {
-  if (!isDbReady()) return true;
+  if (runtimeConfig().databaseUrl === null) return true;
+  if (!isDbReady()) return false;
   try {
     const existing = await db.select({ id: users.id }).from(users).limit(1);
     return existing.length === 0;
   } catch {
-    // Configured but unmigrated or unreachable — still finishable.
-    return true;
+    return false;
   }
 }
+
+/**
+ * Setup runs one at a time.
+ *
+ * The gate is checked and then followed by provisioning, migration and account
+ * creation — long enough for two callers to pass the same check and both go on
+ * to write.
+ */
+let completing = false;
 
 export async function setupRoutes(app: FastifyInstance): Promise<void> {
   app.get("/setup/status", async () => ({ needsSetup: await setupIsOpen() }));
@@ -74,6 +100,9 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
    */
   app.post("/setup/complete", async (req, reply) => {
     if (!(await setupIsOpen())) throw conflict("Brigid is already set up");
+    if (completing) throw conflict("setup is already running");
+    completing = true;
+    try {
     const body = setupBody.parse(req.body);
 
     const problem = assertPasswordAcceptable(body.account.password);
@@ -105,13 +134,28 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
     }
 
     await runMigrations(databaseUrl);
+
+    /**
+     * Asked before anything is kept.
+     *
+     * A database that already holds an account is somebody else's Brigid, and
+     * finding that out used to happen *after* the connection string had been
+     * written to disk and the live pool repointed at it — so an attempt that
+     * was ultimately refused had already replaced the configuration, and the
+     * instance would come up against the wrong database at the next restart.
+     * The candidate is inspected on a connection of its own, and only a
+     * database that passes is adopted.
+     */
+    const candidate = createDb(databaseUrl);
+    try {
+      const existing = await candidate.db.select({ id: users.id }).from(users).limit(1);
+      if (existing.length > 0) throw conflict("that database already has a Brigid account");
+    } finally {
+      await candidate.sql.end({ timeout: 5 }).catch(() => {});
+    }
+
     await persistDatabaseUrl(databaseUrl);
     initDb(databaseUrl);
-
-    // Re-check now that the real database is attached: a pointed-at database
-    // that already holds an account is somebody else's Brigid.
-    const existing = await db.select({ id: users.id }).from(users).limit(1);
-    if (existing.length > 0) throw conflict("that database already has a Brigid account");
 
     const [created] = await db
       .insert(users)
@@ -128,5 +172,8 @@ export async function setupRoutes(app: FastifyInstance): Promise<void> {
     reply.setCookie(SESSION_COOKIE, token, sessionCookieOptions(env.secureCookies, env.basePath));
 
     return { ok: true, username: created.username };
+    } finally {
+      completing = false;
+    }
   });
 }

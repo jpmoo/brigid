@@ -71,8 +71,21 @@ function runsToHtml(runs: ProseText[], speller: Speller | null): string {
     .join("");
 }
 
+/**
+ * Escapes quotes as well as tags, because the result is used in attributes.
+ *
+ * `data-word="…"` was safe only because the word pattern it is fed cannot
+ * produce a quote — true today, and true by accident. A function called
+ * escapeHtml should be safe wherever HTML is being built, not wherever its
+ * author last checked.
+ */
 function escapeHtml(text: string): string {
-  return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**

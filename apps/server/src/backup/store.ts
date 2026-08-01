@@ -99,6 +99,38 @@ export async function toolsAvailable(): Promise<boolean> {
   return true;
 }
 
+
+/**
+ * Strips the password out of any connection URI in the arguments and hands it
+ * over in the environment instead, where it isn't visible to `ps`.
+ *
+ * The arguments are rewritten in place, so callers keep passing a URI and this
+ * stays the only place that has to know.
+ */
+function withoutPassword(args: string[]): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = { ...process.env };
+
+  args.forEach((arg, i) => {
+    const at = arg.indexOf("postgres");
+    if (at === -1) return;
+    const prefix = arg.slice(0, at);
+    let url: URL;
+    try {
+      url = new URL(arg.slice(at));
+    } catch {
+      return;
+    }
+    if (url.protocol !== "postgres:" && url.protocol !== "postgresql:") return;
+    if (!url.password) return;
+
+    env.PGPASSWORD = decodeURIComponent(url.password);
+    url.password = "";
+    args[i] = prefix + url.toString();
+  });
+
+  return env;
+}
+
 /**
  * Runs one of the Postgres tools.
  *
@@ -109,10 +141,25 @@ export async function toolsAvailable(): Promise<boolean> {
 export function run(
   command: string,
   args: string[],
-  options: { stdin?: string; tolerate?: (stderr: string) => boolean } = {},
+  options: {
+    stdin?: string;
+    tolerate?: (stderr: string) => boolean;
+    /** Rewritten in place to strip any password; the tool reads it from here. */
+    args?: string[];
+  } = {},
 ): Promise<string> {
   return new Promise((resolvePromise, reject) => {
-    const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
+    const child = spawn(command, args, {
+      stdio: ["pipe", "pipe", "pipe"],
+      /**
+       * The connection string is on the command line, and on Linux a command
+       * line is world-readable through /proc — so any other local account could
+       * read the database password by watching for the nightly backup. The
+       * password is lifted out of the URI and passed in the environment, which
+       * is what PostgreSQL documents PGPASSWORD for.
+       */
+      env: withoutPassword(options.args ?? args),
+    });
     let out = "";
     let err = "";
     child.stdout.on("data", (chunk: Buffer) => {
