@@ -109,7 +109,7 @@ export async function toolsAvailable(): Promise<boolean> {
 export function run(
   command: string,
   args: string[],
-  options: { stdin?: string } = {},
+  options: { stdin?: string; tolerate?: (stderr: string) => boolean } = {},
 ): Promise<string> {
   return new Promise((resolvePromise, reject) => {
     const child = spawn(command, args, { stdio: ["pipe", "pipe", "pipe"] });
@@ -129,12 +129,49 @@ export function run(
       );
     });
     child.on("close", (code) => {
-      if (code === 0) resolvePromise(out);
-      else reject(new Error(err.trim() || `${command} exited with code ${code}`));
+      if (code === 0) return resolvePromise(out);
+      // Some failures are not failures. pg_restore reports what it skipped and
+      // then exits non-zero, so the caller decides whether what it skipped
+      // mattered rather than every skipped line being fatal.
+      if (options.tolerate?.(err)) return resolvePromise(out);
+      reject(new Error(err.trim() || `${command} exited with code ${code}`));
     });
     if (options.stdin !== undefined) child.stdin.end(options.stdin);
     else child.stdin.end();
   });
+}
+
+/**
+ * Errors a restore is right to shrug at.
+ *
+ * The database's extensions belong to whoever installed them, which for a
+ * self-hosted Postgres is a superuser and not the app's own role. `--clean`
+ * dutifully tries to drop and re-comment them, is refused twice, ignores it,
+ * and then exits non-zero — so a restore that had in fact just succeeded was
+ * reported as having failed. The rows are all that is being restored here; an
+ * extension the app cannot drop is an extension that is still there, which is
+ * what was wanted anyway.
+ *
+ * Only these. Anything else in the output and the restore failed for real.
+ */
+export function onlyExtensionComplaints(stderr: string): boolean {
+  const problems = stderr
+    .split("\n")
+    .filter((line) => /^pg_restore: (error|warning):/.test(line))
+    .filter((line) => !/^pg_restore: warning: errors ignored on restore/.test(line));
+
+  return (
+    problems.length > 0 &&
+    problems.every((line) => /must be owner of extension|extension .* does not exist/i.test(line))
+  );
+}
+
+/** What was skipped, so it can be said out loud rather than swallowed. */
+export function skippedLines(stderr: string): string[] {
+  return stderr
+    .split("\n")
+    .filter((line) => /must be owner of extension/i.test(line))
+    .map((line) => line.replace(/^pg_restore: error:\s*/, "").trim());
 }
 
 /** Takes a backup and returns its filename. `label` distinguishes why. */

@@ -122,6 +122,8 @@ export function WorkPage() {
   // index here rather than closing over a stale one.
   const matchIndexRef = useRef(0);
   matchIndexRef.current = matchIndex;
+  const queryRef = useRef("");
+  queryRef.current = query;
   const [activeBookmark, setActiveBookmark] = useState<string | null>(null);
   const [adding, setAdding] = useState<AddRequest | null>(null);
   const [renaming, setRenaming] = useState<Block | null>(null);
@@ -378,15 +380,17 @@ export function WorkPage() {
       frame = 0;
 
       const rect = pane.getBoundingClientRect();
-      const next = currentBlockAt(
-        items,
-        (item) => {
-          const key = item.kind === "break" ? breakRefKey(item.blockId) : item.block.id;
-          const el = blockRefs.current.get(key);
-          return el ? el.getBoundingClientRect().top : null;
-        },
-        rect.top + 4,
-      );
+
+      // Read straight off the rendered document. Every block and every break
+      // already carries its id as an attribute, and querying them returns them
+      // in document order, which is the order they are read in.
+      const positions: { id: string; top: number }[] = [];
+      for (const el of pane.querySelectorAll<HTMLElement>("[data-block-id],[data-break-for]")) {
+        const id = el.dataset.blockId ?? el.dataset.breakFor;
+        if (id) positions.push({ id, top: el.getBoundingClientRect().top });
+      }
+
+      const next = currentBlockAt(positions, rect.top + 4);
 
       if (!next) return;
 
@@ -405,7 +409,7 @@ export function WorkPage() {
       // means the next one down the page rather than one back from wherever you
       // last clicked. Marks render in the order the matches were found, so the
       // nth mark in the document is the nth match.
-      if (!query.trim()) return;
+      if (!queryRef.current.trim()) return;
       const marks = pane.querySelectorAll("mark.hit");
 
       // While the current result is still on screen it stays the current one.
@@ -457,7 +461,12 @@ export function WorkPage() {
       window.clearTimeout(settle);
       if (frame) window.cancelAnimationFrame(frame);
     };
-  }, [items]);
+    // Mounted once. It reads the document rather than any rendered value, so
+    // there is nothing here that can go stale — and re-running it on every
+    // change of `items` meant tearing down the listener and cancelling a
+    // pending measurement each time the manuscript was touched.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Centre the current block in the outline, so there is always context above
   // and below it rather than it sitting against an edge. Also runs when the

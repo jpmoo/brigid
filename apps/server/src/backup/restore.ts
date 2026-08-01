@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { runMigrations } from "@brigid/db";
 import { closeDb, db, initDb } from "../db.js";
-import { backupPath, run, takeBackup } from "./store.js";
+import { backupPath, onlyExtensionComplaints, run, takeBackup } from "./store.js";
 
 /**
  * Putting a backup back.
@@ -24,16 +24,23 @@ export async function restoreEverything(databaseUrl: string, name: string): Prom
 
   await closeDb();
   try {
-    await run("pg_restore", [
-      "--clean",
-      // Without this, every DROP of something the backup expects but this
-      // database hasn't got is an error rather than a no-op.
-      "--if-exists",
-      "--no-owner",
-      "--no-acl",
-      `--dbname=${databaseUrl}`,
-      backupPath(name),
-    ]);
+    await run(
+      "pg_restore",
+      [
+        "--clean",
+        // Without this, every DROP of something the backup expects but this
+        // database hasn't got is an error rather than a no-op.
+        "--if-exists",
+        "--no-owner",
+        "--no-acl",
+        `--dbname=${databaseUrl}`,
+        backupPath(name),
+      ],
+      // The app's role does not own the database's extensions, so `--clean`
+      // is refused when it tries to drop them and exits non-zero having
+      // restored everything that matters. See onlyExtensionComplaints.
+      { tolerate: onlyExtensionComplaints },
+    );
     // The dump carries the schema it was taken with, which may be older than
     // this code — restoring one from before a migration puts the database back
     // behind the app, and the first thing to break is whatever that migration
