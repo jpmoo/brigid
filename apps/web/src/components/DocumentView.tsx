@@ -4,7 +4,7 @@ import type { CSSProperties } from "react";
 import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
 import { asProseDoc, foldForSearch, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
-import { offsetOfPoint } from "./ProseEditor.js";
+import { offsetOfPoint, offsetOfPosition } from "./ProseEditor.js";
 import type { ProseLayout } from "./ProseEditor.js";
 import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
@@ -105,7 +105,7 @@ function Nodes({
   smart?: boolean;
   editing?: boolean;
   editor?: (layout: ProseLayout) => ReactNode;
-  onEditProse?: (caret: number) => void;
+  onEditProse?: (selection: { anchor: number; focus: number }) => void;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -221,16 +221,30 @@ function Nodes({
             const quoted = doc ? doc.content.map((p) => p.blockquote === true) : [];
             const written = paragraphs.some((runs) => runs.some((r) => r.text.trim()));
 
+            /**
+              * On release, not on press.
+              *
+              * Pressing would be the obvious hook, but a drag-selection is bound
+              * to the node under the pointer when the press lands — swap that
+              * node for the editor at that moment and the browser has nothing
+              * left to extend a selection from. So the rendered text does the
+              * selecting, natively, with all the behaviour that comes free with
+              * it, and what it produced is carried across the swap here.
+              *
+              * Released, rather than clicked: a click only fires when the press
+              * and release share an ancestor, which a drag ending outside the
+              * block does not.
+              */
             const enter = (event: React.MouseEvent<HTMLElement>) => {
               if (!onEditProse) return;
               // The block beneath has its own click; writing where the pointer
               // is should not also be a click on the block.
               event.stopPropagation();
-              onEditProse(offsetOfPoint(event.currentTarget, event.clientX, event.clientY));
+              onEditProse(selectionIn(event.currentTarget, event.clientX, event.clientY));
             };
 
             return written ? (
-              <div className="prose-body" key={i} onClick={enter}>
+              <div className="prose-body" key={i} onMouseUp={enter}>
                 {paragraphs.map((runs, j) => {
                   // An extract is inset as a whole and never carries a
                   // first-line indent, whatever the block's setting.
@@ -265,7 +279,7 @@ function Nodes({
                 })}
               </div>
             ) : (
-              <p className="prose empty" key={i} onClick={enter}>
+              <p className="prose empty" key={i} onMouseUp={enter}>
                 Nothing written here yet.
               </p>
             );
@@ -274,6 +288,36 @@ function Nodes({
       })}
     </>
   );
+}
+
+/**
+ * What is selected inside a block's rendered prose, as character offsets.
+ *
+ * Falls back to the point released on when there is nothing usable — a plain
+ * click, or a selection that started outside this block. Anchor and focus are
+ * kept in the order the writer made them, so a backwards drag stays backwards
+ * and the next shift-arrow extends from the end they were moving.
+ *
+ * A selection running past the block is kept only as far as the block goes.
+ * Each block is its own editor, so there is no other honest answer; the part
+ * outside cannot be edited here whatever we do with it.
+ */
+function selectionIn(
+  root: HTMLElement,
+  x: number,
+  y: number,
+): { anchor: number; focus: number } {
+  const selection = window.getSelection();
+  if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+    const { anchorNode, focusNode } = selection;
+    if (anchorNode && focusNode && root.contains(anchorNode) && root.contains(focusNode)) {
+      const anchor = offsetOfPosition(root, anchorNode, selection.anchorOffset);
+      const focus = offsetOfPosition(root, focusNode, selection.focusOffset);
+      if (anchor !== null && focus !== null) return { anchor, focus };
+    }
+  }
+  const at = offsetOfPoint(root, x, y);
+  return { anchor: at, focus: at };
 }
 
 /** Breaks register under this key so the outline can scroll to one. */
@@ -301,12 +345,12 @@ export interface DocumentViewProps {
   /** The block whose prose is open for editing, if any. */
   editingId: string | null;
   /**
-   * Asked when a block's prose is clicked, with the character the click landed
-   * on so the caret can go there. Only offered for blocks whose format has a
+   * Asked when a block's prose is released on, with whatever was selected so
+   * the editor can open holding it. Only offered for blocks whose format has a
    * content node — a title page is composed of template lines and is edited in
    * its format, not on the page.
    */
-  onEditProse: (blockId: string, caret: number) => void;
+  onEditProse: (blockId: string, selection: { anchor: number; focus: number }) => void;
   /**
    * Given the paragraph setting of the block being edited, since only the
    * renderer knows it — it depends on the view mode and on the break above.
@@ -433,7 +477,7 @@ export function DocumentView({
               prose={item.block.contentText}
               editing={editingId === item.block.id}
               editor={editor}
-              onEditProse={(caret) => onEditProse(item.block.id, caret)}
+              onEditProse={(selection) => onEditProse(item.block.id, selection)}
               indentFirst={item.firstLineIndent}
               mode={mode}
               typography={item.typography}

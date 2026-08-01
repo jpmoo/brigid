@@ -312,7 +312,8 @@ export function offsetOfPoint(root: HTMLElement, x: number, y: number): number {
   return 0;
 }
 
-export function setCaret(root: HTMLElement, offset: number): void {
+/** The node and position a character offset names, or null past the end. */
+function locate(root: HTMLElement, offset: number): { node: Node; at: number } | null {
   let remaining = offset;
   let target: { node: Node; at: number } | null = null;
 
@@ -343,22 +344,40 @@ export function setCaret(root: HTMLElement, offset: number): void {
     }
   };
 
-  const children = Array.from(root.childNodes);
-  children.forEach((child, i) => walk(child, i === 0));
+  Array.from(root.childNodes).forEach((child, i) => walk(child, i === 0));
+  return target;
+}
 
+export function setCaret(root: HTMLElement, offset: number): void {
+  setSelection(root, offset, offset);
+}
+
+/**
+ * Puts the selection back, in the same character offsets the caret travels in.
+ *
+ * Anchor and focus are kept apart rather than sorted into start and end, so a
+ * selection dragged backwards stays backwards — the next shift-arrow then
+ * extends from the end the writer was actually moving.
+ */
+export function setSelection(root: HTMLElement, anchor: number, focus: number): void {
   const selection = window.getSelection();
   if (!selection) return;
-  const range = document.createRange();
-  if (target) {
-    range.setStart((target as { node: Node; at: number }).node, (target as { node: Node; at: number }).at);
-  } else {
-    // Past the end: the very end.
-    range.selectNodeContents(root);
-    range.collapse(false);
-  }
-  range.collapse(true);
+
+  const end = document.createRange();
+  end.selectNodeContents(root);
+  end.collapse(false);
+
+  const at = locate(root, anchor);
+  const to = locate(root, focus);
+
+  // Past the end of the text is the end of the text.
+  const anchorNode = at ? at.node : end.endContainer;
+  const anchorAt = at ? at.at : end.endOffset;
+  const focusNode = to ? to.node : end.endContainer;
+  const focusAt = to ? to.at : end.endOffset;
+
   selection.removeAllRanges();
-  selection.addRange(range);
+  selection.setBaseAndExtent(anchorNode, anchorAt, focusNode, focusAt);
 }
 
 // --- Autocorrect ---------------------------------------------------------
@@ -450,11 +469,15 @@ export function placeSpellMenu(word: string, box: DOMRect): SpellMenu {
 export interface ProseEditorProps {
   blockId: string;
   /**
-   * Where the click that opened the editor landed, counted in characters. The
-   * rendered paragraphs are replaced by this component, so the position has to
-   * cross the swap as an offset rather than as a node.
+   * What was selected when the editor was opened, in characters. Equal ends
+   * mean a caret.
+   *
+   * The rendered paragraphs are replaced by this component, so the position has
+   * to cross the swap as offsets rather than as nodes — which is also what lets
+   * a selection made by dragging over the rendered text survive into the editor
+   * instead of collapsing to the point where the mouse came up.
    */
-  initialCaret: number;
+  initialSelection: { anchor: number; focus: number };
   /** The paragraph setting to match, so clicking in doesn't reflow the block. */
   layout: ProseLayout;
   content: Record<string, unknown> | null;
@@ -472,7 +495,7 @@ export interface ProseEditorProps {
 
 export function ProseEditor({
   blockId,
-  initialCaret,
+  initialSelection,
   layout,
   content,
   fallbackText,
@@ -522,7 +545,7 @@ export function ProseEditor({
     // caret at the moment it arrived. The caret is placed by offset, which
     // needs no scrolling of its own.
     el.focus({ preventScroll: true });
-    setCaret(el, initialCaret);
+    setSelection(el, initialSelection.anchor, initialSelection.focus);
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps

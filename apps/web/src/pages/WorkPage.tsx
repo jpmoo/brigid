@@ -125,10 +125,13 @@ export function WorkPage() {
   const scrollingTo = useRef<string | null>(null);
 
   /**
-   * The block whose prose is open for writing, and where in it the click that
-   * opened it landed.
+   * The block whose prose is open for writing, and what was selected in it when
+   * it opened — a caret when the two ends are equal.
    */
-  const [editingProse, setEditingProse] = useState<{ id: string; caret: number } | null>(null);
+  const [editingProse, setEditingProse] = useState<{
+    id: string;
+    selection: { anchor: number; focus: number };
+  } | null>(null);
   const spelling = useSpelling();
 
   const load = useCallback(async () => {
@@ -758,9 +761,9 @@ export function WorkPage() {
             search={foldForSearch(query.trim())}
             activeMatch={activeMatch}
             editingId={editingProse?.id ?? null}
-            onEditProse={(blockId, caret) => {
+            onEditProse={(blockId, selection) => {
               setSelectedId(blockId);
-              setEditingProse({ id: blockId, caret });
+              setEditingProse({ id: blockId, selection });
             }}
             editor={(layout) =>
               editingProse ? (
@@ -772,7 +775,7 @@ export function WorkPage() {
                   // incoming block's text.
                   key={editingProse.id}
                   blockId={editingProse.id}
-                  initialCaret={editingProse.caret}
+                  initialSelection={editingProse.selection}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}
