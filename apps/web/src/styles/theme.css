@@ -3740,8 +3740,14 @@ mark.hit.active {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 
-/* A manuscript's goal is six figures and a chapter's is four, so the field is
-   sized for the number rather than for the widget. */
-.goal-number {
-  width: 110px;
+/* Sized for the number and the spinner both: six figures, the stepper beside
+   them, and the padding the field already has. Short of this, 75,000 shows as
+   7500 with the last digit under the arrows — a goal misread rather than
+   merely cramped. "No goal" has to fit as well, since that is what it says
+   when there isn't one. */
+/* Written to out-weigh `.bk-field input[type="number"]`, which sets 72px for
+   the small counters that row was built for — a class on its own loses to an
+   attribute selector, which is why widening it twice appeared to do nothing. */
+.bk-field input[type="number"].goal-number {
+  width: 150px;
 }
