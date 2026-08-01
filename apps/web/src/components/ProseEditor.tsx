@@ -4,6 +4,7 @@ import { Bold, Italic, Quote, Redo2, SpellCheck, Underline, Undo2 } from "lucide
 import {
   asProseDoc,
   autocorrectKeystroke,
+  countWords,
   hasMark,
   normalizeProse,
   proseFromParagraphs,
@@ -27,6 +28,8 @@ import type { Speller } from "../spelling.js";
  * the caret always loses. The DOM is read back into the model when something
  * happens that warrants it.
  */
+
+const wordFmt = new Intl.NumberFormat();
 
 const ZWSP = "​";
 
@@ -536,6 +539,7 @@ export function ProseEditor({
   const restoring = useRef(false);
   const [marks, setMarks] = useState({ strong: false, em: false, underline: false });
   const [quoted, setQuoted] = useState(false);
+  const [words, setWords] = useState(0);
   const [menu, setMenu] = useState<SpellMenu | null>(null);
   const saveTimer = useRef<number | null>(null);
 
@@ -553,6 +557,7 @@ export function ProseEditor({
     // needs no scrolling of its own.
     el.focus({ preventScroll: true });
     setSelection(el, initialSelection.anchor, initialSelection.focus);
+    setWords(countWords(el.textContent ?? ""));
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -586,11 +591,25 @@ export function ProseEditor({
     onSave(doc);
   }, [onSave]);
 
+  /**
+   * The section's length, as it is written.
+   *
+   * Counted off the element's own text — one string read, cheap enough for
+   * every keystroke — and with the same counter the server uses, so the number
+   * under the writer's hands is the one that ends up stored rather than one
+   * that merely resembles it.
+   */
+  const recount = useCallback(() => {
+    const el = ref.current;
+    setWords(el ? countWords(el.textContent ?? "") : 0);
+  }, []);
+
   const scheduleSave = useCallback(() => {
+    recount();
     pending.current = readDoc();
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(flush, 900);
-  }, [flush, readDoc]);
+  }, [flush, readDoc, recount]);
 
   /**
    * Records the state *before* a change, so undo has somewhere to go back to.
@@ -998,7 +1017,9 @@ export function ProseEditor({
           <SpellCheck size={13} />
         </span>
         <span className="be-gap" />
-        <span className="prose-hint">Escape when you&rsquo;re done</span>
+        <span className="prose-words" aria-live="polite">
+          {wordFmt.format(words)} {words === 1 ? "word" : "words"}
+        </span>
       </div>
 
       <div

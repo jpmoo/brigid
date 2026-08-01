@@ -2881,10 +2881,14 @@ mark.hit.active {
   z-index: 4;
 }
 
-.prose-hint {
+/* The section's length, kept up to date as it is written. Tabular figures so
+   the number changes without the words beside it shifting. */
+.prose-words {
   font-size: 11px;
   color: var(--text-faint);
   font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* Reading the manuscript, a click into prose starts writing there, so the
@@ -3294,10 +3298,10 @@ mark.hit.active {
     height: 34px;
   }
 
-  /* The hint is for a keyboard nobody has here, and it is the first thing to
-     go when the bar has to hold six controls across the screen. */
-  .prose-hint {
-    display: none;
+  /* The count stays — it is the one thing in the bar that is information
+     rather than a control — but it drops the word. */
+  .prose-words {
+    font-size: 10px;
   }
 
   .prose-toolbar {
