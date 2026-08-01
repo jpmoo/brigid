@@ -420,7 +420,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
     toggleMark,
     insertVariable: (name) =>
       insert(
-        `${ZWSP}<span data-var="${name}" contenteditable="false">${VARIABLES[name].label}</span>${ZWSP}`,
+        `${ZWSP}<span data-var="${name}" contenteditable="false">${chipLabel(name)}</span>${ZWSP}`,
       ),
     insertTab: () => insert(`${ZWSP}<span data-tab="1" contenteditable="false">⇥</span>${ZWSP}`),
     focus: () => ref.current?.focus(),
@@ -538,7 +538,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
                     onClick={() => {
                       setChipMenu(false);
                       insert(
-                        `${ZWSP}<span data-var="${n}" contenteditable="false">${VARIABLES[n].label}</span>${ZWSP}`,
+                        `${ZWSP}<span data-var="${n}" contenteditable="false">${chipLabel(n)}</span>${ZWSP}`,
                       );
                     }}
                   >

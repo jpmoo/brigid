@@ -18,11 +18,10 @@ import type { BlockOptions, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
-import { BodyEditor } from "../components/BodyEditor.js";
-import { StyleMenu } from "../components/StyleMenu.js";
 import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
+import { FormatFields } from "../components/FormatFields.js";
 import { useDialogs } from "../components/Dialogs.js";
 import { SearchBar, findMatches } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -251,7 +250,11 @@ export function WorkPage() {
 
       for (const [key, el] of blockRefs.current) {
         if (key.startsWith("break:")) continue;
-        const top = el.getBoundingClientRect().top - paneTop;
+        // A block starts at its break, not at its first line of prose: reaching
+        // "Chapter Nine" is reaching chapter nine, and the outline should say
+        // so before the heading has scrolled past.
+        const start = blockRefs.current.get(breakRefKey(key)) ?? el;
+        const top = start.getBoundingClientRect().top - paneTop;
         // The last block starting at or above the top edge is the one the edge
         // is inside. A few pixels of slack so a block flush to the top counts.
         if (top <= 8 && top > bestTop) {
@@ -643,6 +646,7 @@ export function WorkPage() {
 
       {editingFormat ? (
         <FormatEditor
+          work={work}
           block={editingFormat}
           template={templateMap.get(editingFormat.formatId) ?? null}
           onClose={() => setEditingFormat(null)}
@@ -655,6 +659,7 @@ export function WorkPage() {
 
       {editingBreak ? (
         <BreakEditor
+          work={work}
           block={editingBreak}
           onClose={() => setEditingBreak(null)}
           onSaved={() => {
@@ -707,6 +712,13 @@ function TextSize({
     </div>
   );
 }
+
+const workMeta = (work: Work) => ({
+  title: work.title,
+  subtitle: work.subtitle,
+  authorFirstName: work.authorFirstName,
+  authorLastName: work.authorLastName,
+});
 
 const PLACEMENT_LABEL: Record<Placement, string> = {
   root: "at the top level",
@@ -866,10 +878,12 @@ function RenameModal({
  * block's own — so one chapter break can read differently from all the others.
  */
 function BreakEditor({
+  work,
   block,
   onClose,
   onSaved,
 }: {
+  work: Work;
   block: Block;
   onClose: () => void;
   onSaved: () => void;
@@ -942,13 +956,22 @@ function BreakEditor({
 
         {error ? <div className="alert error">{error}</div> : null}
 
-        {detached && body ? (
-          <BodyEditor body={body} onChange={setBody} />
-        ) : (
-          <p className="muted" style={{ marginBottom: 18 }}>
-            Nothing here is editable until you detach it.
-          </p>
-        )}
+        <div className="modal-body">
+          {detached && body ? (
+            <FormatFields
+              styleOnly={false}
+              body={body}
+              onBody={setBody}
+              typography={{}}
+              onTypography={() => {}}
+              work={workMeta(work)}
+            />
+          ) : (
+            <p className="muted" style={{ marginBottom: 18 }}>
+              Nothing here is editable until you detach it.
+            </p>
+          )}
+        </div>
 
         <div className="modal-actions">
           {detached ? (
@@ -997,11 +1020,13 @@ function BreakEditor({
  * renders its own, exactly as breaks do.
  */
 function FormatEditor({
+  work,
   block,
   template,
   onClose,
   onSaved,
 }: {
+  work: Work;
   block: Block;
   template: Template | null;
   onClose: () => void;
@@ -1084,10 +1109,15 @@ function FormatEditor({
         {error ? <div className="alert error">{error}</div> : null}
 
         <div className="modal-body">
-          {detached && styleOnly ? (
-            <StyleMenu value={typo} onChange={setTypo} />
-          ) : detached && body ? (
-            <BodyEditor body={body} onChange={setBody} />
+          {detached ? (
+            <FormatFields
+              styleOnly={styleOnly}
+              body={body ?? { nodes: [] }}
+              onBody={setBody}
+              typography={typo}
+              onTypography={setTypo}
+              work={workMeta(work)}
+            />
           ) : (
             <p className="muted" style={{ marginBottom: 18 }}>
               Nothing here is editable until you detach it.

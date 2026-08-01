@@ -67,8 +67,10 @@ export function formatNumber(value: number, format: NumberFormat | undefined): s
       return toWords(value).toUpperCase();
     case "arabic":
     case undefined:
-      return String(value);
+      // Grouped: a word count runs to five and six figures, and "82417" is not
+      // a number anyone reads. A chapter number never reaches the separator.
+      return value.toLocaleString("en-US");
     default:
-      return String(value);
+      return value.toLocaleString("en-US");
   }
 }
