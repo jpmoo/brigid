@@ -132,8 +132,12 @@ Block formats additionally carry `section_start`, for blocks that begin a new
 *section* in the Word/InDesign sense — its own page numbering (`continue` or
 `restart`, with an optional starting number) and its own running heads
 (`continue`, `restart`, or `suppress`, the last being the convention for front
-matter). Recorded now, consumed at export, where pagination becomes real; the
-drafting view can only mark the boundary.
+matter). A block can override the page-numbering half for itself; see §3.7.
+
+**Running heads are deliberately not editable yet.** They are modelled and
+carried through rendering, but a running head only means something once pages
+exist, so the control for them belongs with export rather than with drafting.
+Nothing in the drafting view can show whether one is right.
 
 Breaks are edited **in place, between the blocks**: hovering a break in the
 document reveals its template name and a control that opens it. Editing detaches
@@ -446,6 +450,20 @@ _Limitation._ Soft page breaks are not stored at all — pagination is computed 
 layout from page size, fonts and printer metrics. So the title page can also be
 bounded **manually by paragraph count**, which is offered whenever no break is
 found rather than disabling the option.
+
+---
+
+## 3.7 Block options
+
+Decisions about one particular block, as opposed to the format it renders
+through. All three default to carrying on, so a manuscript that sets none of
+them behaves as though they did not exist.
+
+| Option | What it does |
+|---|---|
+| Word count | Continue the running count, or start a new one at this block. The manuscript total is the run in progress. |
+| Count the break's words | Whether the words in this block's attached break count toward the total. Off by default — a chapter heading is not prose. Only literal text counts; a resolved chapter number is not a word of the manuscript. |
+| Page numbering | Continue, or restart at a given number. Overrides the format's `section_start`. Marked in the draft, real at export. |
 
 ---
 
