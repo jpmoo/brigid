@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import { previewBody } from "@brigid/shared";
-import type { TemplateBody, WorkMeta } from "@brigid/shared";
+import type { ResolvedSpan, TemplateBody, WorkMeta } from "@brigid/shared";
 
 /**
  * A page at a glance, for laying out something whose whole point is where
@@ -14,6 +14,32 @@ import type { TemplateBody, WorkMeta } from "@brigid/shared";
  * sheet would be a third too large against its own margins.
  */
 const MARGIN = 72;
+
+function Spans({ spans }: { spans: ResolvedSpan[] }) {
+  return (
+    <>
+      {spans.map((span, i) =>
+        span.lineBreak ? (
+          <br key={i} />
+        ) : (
+          <span
+            key={i}
+            className={span.placeholder ? "placeholder-var" : undefined}
+            style={{
+              fontWeight: span.bold ? 700 : undefined,
+              fontStyle: span.italic ? "italic" : undefined,
+              fontVariant: span.smallCaps ? "small-caps" : undefined,
+              textTransform: span.allCaps ? "uppercase" : undefined,
+              whiteSpace: span.tab ? "pre" : undefined,
+            }}
+          >
+            {span.tab ? "\u0009" : span.text}
+          </span>
+        ),
+      )}
+    </>
+  );
+}
 
 export function PagePreview({
   body,
@@ -75,7 +101,7 @@ export function PagePreview({
                               fontFamily: cell.fontFamily,
                             }}
                           >
-                            {cell.spans.map((s) => s.text).join("")}
+                            <Spans spans={cell.spans} />
                           </td>
                         ))}
                       </tr>
@@ -96,20 +122,7 @@ export function PagePreview({
                     margin: 0,
                   }}
                 >
-                  {node.spans.map((span, j) => (
-                    <span
-                      key={j}
-                      className={span.placeholder ? "placeholder-var" : undefined}
-                      style={{
-                        fontWeight: span.bold ? 700 : undefined,
-                        fontStyle: span.italic ? "italic" : undefined,
-                        fontVariant: span.smallCaps ? "small-caps" : undefined,
-                        textTransform: span.allCaps ? "uppercase" : undefined,
-                      }}
-                    >
-                      {span.text}
-                    </span>
-                  ))}
+                  <Spans spans={node.spans} />
                 </p>
               );
           }
