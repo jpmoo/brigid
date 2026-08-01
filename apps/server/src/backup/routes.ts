@@ -9,7 +9,7 @@ import { authenticate, requireUser } from "../auth/middleware.js";
 import { runtimeConfig } from "../config.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { restoreEverything, restoreParts, worksInBackup } from "./restore.js";
+import { restoreEverything, restoreWork, worksInBackup } from "./restore.js";
 import { DEFAULT_SCHEDULE, readSchedule } from "./schedule.js";
 import {
   backupDir,
@@ -31,16 +31,31 @@ function requireDatabaseUrl(): string {
 export async function backupRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
+  /**
+   * Everything the page needs, and never a 500.
+   *
+   * This is the page someone opens when something has gone wrong, so it has to
+   * open. Each part is allowed to fail on its own and says so, rather than one
+   * of them taking down the screen that holds the way back.
+   */
   app.get("/backups", async (req) => {
     requireUser(req);
+
     const [schedule, files, tools] = await Promise.all([
       readSchedule().catch(() => DEFAULT_SCHEDULE),
-      listBackups(),
-      toolsAvailable(),
+      listBackups().catch(() => null),
+      toolsAvailable().catch(() => false),
     ]);
-    // Where they are is worth saying: it is the path to point another backup
-    // system at, and the first thing to check when one goes missing.
-    return { schedule, backups: files, directory: backupDir, tools };
+
+    return {
+      schedule,
+      backups: files ?? [],
+      // Where they are is worth saying: it is the path to point another backup
+      // system at, and the first thing to check when one goes missing.
+      directory: backupDir,
+      tools,
+      ...(files === null ? { problem: `could not read ${backupDir}` } : {}),
+    };
   });
 
   app.patch("/backups/schedule", async (req) => {
@@ -148,16 +163,11 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
     const files = await listBackups();
     if (!files.some((f) => f.name === name)) throw notFound("backup");
 
+    // Two choices, not a menu. One manuscript comes back with everything that
+    // decides how it reads, because those things are what it is; anything wider
+    // than that is the whole database.
     const body = z
-      .object({
-        // Everything is the blunt instrument: the database as it was, including
-        // the account and its password. The rest are chosen individually.
-        everything: z.boolean().optional(),
-        workId: z.string().uuid().optional(),
-        settings: z.boolean().optional(),
-        dictionary: z.boolean().optional(),
-        templates: z.boolean().optional(),
-      })
+      .object({ everything: z.boolean().optional(), workId: z.string().uuid().optional() })
       .parse(req.body);
 
     const url = requireDatabaseUrl();
@@ -166,16 +176,8 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
       const safety = await restoreEverything(url, name);
       return { restored: ["everything"], safety };
     }
+    if (!body.workId) throw badRequest("nothing was chosen to restore");
 
-    if (!body.workId && !body.settings && !body.dictionary && !body.templates) {
-      throw badRequest("nothing was chosen to restore");
-    }
-
-    return restoreParts(url, name, {
-      workId: body.workId,
-      settings: body.settings,
-      dictionary: body.dictionary,
-      templates: body.templates,
-    });
+    return restoreWork(url, name, body.workId);
   });
 }

@@ -3278,6 +3278,51 @@ mark.hit.active {
   .page-preview > * {
     max-width: 100%;
   }
+
+  /* --- Writing on a phone -------------------------------------------- */
+
+  /* A finger is not a mouse pointer. These are the controls used while
+     actually writing, so they get a target worth aiming at — and the bar's
+     height and the editor's pull-up are declared together, so raising one
+     raises the other and the prose still doesn't move when you tap into it. */
+  :root {
+    --prose-bar: 42px;
+  }
+
+  .prose-toolbar .be-mark {
+    min-width: 36px;
+    height: 34px;
+  }
+
+  /* The hint is for a keyboard nobody has here, and it is the first thing to
+     go when the bar has to hold six controls across the screen. */
+  .prose-hint {
+    display: none;
+  }
+
+  .prose-toolbar {
+    /* Wide enough to matter, so it may as well span the measure and let the
+       controls space themselves rather than huddle at one end. */
+    width: 100%;
+    justify-content: flex-start;
+    gap: 2px;
+  }
+
+  /* The editor's rule and inset are drawn in the sheet's margin on a desktop.
+     There is no margin to spare here. */
+  .prose-surface {
+    margin-left: -8px;
+    padding-left: 6px;
+  }
+
+  /* Suggestions are tapped, not clicked at. */
+  .spell-menu {
+    width: min(260px, calc(100vw - 16px));
+  }
+
+  .spell-menu button {
+    padding: 9px 10px;
+  }
 }
 
 /* Hover reveals are a pointer's idea. Where there isn't one, the things that

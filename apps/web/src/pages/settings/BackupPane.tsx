@@ -51,6 +51,7 @@ export function BackupPane({ workId }: { workId: string | null }) {
     setBackups(data.backups);
     setDirectory(data.directory);
     setTools(data.tools);
+    setError(data.problem ?? null);
   }, []);
 
   useEffect(() => {
@@ -287,7 +288,6 @@ function RestorePanel({
   const [works, setWorks] = useState<{ id: string; title: string }[] | null>(null);
   const [everything, setEverything] = useState(false);
   const [workId, setWorkId] = useState<string>("");
-  const [parts, setParts] = useState({ settings: false, dictionary: false, templates: false });
   const [understood, setUnderstood] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -296,7 +296,6 @@ function RestorePanel({
     setWorks(null);
     setEverything(false);
     setUnderstood(false);
-    setParts({ settings: false, dictionary: false, templates: false });
     void api
       .worksInBackup(file.name)
       .then(({ works: found }) => {
@@ -307,20 +306,13 @@ function RestorePanel({
       .catch((err) => setError(err instanceof ApiError ? err.message : "could not read it"));
   }, [file.name, currentWorkId]);
 
-  const chosenAnything = everything || workId !== "" || parts.settings || parts.dictionary || parts.templates;
+  const chosenAnything = everything || workId !== "";
 
   async function restore() {
     setBusy(true);
     setError(null);
     try {
-      const what: RestoreRequest = everything
-        ? { everything: true }
-        : {
-            ...(workId ? { workId } : {}),
-            ...(parts.settings ? { settings: true } : {}),
-            ...(parts.dictionary ? { dictionary: true } : {}),
-            ...(parts.templates ? { templates: true } : {}),
-          };
+      const what: RestoreRequest = everything ? { everything: true } : { workId };
       const result = await api.restoreBackup(file.name, what);
       await onDone(
         `Restored ${result.restored.join(", ")}. The state before this was saved as ${result.safety}.`,
@@ -339,13 +331,9 @@ function RestorePanel({
 
       <div className="stack">
         <label className="check">
-          <input
-            type="radio"
-            checked={!everything}
-            onChange={() => setEverything(false)}
-          />
+          <input type="radio" checked={!everything} onChange={() => setEverything(false)} />
           <span>
-            Choose what to bring back <em>&mdash; everything else is left alone</em>
+            One manuscript <em>&mdash; nothing else in the backup is touched</em>
           </span>
         </label>
 
@@ -354,7 +342,7 @@ function RestorePanel({
             <label className="check">
               <span className="bk-part-label">Manuscript</span>
               <select value={workId} onChange={(e) => setWorkId(e.target.value)}>
-                <option value="">None</option>
+                <option value="">Choose one</option>
                 {(works ?? []).map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.title}
@@ -364,50 +352,20 @@ function RestorePanel({
             </label>
             {works?.length === 0 ? (
               <p className="tpl-note">This backup holds no manuscripts.</p>
-            ) : null}
-
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={parts.templates}
-                onChange={(e) => setParts({ ...parts, templates: e.target.checked })}
-              />
-              <span>
-                Formats and breaks <em>&mdash; the shared library</em>
-              </span>
-            </label>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={parts.dictionary}
-                onChange={(e) => setParts({ ...parts, dictionary: e.target.checked })}
-              />
-              <span>
-                Spelling dictionary <em>&mdash; replaced, not merged</em>
-              </span>
-            </label>
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={parts.settings}
-                onChange={(e) => setParts({ ...parts, settings: e.target.checked })}
-              />
-              <span>
-                Settings <em>&mdash; Ollama, spelling, this backup schedule</em>
-              </span>
-            </label>
-            <p className="tpl-note">
-              A manuscript always brings its own formatting with it: the breaks and formats it
-              had edited for itself are stored on its blocks, and any format it uses that has
-              since been deleted is put back.
-            </p>
+            ) : (
+              <p className="tpl-note">
+                It comes back with everything that decides how it reads &mdash; its levels, the
+                breaks and formats it had edited for itself, and any format it uses that has
+                since been deleted. Nothing outside it changes.
+              </p>
+            )}
           </div>
         ) : null}
 
         <label className="check">
           <input type="radio" checked={everything} onChange={() => setEverything(true)} />
           <span>
-            Everything <em>&mdash; the whole database, including your account and password</em>
+            Everything <em>&mdash; every manuscript, the formats, the dictionary, the settings, and your account</em>
           </span>
         </label>
       </div>

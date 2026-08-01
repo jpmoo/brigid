@@ -88,13 +88,10 @@ export interface BackupFile {
   bytes: number;
 }
 
-/** Everything, or any combination of the parts. */
+/** One manuscript, or the whole database. There is no third answer. */
 export interface RestoreRequest {
   everything?: boolean;
   workId?: string;
-  settings?: boolean;
-  dictionary?: boolean;
-  templates?: boolean;
 }
 
 /** How the writer likes to be shown their work. Small, and they accumulate. */
@@ -336,6 +333,8 @@ export const api = {
       backups: BackupFile[];
       directory: string;
       tools: boolean;
+      /** Set when a part of the page couldn't be read, rather than failing it all. */
+      problem?: string;
     }>("/backups"),
   setBackupSchedule: (patch: Partial<BackupSchedule>) =>
     request<{ schedule: BackupSchedule }>("/backups/schedule", {

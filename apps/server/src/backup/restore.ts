@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { runMigrations } from "@brigid/db";
 import { closeDb, db, initDb } from "../db.js";
 import { backupPath, run, takeBackup } from "./store.js";
 
@@ -33,11 +34,20 @@ export async function restoreEverything(databaseUrl: string, name: string): Prom
       `--dbname=${databaseUrl}`,
       backupPath(name),
     ]);
+    // The dump carries the schema it was taken with, which may be older than
+    // this code — restoring one from before a migration puts the database back
+    // behind the app, and the first thing to break is whatever that migration
+    // added. Brought forward before anything is allowed to query it.
+    await runMigrations(databaseUrl);
   } finally {
     // Reconnected whatever happened: a half-restored database still has to be
     // reachable, or the writer cannot even get back in to try the safety copy.
     initDb(databaseUrl);
   }
+
+  // A restore that failed part way can leave this behind, and it is confusing
+  // to find in a database that has no other explanation for it.
+  await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${STAGING} CASCADE`)).catch(() => {});
 
   return safety.name;
 }
@@ -47,56 +57,36 @@ const WORK_TABLES = ["works", "work_levels", "blocks", "bookmarks"] as const;
 const STAGING = "brigid_restore";
 
 /**
- * What to bring back, short of everything.
+ * One manuscript, out of a backup of everything.
  *
- * Separate switches rather than one list, because they are separate decisions:
- * losing a manuscript is not a reason to also revert the formats, and reverting
- * the formats is not a reason to touch a manuscript.
- */
-export interface RestoreParts {
-  /** One manuscript, by id. */
-  workId?: string | undefined;
-  /** The instance settings row — Ollama, spelling, the backup schedule itself. */
-  settings?: boolean | undefined;
-  /** The words taught to the checker. */
-  dictionary?: boolean | undefined;
-  /** The format and break library. */
-  templates?: boolean | undefined;
-}
-
-/**
- * One backup, put back in pieces.
+ * There is no menu of pieces here on purpose. A manuscript is not separable
+ * from the things that decide how it reads: its levels, the breaks and formats
+ * it has edited for itself, the formats it points at. Those are what it *is*,
+ * so they come back with it and there is nothing to tick. Anything wider than
+ * one manuscript is the whole database, which is the other choice.
  *
- * The dump holds the whole database, so whatever is wanted has to be separated
- * from the rest before anything is touched. It is loaded into a schema of its
- * own — which needs no privilege beyond owning the database, unlike the more
- * obvious approach of restoring into a scratch database — and copied across
- * from there inside a single transaction, so a failure part way leaves nothing
+ * The dump holds everything, so this manuscript's rows have to be separated
+ * from the rest before anything is touched. They are loaded into a schema of
+ * their own — which needs no privilege beyond owning the database, unlike the
+ * more obvious approach of restoring into a scratch one — and copied across
+ * inside a single transaction, so a failure part way leaves nothing
  * half-applied.
  *
  * pg_restore writes its data section as `COPY public.<table>`, so staging is a
  * matter of pointing those lines at the other schema. That is the only text
  * handling here, and it touches the COPY header alone; the data is never parsed.
  */
-export async function restoreParts(
+export async function restoreWork(
   databaseUrl: string,
   name: string,
-  parts: RestoreParts,
+  workId: string,
 ): Promise<{ safety: string; restored: string[] }> {
-  const wanted = new Set<string>();
-  // Always staged: a manuscript's blocks point at formats, and the backup may
-  // hold one this database no longer has.
-  wanted.add("templates");
-  if (parts.workId) for (const table of WORK_TABLES) wanted.add(table);
-  if (parts.settings) wanted.add("settings");
-  if (parts.dictionary) wanted.add("dictionary_words");
-
-  if (wanted.size === 1 && !parts.templates) {
-    throw new Error("nothing was chosen to restore");
-  }
-
+  const id = asUuid(workId);
   const safety = (await takeBackup(databaseUrl, "before-restore")).name;
-  const tables = [...wanted];
+
+  // Formats are staged alongside: a block points at one, and the backup may
+  // hold a format this database no longer has.
+  const tables = [...WORK_TABLES, "templates"];
 
   const dumped = await run("pg_restore", [
     "--data-only",
@@ -125,116 +115,63 @@ export async function restoreParts(
     );
   }
 
-  const restored: string[] = [];
   try {
     await run("psql", ["--quiet", "--no-psqlrc", "--set=ON_ERROR_STOP=1", databaseUrl], {
       stdin: staged,
     });
 
-    let title: string | null = null;
-    if (parts.workId) {
-      const rows = await db.execute<{ title: string }>(
-        sql.raw(`SELECT title FROM ${STAGING}.works WHERE id = '${asUuid(parts.workId)}'`),
+    const rows = await db.execute<{ title: string }>(
+      sql.raw(`SELECT title FROM ${STAGING}.works WHERE id = '${id}'`),
+    );
+    const found = Array.isArray(rows) ? rows[0] : undefined;
+    if (!found) throw new Error("that manuscript is not in this backup");
+
+    /**
+     * One connection, one transaction.
+     *
+     * Emphatically not a hand-written BEGIN/COMMIT through `db.execute`. The
+     * pool hands out whatever connection is free per statement, so those three
+     * words can land on three different connections: the BEGIN opens a
+     * transaction on one, the DELETE commits on its own somewhere else, and the
+     * COMMIT closes nothing. A failure between them then leaves the manuscript
+     * deleted with nothing put back — and the connection still holding an open
+     * transaction, which poisons every request that later lands on it.
+     *
+     * `transaction` reserves a single connection for the whole block and
+     * rolls it back on any throw, which is the only thing that makes the delete
+     * and the insert one action.
+     */
+    await db.transaction(async (tx) => {
+      // Only the formats this database is missing. A format is shared, and
+      // rewriting one to suit a single manuscript would change every other
+      // manuscript using it — while this manuscript's own departures from a
+      // format are stored on its blocks and come back with them regardless.
+      await tx.execute(
+        sql.raw(
+          `INSERT INTO public.templates SELECT * FROM ${STAGING}.templates
+           ON CONFLICT (id) DO NOTHING`,
+        ),
       );
-      const found = Array.isArray(rows) ? rows[0] : undefined;
-      if (!found) throw new Error("that manuscript is not in this backup");
-      title = found.title;
-    }
 
-    await db.execute(sql.raw("BEGIN"));
-    try {
-      if (parts.templates) {
-        // Asked for explicitly, so the backup's version wins over what is here.
-        await db.execute(sql.raw(await upsert("templates")));
-        restored.push("formats");
-      }
-
-      if (parts.settings) {
-        await db.execute(sql.raw("DELETE FROM public.settings"));
-        await db.execute(sql.raw(`INSERT INTO public.settings SELECT * FROM ${STAGING}.settings`));
-        restored.push("settings");
-      }
-
-      if (parts.dictionary) {
-        // Replaced rather than merged: restoring a dictionary means the one in
-        // the backup, not that one plus whatever has accumulated since.
-        await db.execute(sql.raw("DELETE FROM public.dictionary_words"));
-        await db.execute(
-          sql.raw(`INSERT INTO public.dictionary_words SELECT * FROM ${STAGING}.dictionary_words`),
+      // Replaced wholesale. Its children cascade, so removing it clears the
+      // blocks and bookmarks of the version being discarded rather than leaving
+      // them to collide with the ones coming in.
+      await tx.execute(sql.raw(`DELETE FROM public.works WHERE id = '${id}'`));
+      for (const table of WORK_TABLES) {
+        const column = table === "works" ? "id" : "work_id";
+        await tx.execute(
+          sql.raw(
+            `INSERT INTO public.${table}
+             SELECT * FROM ${STAGING}.${table} WHERE ${column} = '${id}'`,
+          ),
         );
-        restored.push("dictionary");
       }
+    });
 
-      if (parts.workId) {
-        const id = asUuid(parts.workId);
-        // Formats it needs but this database hasn't got. Only the missing ones:
-        // a format is shared, and quietly rewriting one to suit a single
-        // manuscript would change every other manuscript using it. The
-        // manuscript's own departures from a format are stored on its blocks,
-        // so they come back with the blocks either way.
-        if (!parts.templates) {
-          await db.execute(
-            sql.raw(
-              `INSERT INTO public.templates SELECT * FROM ${STAGING}.templates
-               ON CONFLICT (id) DO NOTHING`,
-            ),
-          );
-        }
-
-        // Replaced wholesale. Its children cascade, so removing it clears the
-        // blocks and bookmarks of the version being discarded rather than
-        // leaving them to collide with the ones coming in.
-        await db.execute(sql.raw(`DELETE FROM public.works WHERE id = '${id}'`));
-        for (const table of WORK_TABLES) {
-          const column = table === "works" ? "id" : "work_id";
-          await db.execute(
-            sql.raw(
-              `INSERT INTO public.${table}
-               SELECT * FROM ${STAGING}.${table} WHERE ${column} = '${id}'`,
-            ),
-          );
-        }
-        restored.push(title ?? "manuscript");
-      }
-
-      await db.execute(sql.raw("COMMIT"));
-    } catch (err) {
-      await db.execute(sql.raw("ROLLBACK"));
-      throw err;
-    }
-
-    return { safety, restored };
+    return { safety, restored: [found.title] };
   } finally {
     await db.execute(sql.raw(`DROP SCHEMA IF EXISTS ${STAGING} CASCADE`));
   }
-}
-
-/**
- * An insert that overwrites what is already there.
- *
- * The column list is read from the database rather than written out here, so a
- * migration that adds a column doesn't quietly leave it behind on restore.
- */
-async function upsert(table: string): Promise<string> {
-  const rows = await db.execute<{ column_name: string }>(
-    sql.raw(
-      `SELECT column_name FROM information_schema.columns
-       WHERE table_schema = 'public' AND table_name = '${table}'
-         AND column_name <> 'id'
-       ORDER BY ordinal_position`,
-    ),
-  );
-  const columns = (Array.isArray(rows) ? rows : []).map((r) => `"${r.column_name}"`);
-  if (columns.length === 0) {
-    return `INSERT INTO public.${table} SELECT * FROM ${STAGING}.${table}
-            ON CONFLICT (id) DO NOTHING`;
-  }
-  const set =
-    columns.length === 1
-      ? `${columns[0]} = EXCLUDED.${columns[0]}`
-      : `(${columns.join(", ")}) = (${columns.map((c) => `EXCLUDED.${c}`).join(", ")})`;
-  return `INSERT INTO public.${table} SELECT * FROM ${STAGING}.${table}
-          ON CONFLICT (id) DO UPDATE SET ${set}`;
 }
 
 /** An id from a request, going into raw SQL. */

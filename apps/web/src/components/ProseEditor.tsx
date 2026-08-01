@@ -442,14 +442,21 @@ const MENU_MIN = 120;
  * and scrolls inside it rather than running off the edge.
  */
 export function placeSpellMenu(word: string, box: DOMRect): SpellMenu {
-  const below = window.innerHeight - box.bottom - MENU_GAP - VIEWPORT_EDGE;
+  // The visual viewport, not the window: on a phone the keyboard covers the
+  // bottom third of the screen and the window knows nothing about it, so a
+  // menu placed by window height opens underneath the keyboard.
+  const seen = window.visualViewport;
+  const viewHeight = seen?.height ?? window.innerHeight;
+  const viewWidth = seen?.width ?? window.innerWidth;
+
+  const below = viewHeight - box.bottom - MENU_GAP - VIEWPORT_EDGE;
   const above = box.top - MENU_GAP - VIEWPORT_EDGE;
   const upward = below < MENU_MIN && above > below;
 
   const room = Math.max(MENU_MIN, upward ? above : below);
   const left = Math.max(
     VIEWPORT_EDGE,
-    Math.min(box.left, window.innerWidth - MENU_WIDTH - VIEWPORT_EDGE),
+    Math.min(box.left, viewWidth - MENU_WIDTH - VIEWPORT_EDGE),
   );
 
   return {
@@ -459,7 +466,7 @@ export function placeSpellMenu(word: string, box: DOMRect): SpellMenu {
     // Anchored to whichever edge it grows from, so a short list still sits
     // against the word rather than floating away from it.
     ...(upward
-      ? { bottom: window.innerHeight - box.top + MENU_GAP }
+      ? { bottom: viewHeight - box.top + MENU_GAP }
       : { top: box.bottom + MENU_GAP }),
   };
 }
@@ -864,7 +871,7 @@ export function ProseEditor({
     flush();
   }, [flush, readDoc]);
 
-  const onClickBody = (event: React.MouseEvent<HTMLDivElement>) => {
+  const onClickBody = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
     const flagged = target.closest(".misspelled");
     if (!flagged) {
@@ -1047,7 +1054,7 @@ export function ProseEditor({
           scheduleSave();
         }}
         onInput={scheduleSave}
-        onClick={onClickBody}
+        onPointerUp={onClickBody}
         onKeyUp={refreshMarks}
         onBlur={() => {
           commit();

@@ -234,8 +234,15 @@ function Nodes({
               * Released, rather than clicked: a click only fires when the press
               * and release share an ancestor, which a drag ending outside the
               * block does not.
+              *
+              * A pointer release rather than a mouse one, so a finger counts.
+              * iOS only synthesizes mouse events for what it decides is
+              * interactive, and prose is not on its list — tapping a paragraph
+              * would have done nothing at all. Pointer events also draw the
+              * right distinction for touch: lifting after a tap or a drag-select
+              * is a release, while lifting after a scroll is a cancel.
               */
-            const enter = (event: React.MouseEvent<HTMLElement>) => {
+            const enter = (event: React.PointerEvent<HTMLElement>) => {
               if (!onEditProse) return;
               // The block beneath has its own click; writing where the pointer
               // is should not also be a click on the block.
@@ -244,7 +251,7 @@ function Nodes({
             };
 
             return written ? (
-              <div className="prose-body" key={i} onMouseUp={enter}>
+              <div className="prose-body" key={i} onPointerUp={enter}>
                 {paragraphs.map((runs, j) => {
                   // An extract is inset as a whole and never carries a
                   // first-line indent, whatever the block's setting.
@@ -279,7 +286,7 @@ function Nodes({
                 })}
               </div>
             ) : (
-              <p className="prose empty" key={i} onMouseUp={enter}>
+              <p className="prose empty" key={i} onPointerUp={enter}>
                 Nothing written here yet.
               </p>
             );
