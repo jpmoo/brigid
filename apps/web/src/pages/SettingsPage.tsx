@@ -12,6 +12,7 @@ import { CompilePane } from "./settings/CompilePane.js";
 import { GoalsPane } from "./settings/GoalsPane.js";
 import { StatsPane } from "./settings/StatsPane.js";
 import { OllamaPane } from "./settings/OllamaPane.js";
+import { AiPane } from "./settings/AiPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
@@ -34,16 +35,16 @@ const PROJECT_TABS = [
   { key: "stats", label: "Stats" },
   { key: "levels", label: "Levels" },
   { key: "goals", label: "Goals" },
-  { key: "compile", label: "Compile" },
 ] as const;
 
-type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"] | "ai";
+/** Compile is the way out of the manuscript, so it sits at the end. */
+const COMPILE_TAB = { key: "compile", label: "Compile" } as const;
+const AI_TAB = { key: "ai", label: "AI" } as const;
+
+type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"] | "ai" | "compile";
 
 export function SettingsPage() {
   const navigate = useNavigate();
-  const [tab, setTab] = useState<TabKey>("templates");
-  const [projectTab, setProjectTab] = useState<ProjectTabKey>("stats");
-  const [templates, setTemplates] = useState<Template[]>([]);
 
   /**
    * Settings reached from inside a manuscript carries which one, and gains a
@@ -52,6 +53,11 @@ export function SettingsPage() {
    */
   const [params] = useSearchParams();
   const workId = params.get("work");
+
+  // Arriving from a manuscript, the manuscript is what you came about.
+  const [tab, setTab] = useState<TabKey>(workId ? "project" : "templates");
+  const [projectTab, setProjectTab] = useState<ProjectTabKey>("stats");
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [work, setWork] = useState<Work | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);
   const [levels, setLevels] = useState<WorkLevel[]>([]);
@@ -102,8 +108,8 @@ export function SettingsPage() {
   }, [tab]);
 
   const projectTabs = aiReady
-    ? [...PROJECT_TABS, { key: "ai", label: "AI" } as const]
-    : PROJECT_TABS;
+    ? [...PROJECT_TABS, AI_TAB, COMPILE_TAB]
+    : [...PROJECT_TABS, COMPILE_TAB];
 
   // Back to wherever the writer came from — usually the work they were in the
   // middle of, not the library. react-router records its position in history
@@ -134,7 +140,23 @@ export function SettingsPage() {
           <h2>Settings and Tools</h2>
         </div>
 
+        {/* The manuscript in hand comes first; the app's own settings follow it,
+            separated so the two kinds of thing don't read as one list. */}
         <nav className="tabs" role="tablist">
+          {workId ? (
+            <>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={tab === "project"}
+                className={tab === "project" ? "selected" : ""}
+                onClick={() => setTab("project")}
+              >
+                Project Settings and Tools
+              </button>
+              <span className="tab-gap" />
+            </>
+          ) : null}
           {TABS.map((t) => (
             <button
               key={t.key}
@@ -147,20 +169,6 @@ export function SettingsPage() {
               {t.label}
             </button>
           ))}
-          {workId ? (
-            <>
-              <span className="tab-gap" />
-              <button
-                type="button"
-                role="tab"
-                aria-selected={tab === "project"}
-                className={tab === "project" ? "selected" : ""}
-                onClick={() => setTab("project")}
-              >
-                Project Settings and Tools
-              </button>
-            </>
-          ) : null}
         </nav>
 
         <div className="card tab-panel" role="tabpanel">
@@ -208,7 +216,7 @@ export function SettingsPage() {
                 ) : projectTab === "stats" ? (
                   <StatsPane blocks={blocks} levels={levels} templates={templates} />
                 ) : projectTab === "ai" ? (
-                  <AiPane />
+                  <AiPane workId={workId} />
                 ) : (
                   <CompilePane
                     workId={workId}
@@ -227,48 +235,6 @@ export function SettingsPage() {
         </div>
       </main>
     </>
-  );
-}
-
-/**
- * The AI tools for this manuscript.
- *
- * Nothing here yet — the tab exists because a model is connected, and what it
- * should do is still being decided. It names the model so it is obvious which
- * one any of this will run against.
- */
-function AiPane() {
-  const [model, setModel] = useState<string | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    void api
-      .getOllama()
-      .then((s) => {
-        if (alive) setModel(s.analysisModel);
-      })
-      .catch(() => {
-        /* The tab wouldn't be showing if this failed a moment ago. */
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  return (
-    <div className="tpl-detail">
-      <h4 className="tpl-section">AI</h4>
-      <p className="tpl-note">
-        {model ? (
-          <>
-            Connected to <strong>{model}</strong>. Tools that read this manuscript and
-            report back will live here.
-          </>
-        ) : (
-          <>Connected. Tools that read this manuscript and report back will live here.</>
-        )}
-      </p>
-    </div>
   );
 }
 

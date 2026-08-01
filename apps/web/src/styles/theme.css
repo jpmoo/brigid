@@ -3759,3 +3759,268 @@ mark.hit.active {
 .bk-field input[type="number"].goal-number {
   width: 150px;
 }
+
+/* --- AI: reading, fit gauges, spider graphs ---------------------------- */
+
+.digest-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.07));
+  overflow: hidden;
+  margin: 10px 0 8px;
+}
+.digest-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 999px;
+  transition: width 0.4s ease;
+}
+
+/* One framework: a bar that reaches across a four-band spectrum. */
+.fit-row {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.fit-row:last-child { border-bottom: none; }
+
+.fit-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+}
+.fit-name { font-weight: 600; font-size: 14px; }
+.fit-verdict {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.fit-verdict.good { color: var(--ok, #2f7d4f); }
+.fit-verdict.moderate { color: #9a7b16; }
+.fit-verdict.low { color: #a4631f; }
+.fit-verdict.bad { color: var(--danger, #a33); }
+.fit-verdict.na { color: var(--text-faint); font-weight: 500; }
+
+.fit-track {
+  position: relative;
+  height: 10px;
+  margin: 9px 0 5px;
+  border-radius: 999px;
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.07));
+  overflow: hidden;
+}
+.fit-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.5s ease;
+}
+/* Green throughout, deepening with the verdict — one scale, not four colours. */
+.fit-fill.good { background: #2f7d4f; }
+.fit-fill.moderate { background: #5d9a5f; }
+.fit-fill.low { background: #93b083; }
+.fit-fill.bad { background: #c4c9bd; }
+
+.fit-tick {
+  position: absolute;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--paper);
+  opacity: 0.85;
+}
+
+.fit-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  letter-spacing: 0.02em;
+}
+
+/* "Not applicable" is not a low score, and must not look like one. */
+.fit-row.na { opacity: 0.72; }
+.fit-na {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.fit-detail { margin-top: 10px; }
+.fit-detail h6 {
+  margin: 12px 0 5px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.fit-summary, .fit-overview {
+  font-size: 13.5px;
+  line-height: 1.55;
+  margin: 6px 0;
+}
+.fit-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fit-list li { margin-bottom: 4px; }
+.fit-list.gaps { color: var(--text-muted); }
+.fit-at {
+  display: inline-block;
+  margin: 0 6px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.06));
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+.fit-ev { color: var(--text-muted); }
+
+/* The radar. */
+.spider {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-start;
+  margin: 12px 0;
+}
+.spider-svg { width: 420px; max-width: 100%; flex: none; overflow: visible; }
+.spider-ring { fill: none; stroke: var(--border); stroke-width: 1; }
+.spider-spoke { stroke: var(--border); stroke-width: 1; }
+.spider-shape {
+  fill: color-mix(in srgb, var(--accent) 22%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.spider-dot { fill: var(--accent); cursor: pointer; }
+.spider-dot.open { fill: var(--text); r: 5; }
+.spider-label {
+  font-size: 10.5px;
+  fill: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.spider-label:hover, .spider-label.open { fill: var(--text); font-weight: 600; }
+.spider-score { font-weight: 700; fill: var(--accent); }
+.spider-hint { flex: 1; min-width: 180px; }
+
+.spider-detail {
+  flex: 1;
+  min-width: 240px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.02));
+}
+.spider-detail h6 {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+.spider-detail-score {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+.axis-head {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.axis-list {
+  margin: 0;
+  padding-left: 17px;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.axis-list li { margin-bottom: 3px; }
+.axis-list.aligned li::marker { color: #2f7d4f; }
+.axis-list.against li::marker { color: #a4631f; }
+
+.cast-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; }
+.cast-chip {
+  padding: 5px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--paper);
+  font-size: 12.5px;
+  cursor: pointer;
+  color: var(--text-muted);
+}
+.cast-chip.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.thin-cast { list-style: none; margin: 6px 0 0; padding: 0; font-size: 12.5px; }
+.thin-cast li {
+  display: flex;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.thin-cast li span { color: var(--text-faint); }
+
+/* The collected material, so the findings can be checked against it. */
+.raw-section { border-bottom: 1px solid var(--border); }
+.raw-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.raw-at {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  min-width: 62px;
+}
+.raw-name { font-weight: 600; font-size: 13px; }
+.raw-count { margin-left: auto; font-size: 11.5px; color: var(--text-faint); }
+.raw-body { padding: 0 0 12px 62px; }
+.raw-body h6 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+}
+.raw-kind {
+  margin-left: 6px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-style: italic;
+}
+.raw-alias { margin-left: 8px; font-size: 11px; color: var(--text-faint); font-weight: 400; }
+.raw-wants { margin: 4px 0 0; font-size: 12px; color: var(--text-muted); }
+
+@media (max-width: 640px) {
+  .spider-svg { width: 100%; }
+  .raw-body { padding-left: 0; }
+}

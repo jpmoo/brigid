@@ -11,3 +11,4 @@ export * from "./punctuation.js";
 export * from "./prose.js";
 export * from "./spelling.js";
 export * from "./stats.js";
+export * from "./digest.js";

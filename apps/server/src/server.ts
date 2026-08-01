@@ -3,6 +3,7 @@ import { buildApp } from "./app.js";
 import { env, initConfig } from "./config.js";
 import { initDb } from "./db.js";
 import { startBackupSchedule, stopBackupSchedule } from "./backup/schedule.js";
+import { startDigestWorker, stopDigestWorker } from "./ollama/worker.js";
 
 async function main() {
   // Resolve config (env + persisted file) and mint the session secret if this is
@@ -23,9 +24,15 @@ async function main() {
   // schedule is running from the moment first-time setup finishes.
   startBackupSchedule((message) => app.log.info(message));
 
+  // Likewise armed unconditionally: it checks each sweep whether a model is
+  // configured and a database is attached, and does nothing until both are. So
+  // connecting a model starts the reading without a restart.
+  startDigestWorker();
+
   const shutdown = async (signal: string) => {
     app.log.info(`${signal} received, shutting down`);
     stopBackupSchedule();
+    stopDigestWorker();
     await app.close();
     process.exit(0);
   };

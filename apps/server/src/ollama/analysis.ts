@@ -1,0 +1,377 @@
+import type {
+  CharacterAnalysis,
+  PlacedDigest,
+  RosterEntry,
+  StructureAnalysis,
+} from "@brigid/shared";
+import { generate, parseJson } from "./client.js";
+import {
+  AXES,
+  AXES_PRINCIPLES,
+  AXIS_KEYS,
+  MODEL_KEYS,
+  MODEL_LABELS,
+  STRUCTURE_MODELS,
+  STRUCTURE_PRINCIPLES,
+} from "./frameworks.js";
+
+/**
+ * Judging, once the whole book has been read.
+ *
+ * Everything here consumes the digest rather than the manuscript. That is what
+ * makes whole-story judgments possible at all — a novel doesn't fit in a
+ * context window, but an account of it does, and the account carries the
+ * positions the structure models need.
+ */
+
+/** Below this, a character cannot produce a profile the rubric would accept. */
+const MIN_ACTIONS = 6;
+const MIN_SECTIONS = 2;
+
+/**
+ * Who is in the book, and who there is enough of to judge.
+ *
+ * Names are reconciled case-insensitively and through the aliases each section
+ * recorded, so "the Colonel" and "Colonel Ash" don't become two people with
+ * half a profile each.
+ */
+export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
+  const byKey = new Map<string, RosterEntry>();
+  const aliasTo = new Map<string, string>();
+
+  const keyFor = (name: string) => {
+    const folded = name.trim().toLowerCase();
+    return aliasTo.get(folded) ?? folded;
+  };
+
+  for (const section of sections) {
+    for (const character of section.characters) {
+      const key = keyFor(character.name);
+      if (!key) continue;
+
+      // Bind this section's aliases to the identity, so a later section using
+      // only the nickname lands on the same person.
+      for (const alias of character.aliases ?? []) {
+        const folded = alias.trim().toLowerCase();
+        if (folded && !aliasTo.has(folded)) aliasTo.set(folded, key);
+      }
+
+      const held = byKey.get(key);
+      if (!held) {
+        byKey.set(key, {
+          name: character.name.trim(),
+          aliases: [...new Set((character.aliases ?? []).map((a) => a.trim()).filter(Boolean))],
+          sections: 1,
+          actions: character.actions.length,
+          span: { first: section.start, last: section.end },
+          judgeable: false,
+        });
+        continue;
+      }
+      held.sections += 1;
+      held.actions += character.actions.length;
+      held.span.last = Math.max(held.span.last, section.end);
+      held.span.first = Math.min(held.span.first, section.start);
+      for (const alias of character.aliases ?? []) {
+        const trimmed = alias.trim();
+        if (trimmed && !held.aliases.includes(trimmed)) held.aliases.push(trimmed);
+      }
+    }
+  }
+
+  return [...byKey.values()]
+    .map((entry) => decideJudgeable(entry))
+    .sort((a, b) => b.actions - a.actions || a.name.localeCompare(b.name));
+}
+
+/**
+ * Enough to judge, or not.
+ *
+ * The rubric requires citable events for every score of 2 or higher, so a
+ * character with four recorded actions in one section can only ever produce a
+ * flat profile of noughts and ones. Spending a model on that reaches a
+ * conclusion already known, and on a self-hosted box that is somebody's
+ * electricity and somebody's GPU. The finding is reported instead.
+ */
+function decideJudgeable(entry: RosterEntry): RosterEntry {
+  if (entry.sections < MIN_SECTIONS) {
+    return {
+      ...entry,
+      judgeable: false,
+      reason: `appears in only one section — too little to score a profile against`,
+    };
+  }
+  if (entry.actions < MIN_ACTIONS) {
+    return {
+      ...entry,
+      judgeable: false,
+      reason: `only ${entry.actions} recorded ${entry.actions === 1 ? "action" : "actions"} across the book — every axis would rest on too little to cite`,
+    };
+  }
+  return { ...entry, judgeable: true, ...(entry.reason ? { reason: undefined } : {}) };
+}
+
+/** The book as the judging model sees it: events, in order, with positions. */
+export function timelineFor(sections: PlacedDigest[]): string {
+  const lines: string[] = [];
+  for (const section of sections) {
+    const at = `${Math.round(section.start * 100)}–${Math.round(section.end * 100)}%`;
+    const name = section.label ? `${section.label} ` : "";
+    lines.push(`\n[${at}] ${name}(${section.words} words)`);
+    if (section.summary) lines.push(`  ${section.summary}`);
+    for (const event of section.events) {
+      const kind = event.kind ? ` (${event.kind}${event.weight ? `, ${event.weight}` : ""})` : "";
+      const who = event.who?.length ? ` — ${event.who.join(", ")}` : "";
+      lines.push(`  • ${event.what}${kind}${who}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** One character's whole-book record, positioned. */
+export function dossierFor(sections: PlacedDigest[], name: string): string {
+  const wanted = name.trim().toLowerCase();
+  const lines: string[] = [];
+
+  for (const section of sections) {
+    const match = section.characters.find(
+      (c) =>
+        c.name.trim().toLowerCase() === wanted ||
+        (c.aliases ?? []).some((a) => a.trim().toLowerCase() === wanted),
+    );
+    if (!match) continue;
+
+    const at = `${Math.round(section.start * 100)}–${Math.round(section.end * 100)}%`;
+    lines.push(`\n[${at}] ${section.label ?? "section"}`);
+    for (const action of match.actions) lines.push(`  • ${action}`);
+    for (const want of match.wants ?? []) lines.push(`  wants: ${want}`);
+    for (const relation of match.relations ?? []) lines.push(`  with ${relation.who}: ${relation.what}`);
+  }
+
+  return lines.join("\n");
+}
+
+const STRUCTURE_SCHEMA = {
+  type: "object",
+  properties: {
+    models: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          model: { type: "string", enum: [...MODEL_KEYS] },
+          fit: { type: "string", enum: ["good", "moderate", "low", "bad", "na"] },
+          evidence: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                element: { type: "string" },
+                event: { type: "string" },
+                position: { type: "number" },
+              },
+              required: ["element", "event"],
+            },
+          },
+          gaps: { type: "array", items: { type: "string" } },
+          summary: { type: "string" },
+        },
+        required: ["model", "fit", "evidence", "gaps", "summary"],
+      },
+    },
+    bestFit: { type: "string" },
+    bestFitWhy: { type: "string" },
+    overview: { type: "string" },
+  },
+  required: ["models", "bestFitWhy", "overview"],
+} as const;
+
+export async function analyseStructure(opts: {
+  url: string;
+  model: string;
+  numCtx: number | null;
+  title: string;
+  totalWords: number;
+  sections: PlacedDigest[];
+  signal?: AbortSignal;
+}): Promise<{ result: StructureAnalysis; ms: number }> {
+  const prompt = `MANUSCRIPT: "${opts.title}" — ${opts.totalWords.toLocaleString()} words, ${opts.sections.length} sections.
+
+${STRUCTURE_MODELS}
+
+Below is the manuscript's event timeline. Each section is marked with its position as a percentage of the whole book. USE THESE POSITIONS: they are exact, and the proportional claims of these models stand or fall on them.
+
+TIMELINE:${timelineFor(opts.sections)}
+
+Judge all seven models. Return one entry per model, using these exact keys: ${MODEL_KEYS.join(", ")}.
+
+For each: the fit rating, the distinctive elements you found with the events instantiating them and their positions, the distinctive elements that are absent or mislocated, and a summary of a few sentences explaining the rating in plain language.
+
+Then name the single best-fitting model in "bestFit" using one of those keys — or leave it empty if the manuscript follows rhetorical or associative logic and fits no beat model well, which is a legitimate finding. Explain in "bestFitWhy". In "overview", give a few sentences on the manuscript's shape overall.`;
+
+  const answer = await generate({
+    url: opts.url,
+    model: opts.model,
+    numCtx: opts.numCtx,
+    system: STRUCTURE_PRINCIPLES,
+    format: STRUCTURE_SCHEMA as unknown as Record<string, unknown>,
+    prompt,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  });
+
+  const raw = parseJson<Partial<StructureAnalysis>>(answer.text);
+  const found = new Map((raw.models ?? []).map((m) => [m.model, m]));
+
+  // Every model gets a bar, whether or not the judge remembered it. A missing
+  // model rendered as an absent row would look like a bug; rendered as "no
+  // finding" it is at least honest.
+  const models = MODEL_KEYS.map((key) => {
+    const m = found.get(key);
+    return {
+      model: key,
+      fit: m?.fit ?? "low",
+      evidence: Array.isArray(m?.evidence) ? m.evidence : [],
+      gaps: Array.isArray(m?.gaps) ? m.gaps : [],
+      summary: m?.summary ?? "No finding was returned for this model.",
+    };
+  });
+
+  const bestFit = raw.bestFit && MODEL_KEYS.includes(raw.bestFit as never) ? raw.bestFit : null;
+
+  return {
+    result: {
+      models,
+      bestFit,
+      bestFitWhy: raw.bestFitWhy ?? "",
+      overview: raw.overview ?? "",
+    },
+    ms: answer.ms,
+  };
+}
+
+const CHARACTER_SCHEMA = {
+  type: "object",
+  properties: {
+    focal: { type: "string" },
+    axes: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          axis: { type: "string", enum: [...AXIS_KEYS] },
+          score: { type: "integer", minimum: 0, maximum: 5 },
+          aligned: { type: "array", items: { type: "string" } },
+          contradictory: { type: "array", items: { type: "string" } },
+        },
+        required: ["axis", "score", "aligned", "contradictory"],
+      },
+    },
+    summary: { type: "string" },
+    phaseShifts: { type: "array", items: { type: "string" } },
+    confidence: { type: "string" },
+  },
+  required: ["focal", "axes", "summary", "confidence"],
+} as const;
+
+export async function analyseCharacter(opts: {
+  url: string;
+  model: string;
+  numCtx: number | null;
+  title: string;
+  name: string;
+  /** Whose arc to score against — one chart, one perspective. */
+  focal: string;
+  sections: PlacedDigest[];
+  signal?: AbortSignal;
+}): Promise<{ result: CharacterAnalysis; ms: number }> {
+  const prompt = `MANUSCRIPT: "${opts.title}"
+
+${AXES}
+
+The focal perspective for this evaluation is ${opts.focal}. Score ${opts.name} relative to that arc.
+
+Here is everything the manuscript records ${opts.name} doing, in order, each marked with its position as a percentage of the book:
+${dossierFor(opts.sections, opts.name)}
+
+For wider context, the book's event timeline:${timelineFor(opts.sections)}
+
+Score ${opts.name} on all ten axes, using these exact keys: ${AXIS_KEYS.join(", ")}.
+
+For every axis give:
+- "aligned": the actions from the record above that MOST support this score — the citable events the rubric demands. For a score of 2 or higher this must not be empty; if you cannot name the events, lower the score.
+- "contradictory": the actions that cut AGAINST this reading, or complicate it — what a careful reader would raise as an objection. If the character's behaviour is consistent on this axis, return an empty list rather than inventing an objection.
+
+Then: "summary", a one- or two-sentence reading of the SHAPE of the profile (for example "Shapeshifter-Guardian with late Sacrifice: the distrusted gatekeeper who is spent to prove loyalty"), followed by a few sentences on what that means for this character's role. "phaseShifts": any axis concentrated in one span of the book, or any mid-story role flip, with where it turns. "confidence": where the evidence is thin and which scores are least certain.
+
+A flat or near-zero profile is a valid result. Do not inflate.`;
+
+  const answer = await generate({
+    url: opts.url,
+    model: opts.model,
+    numCtx: opts.numCtx,
+    system: AXES_PRINCIPLES,
+    format: CHARACTER_SCHEMA as unknown as Record<string, unknown>,
+    prompt,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  });
+
+  const raw = parseJson<Partial<CharacterAnalysis>>(answer.text);
+  const found = new Map((raw.axes ?? []).map((a) => [a.axis, a]));
+
+  // A radar chart with a missing spoke is not a shape, so every axis is
+  // present; an axis the judge skipped is a 0, which is what "no story events
+  // instantiate this function" means anyway.
+  const axes = AXIS_KEYS.map((key) => {
+    const a = found.get(key);
+    const score = typeof a?.score === "number" ? Math.max(0, Math.min(5, Math.round(a.score))) : 0;
+    const aligned = Array.isArray(a?.aligned) ? a.aligned.filter(Boolean) : [];
+    return {
+      axis: key,
+      // The rubric's own rule, enforced rather than requested: a score of 2 or
+      // more with nothing to cite is exactly what principle 3 forbids.
+      score: score >= 2 && aligned.length === 0 ? 1 : score,
+      aligned,
+      contradictory: Array.isArray(a?.contradictory) ? a.contradictory.filter(Boolean) : [],
+    };
+  });
+
+  return {
+    result: {
+      name: opts.name,
+      focal: raw.focal ?? opts.focal,
+      axes,
+      summary: raw.summary ?? "",
+      phaseShifts: Array.isArray(raw.phaseShifts) ? raw.phaseShifts : [],
+      confidence: raw.confidence ?? "",
+    },
+    ms: answer.ms,
+  };
+}
+
+/**
+ * The "only one 5 per axis" rule, applied across the cast.
+ *
+ * The rubric says a 5 means this character is the story's primary carrier of a
+ * function, and that if two seem to hold it, one is usually a 4. Characters are
+ * judged one at a time and cannot know what the others scored, so the rule
+ * cannot be honoured in the prompt — it has to be settled here, once all the
+ * profiles are in. The strongest claim keeps the 5; the rest step down.
+ */
+export function reconcilePrimacy(profiles: CharacterAnalysis[]): CharacterAnalysis[] {
+  const out = profiles.map((p) => ({ ...p, axes: p.axes.map((a) => ({ ...a })) }));
+
+  for (const axis of AXIS_KEYS) {
+    const claimants = out
+      .map((p) => p.axes.find((a) => a.axis === axis))
+      .filter((a): a is NonNullable<typeof a> => Boolean(a) && a!.score === 5);
+    if (claimants.length <= 1) continue;
+
+    // Most cited evidence wins the primacy; ties keep the earlier profile.
+    claimants.sort((a, b) => b.aligned.length - a.aligned.length);
+    for (const loser of claimants.slice(1)) loser.score = 4;
+  }
+
+  return out;
+}
+
+export { MODEL_LABELS };

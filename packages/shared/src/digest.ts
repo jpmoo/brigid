@@ -1,0 +1,206 @@
+/**
+ * What one reading of a section yields.
+ *
+ * A novel does not fit in a model's context, but both reference documents ask
+ * for whole-story judgments: the structure models want proportions ("if the
+ * midpoint must be located at the 80% mark, the story does not fit"), and the
+ * character axes want whole-story presence and one character weighed against
+ * another. So the book is read once, a section at a time, into this — and the
+ * frameworks are judged against the digest, which does fit.
+ *
+ * The rule these shapes are built around: **observations, not verdicts**. A
+ * section digest records what happened and what someone did. It does not score
+ * an axis or name a beat, because a reader who has seen one chapter cannot
+ * know whether a departure is the Crossing of the First Threshold or an
+ * errand. Judgment happens once, at the end, with the whole digest in view.
+ */
+
+/** A person as one section shows them. */
+export interface DigestCharacter {
+  /** As the prose names them here. Reconciled into one identity later. */
+  name: string;
+  /** Other names this section uses for them — title, nickname, epithet. */
+  aliases?: string[];
+  /**
+   * What they did, said, wanted, refused, and had done to them, as plain
+   * statements. These become the citable events the axes rubric demands for
+   * every score of 2 or higher, so each should name an act, not a quality:
+   * "gives Ines the key to the observatory", not "is generous".
+   */
+  actions: string[];
+  /** What they are shown to want here, if the section shows it. */
+  wants?: string[];
+  /** How they are described, and by whom — for the shape, not the score. */
+  traits?: string[];
+  /** Named others they act on or with, for the relational axes. */
+  relations?: { who: string; what: string }[];
+}
+
+/** Something that happens, in the order the section tells it. */
+export interface DigestEvent {
+  /** One sentence, concrete and past-tense. */
+  what: string;
+  /** Who is involved, by the names used above. */
+  who?: string[];
+  /**
+   * The kind of turn this is, in structure-neutral terms — deliberately not
+   * the vocabulary of any one model, so the judging pass isn't led into
+   * force-mapping. A "departure" may or may not be a threshold crossing.
+   */
+  kind?: DigestEventKind;
+  /** Whether the section presents this as a large turn or a small one. */
+  weight?: "minor" | "notable" | "major";
+}
+
+/**
+ * Structure-neutral by design. If the walker were allowed to emit "midpoint"
+ * or "all is lost", every book would fit every model — principle 2 of the
+ * structure document is precisely the warning against that.
+ */
+export type DigestEventKind =
+  | "disruption"
+  | "decision"
+  | "departure"
+  | "arrival"
+  | "conflict"
+  | "revelation"
+  | "reversal"
+  | "loss"
+  | "gain"
+  | "reconciliation"
+  | "death"
+  | "other";
+
+/** One section's reading, as stored. */
+export interface SectionDigest {
+  characters: DigestCharacter[];
+  events: DigestEvent[];
+  /** One or two sentences: what this section is, for the reduce pass. */
+  summary?: string;
+}
+
+/**
+ * A section's digest with its place in the finished book.
+ *
+ * Position is computed when the digest is read, never stored: it is a fraction
+ * of a whole that shifts whenever any other section changes length, and a
+ * stored percentage would be wrong the moment the writer added a paragraph
+ * anywhere earlier. Since five of the seven structure models make proportional
+ * claims, a stale percentage is not a cosmetic problem.
+ */
+export interface PlacedDigest extends SectionDigest {
+  blockId: string;
+  label: string | null;
+  /** Where this section starts and ends, as a fraction of the whole, 0–1. */
+  start: number;
+  end: number;
+  words: number;
+}
+
+/** How far along the walk is, for a work. */
+export interface DigestProgress {
+  status: "idle" | "walking" | "failed";
+  /** Sections whose digest matches their current prose and current model. */
+  done: number;
+  /** Sections that need reading at all. */
+  total: number;
+  lastError: string | null;
+  /** Null until at least one section has been read and timed. */
+  etaSeconds: number | null;
+  /** Nothing can be judged until this is true. */
+  ready: boolean;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Findings                                                               */
+/* ---------------------------------------------------------------------- */
+
+/**
+ * How well the book fits one structure model.
+ *
+ * Four bands rather than the reference document's three, because a gauge with
+ * three stops is barely a gauge — "weak" is split by whether the story's shape
+ * actively contradicts the model or merely fails to evidence it.
+ *
+ * `na` is not a low score and must not render as one. Fifteen timed beats
+ * cannot be asked of a three-thousand-word story, and a near-empty bar would
+ * read as an accusation the model never made.
+ */
+export type FitRating = "good" | "moderate" | "low" | "bad" | "na";
+
+export interface FitEvidence {
+  /** Which of the model's distinctive elements this instantiates. */
+  element: string;
+  /** The story event that does it. */
+  event: string;
+  /** Where, as a percentage of the book, when the finding is positional. */
+  position?: number;
+}
+
+export interface ModelFit {
+  model: string;
+  fit: FitRating;
+  evidence: FitEvidence[];
+  /** Distinctive elements absent or mislocated — why it isn't a better fit. */
+  gaps: string[];
+  /** The per-framework report: a few sentences of prose. */
+  summary: string;
+}
+
+export interface StructureAnalysis {
+  models: ModelFit[];
+  /** Which single model fits most specifically, or null for none of them. */
+  bestFit: string | null;
+  bestFitWhy: string;
+  /** The overall reading, including "this fits no beat model well". */
+  overview: string;
+}
+
+/** One axis of one character's profile. */
+export interface AxisScore {
+  axis: string;
+  /** 0–5. */
+  score: number;
+  /** What most supports the score — the citable events the rubric demands. */
+  aligned: string[];
+  /** What cuts against it: actions that contradict or complicate the reading. */
+  contradictory: string[];
+}
+
+export interface CharacterAnalysis {
+  name: string;
+  /** Whose arc the axes are relative to. One chart, one perspective. */
+  focal: string;
+  axes: AxisScore[];
+  /** The report: a reading of the shape, in prose. */
+  summary: string;
+  /** Role flips and axes concentrated in one span, kept out of the average. */
+  phaseShifts: string[];
+  /** Where the evidence is thin and which scores are least certain. */
+  confidence: string;
+}
+
+/**
+ * Somebody the walk found.
+ *
+ * Characters below the evidence threshold are listed but not analysed. Running
+ * a model over three mentions cannot produce anything the rubric would accept —
+ * every axis would land at 0 or 1 for want of citable events — so it is time
+ * and electricity spent to reach a foregone conclusion. They are reported
+ * rather than hidden, because "the book barely shows this person" is itself
+ * worth seeing.
+ */
+export interface RosterEntry {
+  name: string;
+  aliases: string[];
+  /** How many sections they appear in. */
+  sections: number;
+  /** How many recorded actions across the book. */
+  actions: number;
+  /** Where they appear, as fractions of the book. */
+  span: { first: number; last: number };
+  /** False when there is too little to judge. */
+  judgeable: boolean;
+  /** Said plainly when not judgeable. */
+  reason?: string;
+}

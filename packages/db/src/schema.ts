@@ -20,6 +20,7 @@ import type {
   TemplateCategory,
   Typography,
 } from "@brigid/shared";
+import type { DigestCharacter, DigestEvent } from "@brigid/shared";
 
 /**
  * Brigid is single-user, so this table holds exactly one row. It exists anyway
@@ -58,6 +59,12 @@ export const settings = pgTable("settings", {
   ollamaUrl: text("ollama_url"),
   inferenceModel: text("inference_model"),
   summarizationModel: text("summarization_model"),
+  /**
+   * The model's full context window, read from Ollama when the model is chosen.
+   * Ollama otherwise serves a small default — a model that can hold 128k gets
+   * 4k unless asked otherwise, and the excess is silently dropped.
+   */
+  ollamaNumCtx: integer("ollama_num_ctx"),
   /** How the writer likes to work, not anything about a particular manuscript. */
   spellcheckEnabled: boolean("spellcheck_enabled").notNull().default(true),
   /** The nightly backup: whether, when on the server's own clock, and how many. */
@@ -243,3 +250,79 @@ export const blocks = pgTable(
     byParent: index("blocks_work_parent_sort_idx").on(t.workId, t.parentId, t.sortKey),
   }),
 );
+
+/**
+ * One section, as the model read it.
+ *
+ * Keyed by a hash of the prose that was read, which is the entire staleness
+ * mechanism: nothing has to remember to invalidate anything, because a section
+ * whose prose has changed no longer matches its row, and the walker looks for
+ * exactly that. Edit one scene and one scene is re-read.
+ *
+ * The model is stored too, because a different model is a different reader —
+ * its digest of chapter three is not interchangeable with another's. Changing
+ * the model makes every row stale, which is expensive and correct.
+ */
+export const sectionDigests = pgTable(
+  "section_digests",
+  {
+    blockId: uuid("block_id")
+      .primaryKey()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    contentHash: text("content_hash").notNull(),
+    model: text("model").notNull(),
+    characters: jsonb("characters").$type<DigestCharacter[]>().notNull().default([]),
+    events: jsonb("events").$type<DigestEvent[]>().notNull().default([]),
+    /** What it cost, so the progress display can estimate what is left. */
+    ms: integer("ms"),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    byWork: index("section_digests_work_idx").on(t.workId),
+  }),
+);
+
+/**
+ * Whether the walker is running, and why it stopped if it did.
+ *
+ * Progress is not kept here — it is counted from the digest rows themselves, so
+ * it cannot drift out of step with what has actually been read.
+ */
+export const digestState = pgTable("digest_state", {
+  workId: uuid("work_id")
+    .primaryKey()
+    .references(() => works.id, { onDelete: "cascade" }),
+  status: text("status").$type<"idle" | "walking" | "failed">().notNull().default("idle"),
+  lastError: text("last_error"),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Findings, kept because they are slow to make.
+ *
+ * Stamped with a fingerprint of the digest they were judged from, so a report
+ * can say plainly that the book has moved on rather than quietly presenting
+ * last week's reading of a rewritten chapter. Nothing is invalidated
+ * automatically: a stale report is still the best answer available, and
+ * deleting it the moment a comma changes would leave the panel empty for no
+ * gain.
+ */
+export const analyses = pgTable("analyses", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  workId: uuid("work_id")
+    .notNull()
+    .references(() => works.id, { onDelete: "cascade" }),
+  kind: text("kind").$type<"structure" | "character">().notNull(),
+  /** For 'character', who it is about. Null for 'structure'. */
+  subject: text("subject"),
+  model: text("model").notNull(),
+  digestFingerprint: text("digest_fingerprint").notNull(),
+  result: jsonb("result").$type<Record<string, unknown>>().notNull(),
+  ms: integer("ms"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});

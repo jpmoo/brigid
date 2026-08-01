@@ -3,8 +3,13 @@
 import type {
   BlockFormatSettings,
   BreakTemplateSettings,
+  CharacterAnalysis,
+  DigestProgress,
   ImportedParagraph,
   BlockOptions,
+  PlacedDigest,
+  RosterEntry,
+  StructureAnalysis,
   TemplateBody,
   Typography,
 } from "@brigid/shared";
@@ -107,7 +112,26 @@ export interface Preferences {
   viewMode?: "book" | "manuscript";
 }
 
+/** Everything the AI panel needs to draw itself. */
+export interface AnalysisBundle {
+  progress: DigestProgress;
+  roster: RosterEntry[];
+  axisLabels: Record<string, string>;
+  modelLabels: Record<string, string>;
+  reports: {
+    kind: "structure" | "character";
+    subject: string | null;
+    model: string;
+    result: unknown;
+    createdAt: string;
+    /** False once the manuscript has moved on since this was judged. */
+    current: boolean;
+  }[];
+}
+
 export interface OllamaSettings {
+  /** The model's full context window, as detected. */
+  numCtx?: number | null;
   /** Origin only — no path, no trailing slash. Null until a host is set. */
   url: string | null;
   analysisModel: string | null;
@@ -449,6 +473,16 @@ export const api = {
   deleteDictionaryWord: (id: string) =>
     request<{ ok: true }>(`/spelling/words/${id}`, { method: "DELETE" }),
   getDictionary: () => request<{ aff: string; dic: string }>("/spelling/dictionary"),
+
+  getDigest: (workId: string) =>
+    request<{ progress: DigestProgress; sections: PlacedDigest[] }>(`/works/${workId}/digest`),
+  getDigestProgress: (workId: string) =>
+    request<DigestProgress>(`/works/${workId}/digest/progress`),
+  getAnalysis: (workId: string) => request<AnalysisBundle>(`/works/${workId}/analysis`),
+  runStructureAnalysis: (workId: string) =>
+    post<{ result: StructureAnalysis }>(`/works/${workId}/analysis/structure`),
+  runCharacterAnalysis: (workId: string, body: { name?: string; focal?: string }) =>
+    post<{ results: CharacterAnalysis[] }>(`/works/${workId}/analysis/character`, body),
 
   getOllama: () => request<OllamaSettings>("/ollama"),
   // The address is passed rather than read, so a host can be tried before it is kept.

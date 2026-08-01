@@ -5,6 +5,8 @@ import { settings } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest } from "../lib/errors.js";
+import { contextLengthOf } from "./client.js";
+import { placedDigests, progressOf } from "./worker.js";
 
 /**
  * Where Ollama is, and which model to think with.
@@ -58,16 +60,29 @@ export async function modelsAt(url: string): Promise<string[]> {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/** The saved connection, in the one shape every route here returns. */
+async function current() {
+  const [row] = await db
+    .select({
+      url: settings.ollamaUrl,
+      analysisModel: settings.inferenceModel,
+      numCtx: settings.ollamaNumCtx,
+    })
+    .from(settings)
+    .limit(1);
+  return {
+    url: row?.url ?? null,
+    analysisModel: row?.analysisModel ?? null,
+    numCtx: row?.numCtx ?? null,
+  };
+}
+
 export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
   app.get("/ollama", async (req) => {
     requireUser(req);
-    const [row] = await db
-      .select({ url: settings.ollamaUrl, analysisModel: settings.inferenceModel })
-      .from(settings)
-      .limit(1);
-    return { url: row?.url ?? null, analysisModel: row?.analysisModel ?? null };
+    return current();
   });
 
   /**
@@ -91,6 +106,35 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     return { url: target, models: await modelsAt(target) };
   });
 
+  /**
+   * How far the walk has got, for one manuscript.
+   *
+   * Polled while the panel is open, so it stays cheap: counts and an estimate,
+   * not the digest itself.
+   */
+  app.get("/works/:workId/digest/progress", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    return progressOf(workId);
+  });
+
+  /**
+   * Everything the walk has collected, section by section.
+   *
+   * The analysis is only as good as this, so it is not hidden behind the
+   * findings — a spider graph nobody can check is a spider graph nobody should
+   * believe. Positions are computed here rather than stored, since they shift
+   * whenever any section changes length.
+   */
+  app.get("/works/:workId/digest", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    return {
+      progress: await progressOf(workId),
+      sections: await placedDigests(workId),
+    };
+  });
+
   app.patch("/ollama", async (req) => {
     requireUser(req);
     const body = z
@@ -108,12 +152,25 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     if (body.url !== undefined) patch.ollamaUrl = body.url === null ? null : asOllamaUrl(body.url);
     if (body.analysisModel !== undefined) patch.inferenceModel = body.analysisModel;
 
-    await db.update(settings).set(patch).where(eq(settings.id, row.id));
+    /**
+     * The window is settled here, when the model is chosen, rather than left to
+     * whatever Ollama would otherwise serve — which is a couple of thousand
+     * tokens no matter what the model can hold, and which truncates silently.
+     * A reader of long prose given a small window doesn't fail; it answers
+     * confidently about the first fifth of the chapter.
+     */
+    const target =
+      (patch.ollamaUrl as string | null | undefined) ??
+      (await db.select({ url: settings.ollamaUrl }).from(settings).limit(1))[0]?.url ??
+      null;
+    const model = (patch.inferenceModel as string | null | undefined) ?? null;
+    if (model && target) {
+      patch.ollamaNumCtx = await contextLengthOf(target, model).catch(() => null);
+    } else if (body.analysisModel === null || body.url === null) {
+      patch.ollamaNumCtx = null;
+    }
 
-    const [saved] = await db
-      .select({ url: settings.ollamaUrl, analysisModel: settings.inferenceModel })
-      .from(settings)
-      .limit(1);
-    return { url: saved?.url ?? null, analysisModel: saved?.analysisModel ?? null };
+    await db.update(settings).set(patch).where(eq(settings.id, row.id));
+    return current();
   });
 }
