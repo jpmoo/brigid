@@ -1,5 +1,3 @@
-import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { asc, eq, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -7,8 +5,6 @@ import { dictionaryWords, settings } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-
-const require = createRequire(import.meta.url);
 
 /**
  * The Hunspell dictionary, read once and held.
@@ -23,13 +19,16 @@ let dictionary: { aff: string; dic: string } | null = null;
 
 async function loadDictionary(): Promise<{ aff: string; dic: string }> {
   if (dictionary) return dictionary;
-  const aff = require.resolve("dictionary-en/index.aff");
-  const dic = require.resolve("dictionary-en/index.dic");
-  const [affText, dicText] = await Promise.all([
-    readFile(aff, "utf8"),
-    readFile(dic, "utf8"),
-  ]);
-  dictionary = { aff: affText, dic: dicText };
+  // Through the package's own entry point, not by reaching for the .aff and
+  // .dic beside it: dictionary-en declares a single export and Node refuses
+  // every other subpath, so resolving the files directly throws. Imported
+  // dynamically because the module reads them with a top-level await, which
+  // there is no reason to pay for when checking is switched off.
+  const { default: files } = await import("dictionary-en");
+  dictionary = {
+    aff: Buffer.from(files.aff).toString("utf8"),
+    dic: Buffer.from(files.dic).toString("utf8"),
+  };
   return dictionary;
 }
 

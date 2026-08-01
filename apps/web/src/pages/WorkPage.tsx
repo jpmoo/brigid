@@ -683,9 +683,11 @@ export function WorkPage() {
               setSelectedId(blockId);
               setEditingProse({ id: blockId, caret });
             }}
-            editor={
+            editor={(layout) =>
               editingProse ? (
                 <ProseEditor
+                  layout={layout}
+                  spellcheckWanted={spelling.enabled}
                   // A fresh editor per block. Reusing one across a switch would
                   // leave the outgoing block's debounced save holding the
                   // incoming block's text.

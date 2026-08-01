@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Bold, Italic } from "lucide-react";
+import { Bold, Italic, Redo2, SpellCheck, Undo2 } from "lucide-react";
 import {
   asProseDoc,
   autocorrectKeystroke,
@@ -49,10 +49,11 @@ const PROSE_FLAVOUR = "application/x-brigid-prose";
 
 // --- The model, in the DOM and back -------------------------------------
 //
-// docToHtml, htmlToDoc, caretOffset and setCaret are exported so they can be
-// driven in a real browser: the round trip and the caret's survival across a
-// rebuild are the things most likely to break here, and neither can be tested
-// without a live DOM and a live selection.
+// docToHtml, htmlToDoc, the caret helpers and textBeforeCaret are exported so
+// they can be driven in a real browser: the round trip, the caret's survival
+// across a rebuild, and what a quote sees behind it are the things most likely
+// to break here, and none can be tested without a live DOM and a live
+// selection.
 
 function runsToHtml(runs: ProseText[], speller: Speller | null): string {
   if (runs.length === 0) return "<br>";
@@ -90,9 +91,39 @@ function markMisspellings(text: string, speller: Speller): string {
   return out;
 }
 
-export function docToHtml(doc: ProseDoc, speller: Speller | null): string {
-  if (doc.content.length === 0) return "<p><br></p>";
-  return doc.content.map((p) => `<p>${runsToHtml(p.content ?? [], speller)}</p>`).join("");
+/**
+ * How the manuscript sets its paragraphs: the first-line indent, and whether the
+ * opening one runs flush.
+ *
+ * The editor takes the same class and the same indent as the rendered
+ * paragraphs it replaces. Without it, clicking into a block reflowed every line
+ * — the indent vanished and the text shifted under the caret that had just been
+ * placed by the click.
+ */
+export interface ProseLayout {
+  /** A CSS length, or undefined when the mode sets no indent. */
+  indent?: string | undefined;
+  /** False when the block's break says its opening paragraph runs flush. */
+  indentFirst?: boolean | undefined;
+}
+
+function paragraphAttrs(index: number, layout: ProseLayout | undefined): string {
+  // The clipboard asks for bare paragraphs; only the editing surface is set.
+  if (!layout) return "";
+  const flush = index === 0 && layout.indentFirst === false;
+  const indent = !flush && layout.indent ? ` style="text-indent:${layout.indent}"` : "";
+  return ` class="prose${flush ? " flush" : ""}"${indent}`;
+}
+
+export function docToHtml(
+  doc: ProseDoc,
+  speller: Speller | null,
+  layout?: ProseLayout,
+): string {
+  if (doc.content.length === 0) return `<p${paragraphAttrs(0, layout)}><br></p>`;
+  return doc.content
+    .map((p, i) => `<p${paragraphAttrs(i, layout)}>${runsToHtml(p.content ?? [], speller)}</p>`)
+    .join("");
 }
 
 /** Our own clipboard flavour, or null if it isn't ours or isn't readable. */
@@ -311,6 +342,31 @@ export function setCaret(root: HTMLElement, offset: number): void {
  * no lookahead to tell it from a dash that introduces speech: the next
  * character hasn't been typed yet. So a quote after a dash closes.
  */
+/**
+ * The text before the caret, within its own paragraph.
+ *
+ * Scoped to the paragraph on purpose: a range reaching back to the start of the
+ * block renders a paragraph break as nothing at all, so the last character of
+ * the previous paragraph would look like the character before the caret, and a
+ * quote opening a new line would be read as closing the one above it. Bounded
+ * this way, the start of a paragraph correctly has nothing before it.
+ */
+export function textBeforeCaret(root: HTMLElement, range: Range): string {
+  const node = range.startContainer;
+  const element = node.nodeType === Node.ELEMENT_NODE ? (node as HTMLElement) : node.parentElement;
+  const paragraph = element?.closest("p");
+  const scope = paragraph && root.contains(paragraph) ? paragraph : root;
+
+  const before = document.createRange();
+  before.selectNodeContents(scope);
+  try {
+    before.setEnd(node, range.startOffset);
+  } catch {
+    return "";
+  }
+  return before.toString();
+}
+
 /** Characters that end a word, and so are worth re-checking the spelling on. */
 const BOUNDARY = /[\s.,;:!?)\]}"”'’—–…]/;
 
@@ -324,10 +380,14 @@ export interface ProseEditorProps {
    * cross the swap as an offset rather than as a node.
    */
   initialCaret: number;
+  /** The paragraph setting to match, so clicking in doesn't reflow the block. */
+  layout: ProseLayout;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
   speller: Speller | null;
+  /** Whether checking is switched on, which is not the same as ready. */
+  spellcheckWanted: boolean;
   smartPunctuation: boolean;
   onSave: (doc: ProseDoc) => void;
   onDone: () => void;
@@ -338,9 +398,11 @@ export interface ProseEditorProps {
 export function ProseEditor({
   blockId,
   initialCaret,
+  layout,
   content,
   fallbackText,
   speller,
+  spellcheckWanted,
   smartPunctuation,
   onSave,
   onDone,
@@ -348,6 +410,11 @@ export function ProseEditor({
   onIgnoreWord,
 }: ProseEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
+
+  // Held in a ref: the rebuild functions are memoised on the checker, and the
+  // layout must not be a reason to remake them.
+  const layoutRef = useRef(layout);
+  layoutRef.current = layout;
 
   /**
    * Undo, kept here rather than left to the browser.
@@ -373,7 +440,7 @@ export function ProseEditor({
     const doc =
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
-    el.innerHTML = docToHtml(doc, speller);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current);
     el.focus();
     setCaret(el, initialCaret);
     // Only when the block changes: re-running this on every keystroke, or when
@@ -460,7 +527,7 @@ export function ProseEditor({
       historyAt.current = next;
 
       restoring.current = true;
-      el.innerHTML = docToHtml(entry.doc, speller);
+      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current);
       setCaret(el, entry.caret);
       restoring.current = false;
 
@@ -480,11 +547,22 @@ export function ProseEditor({
     if (!el || !speller) return;
     const doc = htmlToDoc(el);
     const offset = caretOffset(el);
-    const html = docToHtml(doc, speller);
+    const html = docToHtml(doc, speller, layoutRef.current);
     if (html === el.innerHTML) return;
     el.innerHTML = html;
     if (offset !== null) setCaret(el, offset);
   }, [speller]);
+
+  /**
+   * The dictionary is fetched only when checking is first wanted, so on the
+   * first block opened in a session it arrives after the editor is already
+   * showing. Nothing would be underlined until the next word boundary without
+   * this — which reads exactly like a checker that isn't working.
+   */
+  useEffect(() => {
+    if (!speller) return;
+    recheck();
+  }, [speller, recheck]);
 
   const refreshMarks = useCallback(() => {
     setMarks({
@@ -591,20 +669,19 @@ export function ProseEditor({
     if (smartPunctuation && event.key.length === 1) {
       const selection = window.getSelection();
       const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
-      if (range && range.collapsed && range.startContainer.nodeType === Node.TEXT_NODE) {
-        const text = range.startContainer.textContent ?? "";
-        const before = text.slice(Math.max(0, range.startOffset - 2), range.startOffset);
-        const fix = autocorrectKeystroke(event.key, before);
+      if (range && range.collapsed && el.contains(range.startContainer)) {
+        const fix = autocorrectKeystroke(event.key, textBeforeCaret(el, range).slice(-2));
         if (fix) {
           event.preventDefault();
-          const node = range.startContainer as Text;
-          const at = range.startOffset;
-          node.replaceData(at - fix.replace, fix.replace, fix.text);
-          const caret = at - fix.replace + fix.text.length;
-          range.setStart(node, caret);
-          range.collapse(true);
-          selection?.removeAllRanges();
-          selection?.addRange(range);
+          // The characters being replaced are taken back through the selection
+          // rather than by editing a text node directly. At the start of a
+          // paragraph the caret sits in the <p> itself, with no text node to
+          // edit — which is exactly where the opening quote of a line lives, and
+          // why the first quote of a paragraph was the one that never turned.
+          for (let i = 0; i < fix.replace; i += 1) {
+            selection?.modify("extend", "backward", "character");
+          }
+          document.execCommand("insertText", false, fix.text);
           scheduleSave();
           return;
         }
@@ -690,6 +767,43 @@ export function ProseEditor({
         >
           <Italic size={13} />
         </button>
+        <span className="be-gap" />
+        <button
+          type="button"
+          className="be-mark"
+          title="Undo (⌘Z)"
+          aria-label="Undo"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => restore(-1)}
+        >
+          <Undo2 size={13} />
+        </button>
+        <button
+          type="button"
+          className="be-mark"
+          title="Redo (⇧⌘Z)"
+          aria-label="Redo"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => restore(1)}
+        >
+          <Redo2 size={13} />
+        </button>
+        <span className="be-gap" />
+        {/* Whether the checker is on, and whether it has arrived yet: a
+            dictionary is half a megabyte, so there is a moment on first use when
+            nothing is underlined and the reason isn't otherwise visible. */}
+        <span
+          className={`prose-spell${speller ? " on" : ""}`}
+          title={
+            speller
+              ? "Spelling is being checked"
+              : spellcheckWanted
+                ? "Fetching the dictionary…"
+                : "Spelling checking is off — turn it on in Settings"
+          }
+        >
+          <SpellCheck size={13} />
+        </span>
         <span className="be-gap" />
         <span className="prose-hint">Escape when you&rsquo;re done</span>
       </div>

@@ -78,14 +78,14 @@ export function SpellingPane() {
             onChange={(e) => void toggle(e.target.checked)}
           />
           <span>
-            Check spelling as I write
-            <em>
-              Underlines what it doesn&rsquo;t recognise. The dictionary is downloaded
-              once and checked in the browser, so nothing you write is sent anywhere.
-            </em>
+            Check spelling as I write <em>&mdash; underlines what it doesn&rsquo;t recognise</em>
           </span>
         </label>
       </div>
+      <p className="tpl-note">
+        The dictionary is downloaded once and checked in the browser, so nothing you write
+        is sent anywhere.
+      </p>
 
       <h4 className="tpl-section">Your dictionary</h4>
       <p className="tpl-note">

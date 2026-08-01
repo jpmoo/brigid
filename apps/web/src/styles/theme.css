@@ -2780,9 +2780,10 @@ mark.hit.active {
   border-radius: 0 var(--radius) var(--radius) 0;
 }
 
-.prose-surface p {
-  margin: 0;
-  text-indent: inherit;
+/* The paragraphs carry .prose themselves, so the indent, justification and
+   hyphenation are the manuscript's, not the editor's. */
+.prose-surface p.prose {
+  cursor: auto;
 }
 
 /* The toolbar carries only what belongs to the words themselves. Spacing,
@@ -2825,6 +2826,19 @@ mark.hit.active {
 .prose,
 .prose.empty {
   cursor: text;
+}
+
+/* Off until the dictionary lands, so the wait is visible rather than looking
+   like a checker that does nothing. */
+.prose-spell {
+  display: inline-flex;
+  color: var(--text-faint);
+  opacity: 0.5;
+}
+
+.prose-spell.on {
+  color: var(--accent);
+  opacity: 1;
 }
 
 /* Under the word, not through it — a strikethrough reads as deleted. */

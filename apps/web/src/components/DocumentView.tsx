@@ -5,6 +5,7 @@ import { Bookmark as BookmarkIcon, Pencil } from "lucide-react";
 import { asProseDoc, hasMark, proseParagraphs, smartenText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import { offsetOfPoint } from "./ProseEditor.js";
+import type { ProseLayout } from "./ProseEditor.js";
 import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
@@ -99,7 +100,7 @@ function Nodes({
   counter: { n: number };
   smart?: boolean;
   editing?: boolean;
-  editor?: ReactNode;
+  editor?: (layout: ProseLayout) => ReactNode;
   onEditProse?: (caret: number) => void;
 }) {
   const indent =
@@ -199,7 +200,13 @@ function Nodes({
             // A content node is what makes a block writable. The title page has
             // none — it is composed of template lines — so it is not editable
             // here, without that needing to be said anywhere as a special case.
-            if (editing) return <Fragment key={i}>{editor}</Fragment>;
+            if (editing) {
+              return (
+                <Fragment key={i}>
+                  {editor?.({ indent, indentFirst })}
+                </Fragment>
+              );
+            }
 
             const doc = asProseDoc(proseDoc);
             const paragraphs: ProseText[][] = doc
@@ -288,7 +295,11 @@ export interface DocumentViewProps {
    * its format, not on the page.
    */
   onEditProse: (blockId: string, caret: number) => void;
-  editor: ReactNode;
+  /**
+   * Given the paragraph setting of the block being edited, since only the
+   * renderer knows it — it depends on the view mode and on the break above.
+   */
+  editor: (layout: ProseLayout) => ReactNode;
 }
 
 export function DocumentView({
