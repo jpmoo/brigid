@@ -18,10 +18,19 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"] | "project";
 
+const PROJECT_TABS = [
+  { key: "levels", label: "Levels" },
+  { key: "export", label: "Export" },
+  { key: "backup", label: "Backup" },
+] as const;
+
+type ProjectTabKey = (typeof PROJECT_TABS)[number]["key"];
+
 export function SettingsPage() {
   const { username } = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState<TabKey>("templates");
+  const [projectTab, setProjectTab] = useState<ProjectTabKey>("levels");
   const [templates, setTemplates] = useState<Template[]>([]);
 
   /**
@@ -110,7 +119,7 @@ export function SettingsPage() {
                 className={tab === "project" ? "selected" : ""}
                 onClick={() => setTab("project")}
               >
-                {work ? work.title : "This manuscript"}
+                Project Settings
               </button>
             </>
           ) : null}
@@ -121,7 +130,46 @@ export function SettingsPage() {
             <TemplatesPane templates={templates} onReload={() => void loadTemplates()} />
           ) : tab === "project" ? (
             workId ? (
-              <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
+              <>
+                <p className="card-subtitle">
+                  {work ? `Settings for “${work.title}”.` : "Settings for this manuscript."} These
+                  belong to the manuscript, not to Brigid.
+                </p>
+
+                <nav className="subtabs" role="tablist">
+                  {PROJECT_TABS.map((t) => (
+                    <button
+                      key={t.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={projectTab === t.key}
+                      className={projectTab === t.key ? "selected" : ""}
+                      onClick={() => setProjectTab(t.key)}
+                    >
+                      {t.label}
+                    </button>
+                  ))}
+                </nav>
+
+                {projectTab === "levels" ? (
+                  <LevelsEditor workId={workId} blocks={blocks} templates={templates} />
+                ) : projectTab === "export" ? (
+                  <>
+                    <h3 className="card-title">Export</h3>
+                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
+                      Turning this manuscript into a submission — page size, margins, running
+                      heads, and the file itself. Not built yet; it is the next thing.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="card-title">Backup</h3>
+                    <p className="card-subtitle" style={{ marginBottom: 0 }}>
+                      Taking a copy of this manuscript, and putting one back. Not built yet.
+                    </p>
+                  </>
+                )}
+              </>
             ) : null
           ) : tab === "account" ? (
             <PasswordFields />

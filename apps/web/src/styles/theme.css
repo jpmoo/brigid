@@ -2587,3 +2587,36 @@ mark.hit.active {
 .te-cellbar .te-bar-label {
   padding-top: 5px;
 }
+
+/* --- Subtabs within a settings pane ----------------------------------- */
+
+.subtabs {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  margin: 0 0 20px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius);
+}
+
+.subtabs button {
+  padding: 6px 14px;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.subtabs button:hover {
+  color: var(--text);
+}
+
+.subtabs button.selected {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
