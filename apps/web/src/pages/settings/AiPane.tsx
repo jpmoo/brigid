@@ -701,8 +701,12 @@ function CharactersPane({
       <h4 className="tpl-section">Profiles</h4>
       {pending > 0 ? (
         <p className="tpl-note">
-          Settle the {pending} gathered {pending === 1 ? "action" : "actions"} above first.
-          Profiling before that would score charts on a record you haven&rsquo;t seen.
+          Built from what you have committed. The {pending} gathered{" "}
+          {pending === 1 ? "action" : "actions"} still in the queue{" "}
+          {pending === 1 ? "is" : "are"} not included and{" "}
+          {pending === 1 ? "does" : "do"} no harm sitting there &mdash; a minor character
+          can go on collecting until there is enough to be worth profiling. Commit them
+          whenever you are ready and re-run whoever changed.
         </p>
       ) : null}
 
@@ -710,7 +714,7 @@ function CharactersPane({
         <button
           className="btn"
           type="button"
-          disabled={busy || working || pending > 0 || judgeable.length === 0}
+          disabled={busy || working || judgeable.length === 0}
           onClick={onRun}
         >
           {profiles.length > 0 ? <RefreshCw size={14} /> : <Play size={14} />}
