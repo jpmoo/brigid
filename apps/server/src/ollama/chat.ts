@@ -23,13 +23,21 @@ export interface ChatContext {
   structure: StructureAnalysis | null;
   profiles: CharacterAnalysis[];
   sections: PlacedDigest[];
+  /** The actual prose, by section, for questions the findings cannot answer. */
+  prose?: Map<string, string>;
+  /** What was just asked, so the passages chosen bear on it. */
+  question?: string;
 }
 
 const SYSTEM = `You are discussing an unpublished manuscript with the writer who wrote it.
 
-You have been given a structural analysis, character role profiles, and an event timeline — all previously made from the manuscript itself. Answer from those. They are the record; your memory is not.
+You have read this manuscript already. The structural analysis, the character role profiles, and the event timeline below are your own prior work on it — you produced them by reading the book section by section, and the writer has reviewed and corrected the record they were built from.
 
-TREAT THIS MANUSCRIPT AS AN ORIGINAL WORK YOU HAVE NEVER SEEN. Even if it resembles something you recognize, do not use outside knowledge of it: what you remember may differ from what this writer actually wrote, and they may have changed it deliberately. If the brief does not settle a question, say so plainly and say what would settle it. Never fill a gap from memory.
+So do not say the writer "provided" or "specified" any of it, and do not present a finding as something you were told. These are your conclusions. Own them: say "the midpoint falls at 54%", not "the analysis you gave me says the midpoint falls at 54%". If you disagree with something in your earlier analysis on reflection, say so directly.
+
+Answer from this material. It is the record; your memory of any book it resembles is not.
+
+THIS IS AN ORIGINAL, UNPUBLISHED WORK. If it resembles something you recognize, that resemblance is a trap: what you remember of the published book may differ from what is actually here, and this writer may have changed it deliberately. Use only the material in this brief and the passages quoted in it. If they do not settle a question, say so plainly and say what would settle it — never fill the gap from memory.
 
 Cite positions when they matter — the timeline gives each section's place as a percentage of the book, and a claim about where something falls should carry one.
 
@@ -55,6 +63,58 @@ function shapeBrief(structure: StructureAnalysis): string {
     )
     .join("\n");
   return `STORY SHAPE\n${structure.overview}\n\nBest fit: ${structure.bestFit ?? "none clearly"}. ${structure.bestFitWhy}\n\nFramework by framework:\n${rated}`;
+}
+
+/**
+ * Which passages to quote.
+ *
+ * The findings answer questions about shape and role; they cannot answer a
+ * question about the writing, because a summary of a scene has none of the
+ * sentences in it. So some real prose comes too, chosen by overlap between the
+ * question and what each section says.
+ *
+ * Crude on purpose — term overlap, not embeddings. There is no vector store
+ * here and adding one for a single-user tool would be a great deal of machinery
+ * for a ranking that only has to beat "the first three sections". The opening
+ * is always included regardless: questions about voice are usually questions
+ * about how the book starts, and it is the passage a writer is most likely to
+ * have in mind.
+ */
+function passagesFor(context: ChatContext, room: number): string {
+  const prose = context.prose;
+  if (!prose || room < 800) return "";
+
+  const asked = (context.question ?? "").toLowerCase();
+  const terms = [...new Set(asked.split(/[^a-z0-9']+/).filter((w) => w.length > 3))];
+
+  const scored = context.sections.map((section) => {
+    const text = prose.get(section.blockId) ?? "";
+    const hay = `${section.label ?? ""} ${section.summary ?? ""} ${text.slice(0, 4000)}`.toLowerCase();
+    let score = 0;
+    for (const term of terms) if (hay.includes(term)) score += 1;
+    // The opening, always: a question about the writing is usually a question
+    // about how it begins.
+    if (section.start === 0) score += 2;
+    return { section, text, score };
+  });
+
+  const chosen = scored
+    .filter((s) => s.text.trim() && s.score > 0)
+    .sort((a, b) => b.score - a.score || a.section.start - b.section.start)
+    .slice(0, 4);
+  if (chosen.length === 0) return "";
+
+  // Split evenly, so one long chapter cannot crowd out the other three.
+  const each = Math.floor((room - 200) / chosen.length);
+  const blocks = chosen
+    .sort((a, b) => a.section.start - b.section.start)
+    .map(({ section, text }) => {
+      const at = `${Math.round(section.start * 100)}%`;
+      const body = text.length <= each ? text : `${text.slice(0, each)}…`;
+      return `[${at}] ${section.label ?? "section"}\n${body}`;
+    });
+
+  return `PASSAGES FROM THE MANUSCRIPT (verbatim — quote from these when discussing the writing itself)\n\n${blocks.join("\n\n---\n\n")}`;
 }
 
 /**
@@ -94,7 +154,20 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
     parts.push(heads.join("\n\n"));
   }
 
-  // Whatever is left goes to the timeline, trimmed from the end rather than
+  /**
+   * Prose takes its share before the timeline does. A question the timeline
+   * could answer is usually one the shape and the profiles already answered;
+   * a question about the writing can only be answered from the writing, so
+   * losing the passages costs more than losing the tail of a timeline.
+   */
+  const left = budget - spent - 40;
+  const passages = passagesFor(context, Math.floor(left * 0.55));
+  if (passages) {
+    parts.push(passages);
+    spent += passages.length;
+  }
+
+  // Whatever remains goes to the timeline, trimmed from the end rather than
   // omitted — half a timeline still places the first half of the book.
   const timeline = timelineFor(context.sections);
   const room = budget - spent - 40;

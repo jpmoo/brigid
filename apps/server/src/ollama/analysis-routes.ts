@@ -4,6 +4,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   analyses,
+  blocks,
   characterRuns,
   digestState,
   castActions,
@@ -485,6 +486,20 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       throw badRequest("the story shape and at least one character profile are needed first");
     }
 
+    /**
+     * The prose itself, for questions the findings cannot reach. A summary of a
+     * scene has none of its sentences in it, so nothing derived from the reading
+     * can answer a question about the writing.
+     */
+    const prose = new Map(
+      (
+        await db
+          .select({ id: blocks.id, text: blocks.contentText })
+          .from(blocks)
+          .where(eq(blocks.workId, workId))
+      ).map((b) => [b.id, b.text]),
+    );
+
     const brief = buildBrief(
       {
         title: work.title,
@@ -492,6 +507,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         structure,
         profiles,
         sections,
+        prose,
+        question: messages.filter((m) => m.role === "user").at(-1)?.content ?? "",
       },
       config.numCtx,
     );

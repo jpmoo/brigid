@@ -103,10 +103,10 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   return (
     <>
       <p className="tpl-note">
-        Asks about this manuscript, answered from the analyses rather than from the
-        prose. It has the story-shape findings, every character profile, and the event
-        timeline with positions &mdash; so questions about where something falls, or
-        whether a role is carried, have something to stand on.
+        Asks about this manuscript. It has its own story-shape findings, every character
+        profile, and the event timeline with positions &mdash; and it pulls in the actual
+        passages your question bears on, so it can talk about the sentences as well as
+        the structure.
       </p>
 
       {error ? <div className="alert error">{error}</div> : null}
@@ -115,8 +115,9 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
         {messages.length === 0 ? (
           <p className="chat-empty">
             Try: &ldquo;Where does the midpoint actually fall?&rdquo; &middot; &ldquo;Who
-            carries the Shadow function, and is it earned?&rdquo; &middot; &ldquo;What
-            would have to change for this to fit Seven-Point?&rdquo;
+            carries the Shadow function, and is it earned?&rdquo; &middot; &ldquo;Is the
+            opening doing too much work?&rdquo; &middot; &ldquo;How would you describe
+            the voice?&rdquo;
           </p>
         ) : null}
 
