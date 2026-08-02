@@ -38,37 +38,21 @@ const MIN_SECTIONS = 2;
  * half a profile each.
  */
 /**
- * Things a model records as people that are not people.
+ * Strings that are placeholders rather than names.
  *
- * A digest asked "who is in this section" will sometimes answer "the narrator",
- * or name the reader, or the author. These are not characters and cannot be
- * scored on axes that ask what someone does to the plot — but they accumulate
- * mentions across every section, so they arrive at the top of the roster and
- * sit in the unscored list looking like an omission. They are dropped outright
- * rather than reported as too thin to judge, because "not enough evidence" is
- * the wrong reason: there would be no profile however much was written.
+ * Deliberately tiny. This used to catch "the narrator", "the author" and their
+ * kin, which was wrong: whether a narrator is a character is a question about a
+ * particular book, and plenty of books answer yes — an unnamed first-person
+ * narrator with a presence throughout is the story's centre, not an artefact of
+ * the reading. Deciding that in code meant the one character the writer most
+ * wanted profiled could not be.
  *
- * A first-person narrator who is also in the story is named — Pip, Nick, Ishmael
- * — and passes through this untouched. Only the bare role words are caught.
+ * What is left is only what could never name anybody: a reader's non-answer.
+ * Everything else is the writer's call, and there is now a control for it — see
+ * the excluded_characters table, which records that judgment per manuscript and
+ * survives re-reads.
  */
-const NOT_A_CHARACTER = new Set([
-  "narrator",
-  "the narrator",
-  "narration",
-  "narrative voice",
-  "the author",
-  "author",
-  "the reader",
-  "reader",
-  "unnamed narrator",
-  "first-person narrator",
-  "omniscient narrator",
-  "the omniscient narrator",
-  "third-person narrator",
-  "unknown",
-  "none",
-  "n/a",
-]);
+const NOT_A_CHARACTER = new Set(["unknown", "none", "n/a", "na", "-", "unnamed", "nobody"]);
 
 function isRealCharacter(name: string): boolean {
   return !NOT_A_CHARACTER.has(name.trim().toLowerCase());
