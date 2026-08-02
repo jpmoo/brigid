@@ -162,6 +162,13 @@ export function mergeDigests(parts: SectionDigest[]): SectionDigest {
       }
       held.actions = [...held.actions, ...(character.actions ?? [])];
       held.aliases = dedupe([...(held.aliases ?? []), ...(character.aliases ?? [])]);
+      /**
+       * No longer gathered, but still merged. A section long enough to be read
+       * in parts is merged here, and a digest written before these fields were
+       * dropped would lose half its record if only the new fields survived.
+       */
+      held.wants = dedupe([...(held.wants ?? []), ...(character.wants ?? [])]);
+      held.relations = [...(held.relations ?? []), ...(character.relations ?? [])];
       held.traits = dedupe([...(held.traits ?? []), ...(character.traits ?? [])]);
     }
     events.push(...(part.events ?? []));
