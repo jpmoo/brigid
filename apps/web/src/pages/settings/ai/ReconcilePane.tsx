@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, ChevronRight, RotateCcw, Trash2, Users } from "lucide-react";
+import { foldName } from "@brigid/shared";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
 
@@ -89,7 +90,9 @@ export function ReconcilePane({
     const by = new Map<string, { name: string; pending: CastRow[]; committed: CastRow[] }>();
     for (const row of rows) {
       if (row.state === "dropped") continue;
-      const key = row.characterName.trim().toLowerCase();
+      // Folded, as the roster folds: otherwise "Brother Tuan" and "Tuan"
+      // sit in two groups here and one everywhere else.
+      const key = foldName(row.characterName);
       const held = by.get(key) ?? { name: row.characterName.trim(), pending: [], committed: [] };
       // A draft may have moved this row to someone else since it loaded.
       if (row.state === "pending") held.pending.push(row);
@@ -135,7 +138,7 @@ export function ReconcilePane({
       const settled = draft[row.id];
       if (settled?.drop) continue;
       const name = (settled?.characterName ?? row.characterName).trim();
-      const key = name.toLowerCase();
+      const key = foldName(name);
       const held = tally.get(key) ?? { name, actions: 0, sections: new Set<string>() };
       if ((settled?.action ?? row.action).trim()) held.actions += 1;
       held.sections.add(row.blockId);
@@ -510,12 +513,17 @@ export function ReconcilePane({
 
       {thin.length > 0 ? (
         <>
-          <h6 className="cast-axes-head">Too little to profile</h6>
+          <h6 className="cast-axes-head">Not enough yet to profile</h6>
           <p className="tpl-note">
-            The rubric wants citable events for any score above 1, so these would only
-            ever produce a flat chart. Nothing to do about them &mdash; a walk-on with two
-            lines is a true finding about the book, not an omission. They simply
-            won&rsquo;t be profiled.
+            The rubric wants citable events for any score above 1, so on this much these
+            would only produce a flat chart. They stay in the queue above and keep
+            collecting: later sections may bring more, and moving their actions to the
+            character they belong to may be all it takes &mdash; two of these are often
+            one person the reading named twice.
+          </p>
+          <p className="tpl-note">
+            Some are genuinely walk-ons, and that is a true finding about the book rather
+            than an omission. Those simply won&rsquo;t be profiled, and need nothing done.
           </p>
           <p className="rec-thin">
             {thin

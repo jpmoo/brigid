@@ -294,3 +294,164 @@ export interface IdentityProposal {
   groups: IdentityGroup[];
   suspects: IdentitySuspect[];
 }
+
+/**
+ * Words that only ever count or point, and never identify.
+ *
+ * A digest naming the same people twice is the commonest way the roster grows a
+ * duplicate: one section writes "Two French brothers", the next writes "French
+ * brothers", and they arrive as two characters with half a record each. Folding
+ * these off the front settles it.
+ *
+ * Deliberately short, and deliberately not including honorifics. Dropping "Mr"
+ * would fold Mr Bennet and Mrs Bennet into one person, which is a far worse
+ * error than the one being fixed — a duplicate is untidy, a merge is wrong.
+ */
+const LEADING_NOISE = new Set([
+  "a",
+  "an",
+  "the",
+  "some",
+  "several",
+  "many",
+  "few",
+  "both",
+  "two",
+  "three",
+  "four",
+  "five",
+  "six",
+  "seven",
+  "eight",
+  "nine",
+  "ten",
+  "another",
+  "other",
+  "various",
+  "assorted",
+  "unnamed",
+  "unknown",
+]);
+
+/**
+ * The key two spellings of one name have in common.
+ *
+ * Lowercased, stripped of punctuation, and with counting words taken off the
+ * front. Conservative on purpose: it merges what is plainly the same phrase and
+ * leaves anything else alone.
+ */
+export function foldName(name: string): string {
+  const words = name
+    .toLowerCase()
+    .replace(/[.,''"()\[\]]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  let start = 0;
+  while (start < words.length - 1 && LEADING_NOISE.has(words[start]!)) start += 1;
+
+  return words.slice(start).join(" ");
+}
+
+/**
+ * Titles that sit in front of a name.
+ *
+ * These cannot be stripped blindly. "Mr Bennet" and "Mrs Bennet" fold to the
+ * same thing and are two people, and merging them corrupts both profiles — far
+ * worse than leaving a duplicate. So they are stripped only where the roster
+ * itself shows it is safe: see `mergeTitled`.
+ */
+const TITLES = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "miss",
+  "master",
+  "sir",
+  "lady",
+  "lord",
+  "dame",
+  "dr",
+  "doctor",
+  "prof",
+  "professor",
+  "rev",
+  "reverend",
+  "father",
+  "mother",
+  "brother",
+  "sister",
+  "saint",
+  "st",
+  "captain",
+  "capt",
+  "colonel",
+  "col",
+  "major",
+  "general",
+  "lieutenant",
+  "lt",
+  "sergeant",
+  "sgt",
+  "admiral",
+  "king",
+  "queen",
+  "prince",
+  "princess",
+  "duke",
+  "duchess",
+  "count",
+  "countess",
+  "baron",
+  "uncle",
+  "aunt",
+  "cousin",
+  "old",
+  "young",
+]);
+
+/** The name with any leading title removed, or null if there wasn't one. */
+export function withoutTitle(folded: string): string | null {
+  const words = folded.split(" ");
+  if (words.length < 2 || !TITLES.has(words[0]!)) return null;
+  return words.slice(1).join(" ");
+}
+
+/**
+ * Fold "Brother Tuan" into "Tuan" — but only when that is demonstrably safe.
+ *
+ * The test is the roster itself. If exactly one titled form reduces to a given
+ * bare name, the two are the same person and are merged. If two do — Mr Bennet
+ * and Mrs Bennet both reducing to "bennet" — the title is the only thing
+ * telling them apart, so nothing is touched.
+ *
+ * This is why it runs after the roster is built rather than inside the fold: it
+ * is a question about the cast, and a string on its own cannot answer it.
+ */
+export function mergeTitled(byKey: Map<string, RosterEntry>): void {
+  const reducesTo = new Map<string, string[]>();
+  for (const key of byKey.keys()) {
+    const bare = withoutTitle(key);
+    if (!bare) continue;
+    reducesTo.set(bare, [...(reducesTo.get(bare) ?? []), key]);
+  }
+
+  for (const [bare, titled] of reducesTo) {
+    // Only when the bare name is itself in the cast, and only one title claims
+    // it. Two claimants means the title is load-bearing.
+    if (titled.length !== 1) continue;
+    const host = byKey.get(bare);
+    const held = byKey.get(titled[0]!);
+    if (!host || !held) continue;
+
+    host.sections += held.sections;
+    host.actions += held.actions;
+    host.span.first = Math.min(host.span.first, held.span.first);
+    host.span.last = Math.max(host.span.last, held.span.last);
+    for (const alias of [held.name, ...held.aliases]) {
+      if (!host.aliases.includes(alias) && alias !== host.name) host.aliases.push(alias);
+    }
+    byKey.delete(titled[0]!);
+  }
+}
+
