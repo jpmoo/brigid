@@ -393,6 +393,7 @@ export function ReconcilePane({
 
                       </td>
                       <td className="rec-cell-to">
+                        <div className="rec-to-inner">
                         <select
                           value={d.characterName}
                           disabled={d.drop}
@@ -418,6 +419,7 @@ export function ReconcilePane({
                         >
                           <Trash2 size={13} />
                         </button>
+                        </div>
                       </td>
                     </tr>
                   );

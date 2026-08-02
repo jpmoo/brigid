@@ -4588,14 +4588,7 @@ mark.hit.active {
   padding: 0 0 10px 22px;
 }
 
-.rec-row {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px 12px;
-  align-items: start;
-  padding: 8px 0;
-  border-top: 1px dashed var(--border);
-}
+
 
 /* A row on its way out stays legible but stops looking like a decision
    still to be made. */
@@ -4605,13 +4598,7 @@ mark.hit.active {
   text-decoration: line-through;
 }
 
-.rec-at {
-  grid-column: 1 / -1;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
+
 
 .rec-action {
   width: 100%;
@@ -4628,18 +4615,7 @@ mark.hit.active {
   color: var(--text-faint);
 }
 
-.rec-controls {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.rec-controls select {
-  width: auto;
-  max-width: 190px;
-  padding: 6px 9px;
-  font-size: 13px;
-}
 
 .rec-drop {
   display: grid;
@@ -4708,20 +4684,7 @@ mark.hit.active {
   font-weight: 600;
 }
 
-/* The tick sits with the section label rather than in a column of its own —
-   the label is the row's handle, so they belong together. */
-.rec-pick {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 0;
-  cursor: pointer;
-}
 
-.rec-pick .rec-at {
-  grid-column: auto;
-}
 
 /* Thrown-out lines, kept so they can be put back. Set quiet — they are not
    asking anything, they are only available. */
@@ -4798,40 +4761,6 @@ mark.hit.active {
   border-collapse: collapse;
 }
 
-.rec-table td {
-  padding: 7px 8px 7px 0;
-  border-top: 1px dashed var(--border);
-  vertical-align: top;
-}
-
-.rec-cell-pick {
-  width: 22px;
-  padding-top: 12px;
-}
-
-.rec-cell-at {
-  width: 1%;
-  white-space: nowrap;
-  padding-top: 12px;
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.rec-cell-action {
-  width: 100%;
-}
-
-.rec-cell-to {
-  width: 1%;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding-top: 8px;
-}
-
 /* --- Talking about the manuscript ---------------------------------------- */
 
 .chat-log {
@@ -4897,4 +4826,81 @@ mark.hit.active {
 .chat-ask textarea {
   flex: 1;
   resize: vertical;
+}
+
+/* --- The queue table, laid out as a table -------------------------------- */
+
+/* Written after the block layout it replaced, and deliberately restating the
+   whole row: a `tr` inheriting `display: grid` from the earlier version stops
+   being a table row at all, which is what wrapped every cell onto its own line. */
+.rec-table tr.rec-row {
+  display: table-row;
+}
+
+.rec-table td {
+  padding: 6px 10px 6px 0;
+  border-top: 1px dashed var(--border);
+  vertical-align: middle;
+}
+
+.rec-table tr:first-child td {
+  border-top: 0;
+}
+
+.rec-cell-pick {
+  width: 24px;
+  padding-left: 2px;
+}
+
+/* The section, set small and kept on one line so the sentence beside it gets
+   the width. */
+.rec-cell-at {
+  width: 1%;
+  white-space: nowrap;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.rec-cell-action {
+  width: 100%;
+}
+
+/* One line unless it needs two. These are single sentences, and a two-row box
+   around each of forty of them is most of a screen spent on nothing. */
+.rec-cell-action .rec-action {
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 9px;
+  font-size: 13.5px;
+  line-height: 1.4;
+  resize: vertical;
+  field-sizing: content;
+}
+
+.rec-cell-to {
+  width: 1%;
+  white-space: nowrap;
+}
+
+/* The flex lives on a wrapper, not on the cell: `display: flex` on a `td`
+   takes it out of the table and the column stops aligning with its neighbours. */
+.rec-to-inner {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-to-inner select {
+  width: auto;
+  min-width: 130px;
+  max-width: 180px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.rec-row.dropped .rec-action {
+  opacity: 0.4;
+  text-decoration: line-through;
 }
