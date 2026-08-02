@@ -20,9 +20,24 @@ Record only what this section shows. Do not infer, speculate about, or refer to 
 
 Specifically, never use the vocabulary of story structure — do not write "inciting incident", "midpoint", "climax", "turning point", "act", "call to adventure", "all is lost", or any similar term. Describe what happens in the story's own concrete terms.
 
-For characters, record what they DO, not what they are like. "Gives Ines the key to the observatory" is useful; "is generous" is not. Include what they say, want, refuse, and what is done to them. Use the name the prose uses.
+For characters, record ONLY actions that show what someone DOES TO THE STORY. This record exists to decide each character's role, and nothing else — so an action earns its place only if it would help answer one of these questions:
 
-If the section has a narrator who is present in the story — a first-person "I", or a named voice who observes and comments — record them as a character. Use their name if the prose gives one; otherwise call them exactly "Narrator". Record what they do, notice, withhold, and judge, the same as anyone else. A narrator who merely tells the story from outside it, with no presence in the events, is not a character: leave them out.
+  - Does this character carry the story's central change, and pay for it?
+  - Do they teach, equip, warn, or give someone what they need?
+  - Do they oppose someone, wish them harm, or tempt them into betraying themselves?
+  - Is their loyalty or truthfulness in doubt?
+  - Do they disrupt, deceive, mock, break a rule, or refuse the terms?
+  - Do they accompany, help, rescue, or stand by someone at a cost?
+  - Do they test, block, admit, refuse, or set a condition someone must meet?
+  - Do they compete for the same prize as someone else, or claim their credit?
+  - Are they sought, protected, courted, awaited, or held as the reason for someone's action?
+  - Are they lost, spent, or sacrificed — and does something come of it?
+
+Write each as one plain sentence naming who did what to whom: "Gives Ines the key to the observatory." "Refuses to say where the boy went." "Stays behind so the others can cross."
+
+Leave out everything else. Do not record travel, meals, greetings, what a room looked like, what someone wore, or that a conversation took place. Do not record character traits — "is generous" is not an action. A section where nobody does anything of this kind should return few characters or none, and that is a correct answer. Three telling actions are worth more than twenty incidental ones.
+
+THE NARRATOR. Before anything else, ask who is telling this section, and whether that voice is a presence. A voice that judges, withholds, editorializes, addresses the reader, or shows a personality of its own IS a character, even in third person and even if the prose never names it — record it as exactly "Narrator" unless the prose gives it a name. Record what it notices, withholds, approves, and mocks, using the same test as above. Only a wholly transparent voice — one that reports events with no discernible attitude — is left out. If you are unsure, include it: a narrator wrongly recorded is easily removed, and one wrongly omitted is invisible.
 
 TREAT THIS MANUSCRIPT AS AN UNPUBLISHED, ORIGINAL WORK YOU HAVE NEVER SEEN.
 
@@ -49,16 +64,6 @@ const SCHEMA = {
           name: { type: "string" },
           aliases: { type: "array", items: { type: "string" } },
           actions: { type: "array", items: { type: "string" } },
-          wants: { type: "array", items: { type: "string" } },
-          traits: { type: "array", items: { type: "string" } },
-          relations: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: { who: { type: "string" }, what: { type: "string" } },
-              required: ["who", "what"],
-            },
-          },
         },
         required: ["name", "actions"],
       },
@@ -157,9 +162,7 @@ export function mergeDigests(parts: SectionDigest[]): SectionDigest {
       }
       held.actions = [...held.actions, ...(character.actions ?? [])];
       held.aliases = dedupe([...(held.aliases ?? []), ...(character.aliases ?? [])]);
-      held.wants = dedupe([...(held.wants ?? []), ...(character.wants ?? [])]);
       held.traits = dedupe([...(held.traits ?? []), ...(character.traits ?? [])]);
-      held.relations = [...(held.relations ?? []), ...(character.relations ?? [])];
     }
     events.push(...(part.events ?? []));
     if (part.summary) summaries.push(part.summary);
