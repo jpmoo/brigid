@@ -164,12 +164,20 @@ export function ReconcilePane({
     setBusy(true);
     setError(null);
     try {
-      const decisions = Object.entries(draft).map(([id, d]) => ({
-        id,
-        characterName: d.characterName,
-        action: d.action,
-        drop: d.drop,
-      }));
+      /**
+       * Only what is selected. Settling a queue of hundreds is done in
+       * sittings, and a Commit that swept in every row the writer had merely
+       * scrolled past would make the gate meaningless — the whole point is that
+       * nothing is committed by omission.
+       */
+      const decisions = [...picked]
+        .map((id) => {
+          const d = draft[id];
+          return d
+            ? { id, characterName: d.characterName, action: d.action, drop: d.drop }
+            : null;
+        })
+        .filter((d): d is NonNullable<typeof d> => d !== null);
       const { affected } = await api.commitCast(workId, decisions);
       await load();
       onCommitted(affected);
@@ -184,7 +192,7 @@ export function ReconcilePane({
 
   const waiting = rows.filter((r) => r.state === "pending").length;
   const binned = rows.filter((r) => r.state === "dropped");
-  const dropping = Object.values(draft).filter((d) => d.drop).length;
+  const droppingPicked = [...picked].filter((id) => draft[id]?.drop).length;
 
   return (
     <>
@@ -201,7 +209,8 @@ export function ReconcilePane({
             {waiting} {waiting === 1 ? "action" : "actions"} to review
           </strong>{" "}
           &mdash; move any to whoever actually did it, reword it, or throw it out.
-          Nothing is profiled until this is committed.
+          Tick what you have settled and commit it; the rest waits. Nothing is
+          profiled while anything here is still outstanding.
         </p>
       )}
 
@@ -291,7 +300,7 @@ export function ReconcilePane({
                         : { ...held, characterName: confirming.to!, drop: false };
                   }
                   setDraft(next);
-                  setPicked(new Set());
+                  // Kept: the batch marks what to do, Commit is what does it.
                   setConfirming(null);
                 }}
               >
@@ -519,14 +528,21 @@ export function ReconcilePane({
 
       {waiting > 0 ? (
         <div className="be-line" style={{ marginTop: 14 }}>
-          <button className="btn" type="button" disabled={busy} onClick={() => void commit()}>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy || picked.size === 0}
+            onClick={() => void commit()}
+          >
             <Check size={14} />
-            {busy ? "Committing…" : `Commit ${waiting} ${waiting === 1 ? "action" : "actions"}`}
+            {busy
+              ? "Committing…"
+              : picked.size === 0
+                ? "Select what to commit"
+                : `Commit ${picked.size} ${picked.size === 1 ? "action" : "actions"}`}
           </button>
-          {dropping > 0 ? (
-            <span className="muted">
-              {dropping} will be thrown out.
-            </span>
+          {droppingPicked > 0 ? (
+            <span className="muted">{droppingPicked} of them will be thrown out.</span>
           ) : null}
         </div>
       ) : null}
