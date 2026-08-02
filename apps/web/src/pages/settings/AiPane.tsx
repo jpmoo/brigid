@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   Maximize2,
   Play,
+  Square,
   UserX,
   X,
   RefreshCw,
@@ -147,7 +148,7 @@ export function AiPane({ workId }: { workId: string }) {
 
   return (
     <div className="tpl-detail">
-      <ReadingState progress={progress} />
+      <ReadingState progress={progress} workId={workId} onChanged={() => void reload()} />
 
       {progress.ready ? (
         <>
@@ -304,13 +305,54 @@ function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void
 }
 
 /** How far the reading has got. */
-function ReadingState({ progress }: { progress: AnalysisBundle["progress"] }) {
+function ReadingState({
+  progress,
+  workId,
+  onChanged,
+}: {
+  progress: AnalysisBundle["progress"];
+  workId: string;
+  onChanged: () => void;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const control = async (action: "stop" | "resume" | "restart") => {
+    setBusy(true);
+    try {
+      await api.controlDigest(workId, action);
+      setConfirming(false);
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (progress.total === 0) {
     return (
       <p className="tpl-note">
         There is nothing written to read yet. Once the manuscript has some prose in it,
         Brigid will read it in the background and the tools here will open.
       </p>
+    );
+  }
+
+  if (progress.status === "stopped") {
+    return (
+      <>
+        <h4 className="tpl-section">Reading stopped</h4>
+        <p className="tpl-note">
+          {progress.done} of {progress.total} sections were read before this was stopped.
+          Nothing has been lost &mdash; carrying on picks up at the next unread section.
+        </p>
+        <div className="be-line">
+          <button className="btn" type="button" disabled={busy} onClick={() => void control("resume")}>
+            <Play size={14} />
+            Carry on reading
+          </button>
+          <RestartReading busy={busy} confirming={confirming} setConfirming={setConfirming} onRestart={() => void control("restart")} />
+        </div>
+      </>
     );
   }
 
@@ -343,12 +385,56 @@ function ReadingState({ progress }: { progress: AnalysisBundle["progress"] }) {
         analyses open when it finishes. You can carry on writing.
       </p>
 
+      <div className="be-line" style={{ marginTop: 8 }}>
+        <button className="btn secondary" type="button" disabled={busy} onClick={() => void control("stop")}>
+          <Square size={14} />
+          Stop reading
+        </button>
+        <RestartReading busy={busy} confirming={confirming} setConfirming={setConfirming} onRestart={() => void control("restart")} />
+      </div>
+
       {progress.status === "failed" && progress.lastError ? (
         <div className="alert error">
           <AlertTriangle size={14} /> The reading stopped: {progress.lastError}. It will try
           again shortly.
         </div>
       ) : null}
+    </>
+  );
+}
+
+/**
+ * Starting over throws away everything read so far, so it asks first — but
+ * inline rather than in a dialog. It is undone by waiting, not by a restore,
+ * and the cost is time rather than work.
+ */
+function RestartReading({
+  busy,
+  confirming,
+  setConfirming,
+  onRestart,
+}: {
+  busy: boolean;
+  confirming: boolean;
+  setConfirming: (v: boolean) => void;
+  onRestart: () => void;
+}) {
+  if (!confirming) {
+    return (
+      <button className="btn ghost" type="button" disabled={busy} onClick={() => setConfirming(true)}>
+        Start over
+      </button>
+    );
+  }
+  return (
+    <>
+      <span className="muted">Throw away what has been read and start again?</span>
+      <button className="btn danger" type="button" disabled={busy} onClick={onRestart}>
+        {busy ? "Starting…" : "Yes, start over"}
+      </button>
+      <button className="btn ghost" type="button" disabled={busy} onClick={() => setConfirming(false)}>
+        Keep it
+      </button>
     </>
   );
 }

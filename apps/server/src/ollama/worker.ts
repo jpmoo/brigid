@@ -167,6 +167,14 @@ async function setState(
  * from a busy one and slow down accordingly.
  */
 async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
+  // Called off by the writer. Nothing is undone; it simply stops being read.
+  const [calledOff] = await db
+    .select({ status: digestState.status })
+    .from(digestState)
+    .where(eq(digestState.workId, workId))
+    .limit(1);
+  if (calledOff?.status === "stopped") return false;
+
   const config = await reader();
   if (!config) return false;
 

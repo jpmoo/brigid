@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { settings } from "@brigid/db";
+import { digestState, sectionDigests, settings } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest } from "../lib/errors.js";
@@ -135,6 +135,49 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
       progress: await progressOf(workId),
       sections: await placedDigests(workId),
     };
+  });
+
+  /**
+   * Call the reading off, or set it going again.
+   *
+   * Stopping keeps every section already read. Starting over throws them away
+   * first, which is what makes it the right answer after a prompt or model
+   * change — half a book read one way and half the other is not a reading
+   * anyone should judge a manuscript from.
+   */
+  app.post("/works/:workId/digest/:action", async (req) => {
+    requireUser(req);
+    const { workId, action } = z
+      .object({
+        workId: z.string().uuid(),
+        action: z.enum(["stop", "resume", "restart"]),
+      })
+      .parse(req.params);
+
+    if (action === "restart") {
+      await db.transaction(async (tx) => {
+        await tx.delete(sectionDigests).where(eq(sectionDigests.workId, workId));
+        await tx
+          .insert(digestState)
+          .values({ workId, status: "idle", lastError: null, updatedAt: new Date() })
+          .onConflictDoUpdate({
+            target: digestState.workId,
+            set: { status: "idle", lastError: null, startedAt: null, finishedAt: null, updatedAt: new Date() },
+          });
+      });
+      return { progress: await progressOf(workId) };
+    }
+
+    const status = action === "stop" ? ("stopped" as const) : ("idle" as const);
+    await db
+      .insert(digestState)
+      .values({ workId, status, updatedAt: new Date() })
+      .onConflictDoUpdate({
+        target: digestState.workId,
+        set: { status, lastError: null, updatedAt: new Date() },
+      });
+
+    return { progress: await progressOf(workId) };
   });
 
   app.patch("/ollama", async (req) => {

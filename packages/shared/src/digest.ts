@@ -99,7 +99,7 @@ export interface PlacedDigest extends SectionDigest {
 
 /** How far along the walk is, for a work. */
 export interface DigestProgress {
-  status: "idle" | "walking" | "failed";
+  status: "idle" | "walking" | "failed" | "stopped";
   /** Sections whose digest matches their current prose and current model. */
   done: number;
   /** Sections that need reading at all. */

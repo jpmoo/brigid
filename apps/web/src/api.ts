@@ -520,6 +520,9 @@ export const api = {
       `/works/${workId}/analysis/character`,
       body,
     ),
+  /** Stop the reading, set it going again, or throw it away and start over. */
+  controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
+    post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
   /** Where a non-character's recorded actions belong. A proposal only. */
   proposeReassignment: (workId: string, name: string) =>
     post<{ proposal: ReassignProposal; ms: number }>(`/works/${workId}/analysis/reassign`, { name }),

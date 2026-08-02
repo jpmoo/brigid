@@ -303,7 +303,7 @@ export const digestState = pgTable("digest_state", {
   workId: uuid("work_id")
     .primaryKey()
     .references(() => works.id, { onDelete: "cascade" }),
-  status: text("status").$type<"idle" | "walking" | "failed">().notNull().default("idle"),
+  status: text("status").$type<"idle" | "walking" | "failed" | "stopped">().notNull().default("idle"),
   lastError: text("last_error"),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
