@@ -7,7 +7,6 @@ import {
   Maximize2,
   Play,
   Square,
-  UserX,
   Users,
   X,
   RefreshCw,
@@ -25,7 +24,6 @@ import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
-import { ReassignDialog } from "./ai/ReassignDialog.js";
 import { IdentityDialog } from "./ai/IdentityDialog.js";
 import { ReconcilePane } from "./ai/ReconcilePane.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
@@ -94,43 +92,6 @@ export function AiPane({ workId }: { workId: string }) {
     }
   }
 
-  /**
-   * One character, done again. A single model call rather than the whole cast,
-   * because the reading it works from is already there.
-   */
-  async function rerunOne(name: string) {
-    setError(null);
-    try {
-      await api.runCharacterAnalysis(workId, { name });
-      await reload();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : `could not queue ${name}`);
-    }
-  }
-
-  /**
-   * A profile thrown away. No confirmation: the reading stays, so putting it
-   * back is one call — nothing like the cost of clearing everything, and a
-   * dialog for it would be theatre.
-   */
-  async function dismissOne(name: string) {
-    setError(null);
-    try {
-      await api.dismissCharacter(workId, name);
-      await reload();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : `could not dismiss ${name}`);
-    }
-  }
-
-  /**
-   * Not a person at all — a crowd, a ship, a title read as a name.
-   *
-   * Recorded against the manuscript rather than acted on once, because the
-   * walker re-reads changed sections and would otherwise put it back every time
-   * its chapter was edited.
-   */
-  const [ruling, setRuling] = useState<string | null>(null);
   const [reconciling, setReconciling] = useState(false);
 
   async function cancel() {
@@ -196,9 +157,6 @@ export function AiPane({ workId }: { workId: string }) {
               busy={busy === "characters"}
               onRun={() => void start("characters")}
               onCancel={() => void cancel()}
-              onRerun={rerunOne}
-              onDismiss={dismissOne}
-              onNotACharacter={setRuling}
               onReconcile={() => setReconciling(true)}
               workId={workId}
               pending={bundle.pendingActions}
@@ -207,19 +165,6 @@ export function AiPane({ workId }: { workId: string }) {
           ) : (
             <RawPane workId={workId} />
           )}
-
-          {ruling ? (
-            <ReassignDialog
-              workId={workId}
-              name={ruling}
-              cast={bundle.roster.filter((r) => r.name !== ruling).map((r) => r.name)}
-              onClose={() => setRuling(null)}
-              onApplied={() => {
-                setRuling(null);
-                void reload();
-              }}
-            />
-          ) : null}
 
           {reconciling ? (
             <IdentityDialog
@@ -671,9 +616,6 @@ function CharactersPane({
   busy,
   onRun,
   onCancel,
-  onRerun,
-  onDismiss,
-  onNotACharacter,
   onReconcile,
   workId,
   pending,
@@ -685,9 +627,6 @@ function CharactersPane({
   busy: boolean;
   onRun: () => void;
   onCancel: () => void;
-  onRerun: (name: string) => Promise<void>;
-  onDismiss: (name: string) => Promise<void>;
-  onNotACharacter: (name: string) => void;
   onReconcile: () => void;
   workId: string;
   pending: number;

@@ -12,8 +12,6 @@ import type {
   BlockOptions,
   PlacedDigest,
   IdentityProposal,
-  ReassignMove,
-  ReassignProposal,
   RosterEntry,
   StructureAnalysis,
   TemplateBody,
@@ -560,15 +558,6 @@ export const api = {
   applyIdentities: (workId: string, groups: { canonical: string; names: string[] }[]) =>
     post<{ ok: true; reprofiling: string[] }>(`/works/${workId}/analysis/identities/apply`, {
       groups,
-    }),
-  /** Where a non-character's recorded actions belong. A proposal only. */
-  proposeReassignment: (workId: string, name: string) =>
-    post<{ proposal: ReassignProposal; ms: number }>(`/works/${workId}/analysis/reassign`, { name }),
-  /** Approve it: rewrites the reading and re-profiles whoever gained actions. */
-  applyReassignment: (workId: string, name: string, moves: ReassignMove[]) =>
-    post<{ ok: true; reprofiling: string[] }>(`/works/${workId}/analysis/reassign/apply`, {
-      name,
-      moves,
     }),
   /** Rule that an entry is not a character. Survives re-reads of its section. */
   notACharacter: (workId: string, name: string) =>
