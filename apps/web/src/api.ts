@@ -518,6 +518,9 @@ export const api = {
       `/works/${workId}/analysis/character`,
       body,
     ),
+  /** Everything AI-derived, the reading included. The prose is untouched. */
+  clearAllAnalysis: (workId: string) =>
+    request<{ ok: true }>(`/works/${workId}/analysis?everything=true`, { method: "DELETE" }),
   cancelCharacterRun: (workId: string) =>
     request<{ progress: CharacterRunProgress | null }>(
       `/works/${workId}/analysis/characters/run`,

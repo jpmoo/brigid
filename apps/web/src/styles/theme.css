@@ -4428,3 +4428,25 @@ mark.hit.active {
 .cast-axis-score.s1 {
   opacity: 0.55;
 }
+
+/* Clearing everything the model has made. Set below the tabs and shut by
+   default: it is a rare thing to want and an expensive one to do by accident. */
+.ai-clear {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-clear-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.ai-clear-head[aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}

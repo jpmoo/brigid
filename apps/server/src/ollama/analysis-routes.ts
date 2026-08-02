@@ -2,7 +2,15 @@ import { createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { analyses, settings, works } from "@brigid/db";
+import {
+  analyses,
+  characterRuns,
+  digestState,
+  sectionDigests,
+  settings,
+  structureRuns,
+  works,
+} from "@brigid/db";
 import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
@@ -303,12 +311,38 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   app.delete("/works/:workId/analysis", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const { kind } = z
-      .object({ kind: z.enum(["structure", "character"]).optional() })
+    const { kind, everything } = z
+      .object({
+        kind: z.enum(["structure", "character"]).optional(),
+        everything: z.enum(["true", "false"]).optional(),
+      })
       .parse(req.query ?? {});
+
+    /**
+     * Everything AI-derived, including the reading itself.
+     *
+     * Done in one transaction, because a half-cleared manuscript is worse than
+     * either state: the digest gone and the findings left would leave reports
+     * on the page with nothing behind them. Queued runs are stopped in the same
+     * breath, or a worker mid-sweep would write a profile back into a
+     * manuscript that was just cleared.
+     *
+     * The prose is untouched. The walker will read it again from scratch.
+     */
+    if (everything === "true") {
+      await db.transaction(async (tx) => {
+        await tx.delete(analyses).where(eq(analyses.workId, workId));
+        await tx.delete(characterRuns).where(eq(characterRuns.workId, workId));
+        await tx.delete(structureRuns).where(eq(structureRuns.workId, workId));
+        await tx.delete(sectionDigests).where(eq(sectionDigests.workId, workId));
+        await tx.delete(digestState).where(eq(digestState.workId, workId));
+      });
+      return { ok: true as const, cleared: "everything" as const };
+    }
+
     await db
       .delete(analyses)
       .where(kind ? and(eq(analyses.workId, workId), eq(analyses.kind, kind)) : eq(analyses.workId, workId));
-    return { ok: true as const };
+    return { ok: true as const, cleared: kind ?? ("findings" as const) };
   });
 }

@@ -22,6 +22,7 @@ import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
+import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
 /**
  * The AI tools for one manuscript.
@@ -154,6 +155,92 @@ export function AiPane({ workId }: { workId: string }) {
           ) : (
             <RawPane workId={workId} />
           )}
+
+          <ClearAll workId={workId} onCleared={() => void reload()} />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Throw away everything the model has produced for this manuscript.
+ *
+ * Held to the same confirmation as deleting a manuscript, because from the
+ * writer's side it costs the same thing: hours of a machine's work, and no way
+ * back except doing it again. The prose is never touched — but saying so is
+ * part of the control, since "clear all AI results" sitting under a manuscript
+ * is a sentence worth being unambiguous about.
+ */
+function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [understood, setUnderstood] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function clear() {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.clearAllAnalysis(workId);
+      setOpen(false);
+      setUnderstood(false);
+      onCleared();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not clear it");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="ai-clear">
+      <button
+        type="button"
+        className="ai-clear-head"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
+        <span className="thin-title">Clear all AI results</span>
+      </button>
+
+      {open ? (
+        <>
+          <p className="tpl-note">
+            Throws away the reading of this manuscript and every analysis built from it
+            &mdash; the story shape, every character profile, and the collected digest.
+            Brigid will start reading the manuscript again from the beginning, which takes
+            as long as it did the first time.
+          </p>
+          <p className="tpl-note">
+            <strong>Your writing is not touched.</strong> This only clears what the model
+            produced.
+          </p>
+
+          {error ? <div className="alert error">{error}</div> : null}
+
+          <label className="check bk-understood">
+            <input
+              type="checkbox"
+              checked={understood}
+              onChange={(e) => setUnderstood(e.target.checked)}
+            />
+            <span>
+              I understand this cannot be undone, and the manuscript will have to be read
+              again.
+            </span>
+          </label>
+
+          <div className="be-line">
+            <HoldToConfirm
+              seconds={3}
+              disabled={!understood || busy}
+              label={busy ? "Clearing…" : "Hold to clear"}
+              holdingLabel="Keep holding to clear…"
+              onConfirm={() => void clear()}
+            />
+          </div>
         </>
       ) : null}
     </div>
