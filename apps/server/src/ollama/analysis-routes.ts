@@ -10,12 +10,13 @@ import {
   settings,
   structureRuns,
   works,
+  excludedCharacters,
 } from "@brigid/db";
 import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { analyseStructure, buildRoster } from "./analysis.js";
+import { analyseStructure, buildRoster, foldName } from "./analysis.js";
 import {
   cancelCharacterRun,
   characterProgressOf,
@@ -178,6 +179,15 @@ async function store(
   });
 }
 
+/** The folded names this manuscript's writer has ruled are not characters. */
+async function exclusionsFor(workId: string): Promise<string[]> {
+  const rows = await db
+    .select({ folded: excludedCharacters.nameFolded })
+    .from(excludedCharacters)
+    .where(eq(excludedCharacters.workId, workId));
+  return rows.map((r) => r.folded);
+}
+
 export async function analysisRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
@@ -197,7 +207,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       progress,
       characterRun: await characterProgressOf(workId),
       structureRun: await structureProgressOf(workId),
-      roster: buildRoster(sections),
+      roster: buildRoster(sections, await exclusionsFor(workId)),
       // Labels travel with the findings so the web app doesn't keep a second
       // copy of the frameworks' names that could drift from this one.
       axisLabels: AXIS_LABELS,
@@ -255,7 +265,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const work = await workOr404(workId);
     const config = await reader();
     const sections = await readyDigest(workId);
-    const roster = buildRoster(sections);
+    const roster = buildRoster(sections, await exclusionsFor(workId));
     const judgeable = roster.filter((r) => r.judgeable);
 
     if (judgeable.length === 0) {
@@ -317,6 +327,48 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * The reading is untouched, so re-running is one model call rather than an
    * afternoon.
    */
+  /**
+   * Rule that something the reading called a character is not one.
+   *
+   * Recorded rather than acted on once: the walker re-reads changed sections and
+   * would reintroduce the entry every time its chapter was edited. Its profile
+   * goes with it, since a profile of a crowd is not worth keeping.
+   */
+  app.post("/works/:workId/analysis/not-a-character", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+    await workOr404(workId);
+
+    await db.transaction(async (tx) => {
+      await tx
+        .insert(excludedCharacters)
+        .values({ workId, nameFolded: foldName(name), name: name.trim() })
+        .onConflictDoNothing();
+      await tx
+        .delete(analyses)
+        .where(
+          and(eq(analyses.workId, workId), eq(analyses.kind, "character"), eq(analyses.subject, name)),
+        );
+    });
+    return { ok: true as const };
+  });
+
+  /** Put one back. The name returns on the next read of any section naming it. */
+  app.delete("/works/:workId/analysis/not-a-character/:name", async (req) => {
+    requireUser(req);
+    const { workId, name } = z
+      .object({ workId: z.string().uuid(), name: z.string().min(1) })
+      .parse(req.params);
+    await workOr404(workId);
+    await db
+      .delete(excludedCharacters)
+      .where(
+        and(eq(excludedCharacters.workId, workId), eq(excludedCharacters.nameFolded, foldName(name))),
+      );
+    return { ok: true as const };
+  });
+
   app.delete("/works/:workId/analysis/character/:name", async (req) => {
     requireUser(req);
     const { workId, name } = z

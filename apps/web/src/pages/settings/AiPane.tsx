@@ -6,6 +6,7 @@ import {
   ChevronsUpDown,
   Maximize2,
   Play,
+  UserX,
   X,
   RefreshCw,
 } from "lucide-react";
@@ -117,6 +118,23 @@ export function AiPane({ workId }: { workId: string }) {
     }
   }
 
+  /**
+   * Not a person at all — a crowd, a ship, a title read as a name.
+   *
+   * Recorded against the manuscript rather than acted on once, because the
+   * walker re-reads changed sections and would otherwise put it back every time
+   * its chapter was edited.
+   */
+  async function notACharacter(name: string) {
+    setError(null);
+    try {
+      await api.notACharacter(workId, name);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `could not rule out ${name}`);
+    }
+  }
+
   async function cancel() {
     try {
       await api.cancelCharacterRun(workId);
@@ -182,6 +200,7 @@ export function AiPane({ workId }: { workId: string }) {
               onCancel={() => void cancel()}
               onRerun={rerunOne}
               onDismiss={dismissOne}
+              onNotACharacter={notACharacter}
             />
           ) : (
             <RawPane workId={workId} />
@@ -524,6 +543,7 @@ function CharactersPane({
   onCancel,
   onRerun,
   onDismiss,
+  onNotACharacter,
 }: {
   bundle: AnalysisBundle;
   reports: AnalysisBundle["reports"];
@@ -533,6 +553,7 @@ function CharactersPane({
   onCancel: () => void;
   onRerun: (name: string) => Promise<void>;
   onDismiss: (name: string) => Promise<void>;
+  onNotACharacter: (name: string) => Promise<void>;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
@@ -637,6 +658,15 @@ function CharactersPane({
                         onClick={() => void onRerun(profile.name)}
                       >
                         <RefreshCw size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="cast-tile-tool"
+                        title={`${profile.name} is not a character`}
+                        aria-label={`${profile.name} is not a character`}
+                        onClick={() => void onNotACharacter(profile.name)}
+                      >
+                        <UserX size={13} />
                       </button>
                       <button
                         type="button"

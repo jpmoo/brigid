@@ -232,7 +232,8 @@ function mergeTitled(byKey: Map<string, RosterEntry>): void {
   }
 }
 
-export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
+export function buildRoster(sections: PlacedDigest[], excluded: string[] = []): RosterEntry[] {
+  const ruledOut = new Set(excluded);
   const byKey = new Map<string, RosterEntry>();
   const aliasTo = new Map<string, string>();
 
@@ -244,7 +245,8 @@ export function buildRoster(sections: PlacedDigest[]): RosterEntry[] {
   for (const section of sections) {
     for (const character of section.characters) {
       const key = keyFor(character.name);
-      if (!key || !isRealCharacter(character.name)) continue;
+      // Ruled out by the writer, or a bare role word. Either way, not a person.
+      if (!key || ruledOut.has(key) || !isRealCharacter(character.name)) continue;
 
       // Bind this section's aliases to the identity, so a later section using
       // only the nickname lands on the same person.

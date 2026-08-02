@@ -1,5 +1,6 @@
 import {
   boolean,
+  primaryKey,
   index,
   integer,
   jsonb,
@@ -384,3 +385,24 @@ export const structureRuns = pgTable("structure_runs", {
   finishedAt: timestamp("finished_at", { withTimezone: true }),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Entries the writer has ruled are not characters.
+ *
+ * Recorded rather than acted on once, because the walker re-reads changed
+ * sections and would otherwise reintroduce the same entry every time its
+ * chapter was edited. Folded is what the roster matches on; the raw name is
+ * what the writer actually saw when they ruled.
+ */
+export const excludedCharacters = pgTable(
+  "excluded_characters",
+  {
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    nameFolded: text("name_folded").notNull(),
+    name: text("name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ pk: primaryKey({ columns: [t.workId, t.nameFolded] }) }),
+);

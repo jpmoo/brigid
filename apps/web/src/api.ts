@@ -518,6 +518,9 @@ export const api = {
       `/works/${workId}/analysis/character`,
       body,
     ),
+  /** Rule that an entry is not a character. Survives re-reads of its section. */
+  notACharacter: (workId: string, name: string) =>
+    post<{ ok: true }>(`/works/${workId}/analysis/not-a-character`, { name }),
   /** One character's profile. The reading stays, so a re-run is one call. */
   dismissCharacter: (workId: string, name: string) =>
     request<{ ok: true }>(
