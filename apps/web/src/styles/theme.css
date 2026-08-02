@@ -4971,3 +4971,22 @@ mark.hit.active {
   color: var(--danger, #b3261e);
   border-color: color-mix(in srgb, var(--danger, #b3261e) 45%, var(--border));
 }
+
+/* Characters who cannot be profiled yet, said at the top rather than the
+   bottom: it is a thing to act on while settling, not a footnote after. */
+.rec-thin-panel {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunk, var(--paper));
+}
+
+.rec-thin-badge {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-faint) 15%, transparent);
+  color: var(--text-faint);
+  font-weight: 600;
+  font-size: 11px;
+}

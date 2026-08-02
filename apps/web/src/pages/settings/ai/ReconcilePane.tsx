@@ -92,10 +92,18 @@ export function ReconcilePane({
     const by = new Map<string, { name: string; pending: CastRow[]; committed: CastRow[] }>();
     for (const row of rows) {
       if (row.state === "dropped") continue;
-      // Folded, as the roster folds: otherwise "Brother Tuan" and "Tuan"
-      // sit in two groups here and one everywhere else.
-      const key = foldName(row.characterName);
-      const held = by.get(key) ?? { name: row.characterName.trim(), pending: [], committed: [] };
+      /**
+       * By where the draft puts it, not by where the reading did. Reassigning a
+       * thin character's actions to the person they belong to is how that
+       * person clears the threshold — so the row has to move the moment it is
+       * reassigned, or it would sit in a group that cannot commit it and could
+       * never leave. Folded, as the roster folds, so "Brother Tuan" and "Tuan"
+       * are one group here as they are everywhere else.
+       */
+      const key = foldName(draft[row.id]?.characterName ?? row.characterName);
+      const held =
+        by.get(key) ??
+        { name: (draft[row.id]?.characterName ?? row.characterName).trim(), pending: [], committed: [] };
       // A draft may have moved this row to someone else since it loaded.
       if (row.state === "pending") held.pending.push(row);
       else held.committed.push(row);
@@ -118,7 +126,32 @@ export function ReconcilePane({
           b.pending.length + b.committed.length - (a.pending.length + a.committed.length) ||
           a.name.localeCompare(b.name),
       );
-  }, [rows, order]);
+  }, [rows, order, draft]);
+
+  /**
+   * How many actions each group would have once committed. The threshold is a
+   * property of the whole record, so it is counted here rather than inferred
+   * from whatever is on screen.
+   */
+  const strength = useMemo(() => {
+    const by = new Map<string, { actions: number; sections: Set<string> }>();
+    for (const group of groups) {
+      const held = { actions: 0, sections: new Set<string>() };
+      for (const row of [...group.pending, ...group.committed]) {
+        if (draft[row.id]?.drop) continue;
+        if ((draft[row.id]?.action ?? row.action).trim()) held.actions += 1;
+        held.sections.add(row.blockId);
+      }
+      by.set(foldName(group.name), held);
+    }
+    return by;
+  }, [groups, draft]);
+
+  const tooThin = (name: string): boolean => {
+    const held = strength.get(foldName(name));
+    if (!held) return true;
+    return held.actions < MIN_ACTIONS || held.sections.size < MIN_SECTIONS;
+  };
 
   /** Every name currently in play, for the "move to" menus. */
   const names = useMemo(
@@ -236,6 +269,32 @@ export function ReconcilePane({
         </p>
       )}
 
+      {thin.length > 0 ? (
+        <div className="rec-thin-panel">
+          <h6 className="cast-axes-head" style={{ marginTop: 0, borderTop: 0, paddingTop: 0 }}>
+            Not enough yet to profile
+          </h6>
+          <p className="tpl-note">
+            The rubric wants citable events for any score above 1, so on this much these
+            would only produce a flat chart. They have no tick and cannot be committed
+            &mdash; committing them would settle a record that still cannot be used.
+          </p>
+          <p className="tpl-note">
+            Two things move them off this list. Later sections may bring more. And several
+            of these are usually one person the reading named twice: reassign their actions
+            to whoever they belong to and the row moves into that character straight away,
+            where it can be committed. Genuine walk-ons stay here, which is a true finding
+            about the book rather than an omission.
+          </p>
+          <p className="rec-thin">
+            {thin
+              .sort((a, b) => b.actions - a.actions)
+              .map((t) => `${t.name} (${t.actions})`)
+              .join(", ")}
+          </p>
+        </div>
+      ) : null}
+
       {waiting > 0 ? (
         <div className="rec-bar">
           <label className="check rec-all">
@@ -250,7 +309,13 @@ export function ReconcilePane({
               onChange={(e) =>
                 setPicked(
                   e.target.checked
-                    ? new Set(rows.filter((r) => r.state === "pending").map((r) => r.id))
+                    ? // Select-all means everything that could actually be
+                      // committed, which excludes anyone still too thin.
+                      new Set(
+                        groups
+                          .filter((g) => !tooThin(g.name))
+                          .flatMap((g) => g.pending.map((r) => r.id)),
+                      )
                     : new Set(),
                 )
               }
@@ -376,7 +441,7 @@ export function ReconcilePane({
               {/* Selection is by character: the decision "everything this
                   reading said about Tuan is wrong" is a real one, and far more
                   common than picking rows out of a list at random. */}
-              {group.pending.length > 0 ? (
+              {group.pending.length > 0 && !tooThin(group.name) ? (
                 <input
                   type="checkbox"
                   aria-label={`Select every new action for ${group.name}`}
@@ -417,6 +482,9 @@ export function ReconcilePane({
                     <span className="rec-new">{group.pending.length} new</span>
                   ) : null}
                   {group.committed.length} settled
+                  {tooThin(group.name) ? (
+                    <span className="rec-thin-badge">not enough to profile</span>
+                  ) : null}
                 </span>
               </button>
 
@@ -448,6 +516,7 @@ export function ReconcilePane({
                   return (
                     <tr className={`rec-row${d.drop ? " dropped" : ""}`} key={row.id}>
                       <td className="rec-cell-pick">
+                        {tooThin(group.name) ? null : (
                         <input
                           type="checkbox"
                           aria-label="Select this action"
@@ -459,6 +528,7 @@ export function ReconcilePane({
                             setPicked(next);
                           }}
                         />
+                        )}
                       </td>
                       <td className="rec-cell-at">{labels.get(row.blockId) ?? "section"}</td>
                       <td className="rec-cell-action">
@@ -588,29 +658,6 @@ export function ReconcilePane({
               </li>
             ))}
           </ul>
-        </>
-      ) : null}
-
-      {thin.length > 0 ? (
-        <>
-          <h6 className="cast-axes-head">Not enough yet to profile</h6>
-          <p className="tpl-note">
-            The rubric wants citable events for any score above 1, so on this much these
-            would only produce a flat chart. They stay in the queue above and keep
-            collecting: later sections may bring more, and moving their actions to the
-            character they belong to may be all it takes &mdash; two of these are often
-            one person the reading named twice.
-          </p>
-          <p className="tpl-note">
-            Some are genuinely walk-ons, and that is a true finding about the book rather
-            than an omission. Those simply won&rsquo;t be profiled, and need nothing done.
-          </p>
-          <p className="rec-thin">
-            {thin
-              .sort((a, b) => b.actions - a.actions)
-              .map((t) => `${t.name} (${t.actions})`)
-              .join(", ")}
-          </p>
         </>
       ) : null}
 
