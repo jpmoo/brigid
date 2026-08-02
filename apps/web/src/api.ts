@@ -164,6 +164,18 @@ export interface AnalysisBundle {
   }[];
 }
 
+/** One gathered action, as the reconcile screen shows it. */
+export interface CastRow {
+  id: string;
+  blockId: string;
+  characterName: string;
+  action: string;
+  /** What the reading said, when the writer has changed it. Null when unedited. */
+  originName: string | null;
+  originAction: string | null;
+  state: "pending" | "committed" | "dropped";
+}
+
 export interface OllamaSettings {
   /** The model's full context window, as detected. */
   numCtx?: number | null;
@@ -526,6 +538,21 @@ export const api = {
   /** Stop the reading, set it going again, or throw it away and start over. */
   controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
+  /** Everything gathered, for the reconcile screen. */
+  getCast: (workId: string) =>
+    request<{
+      rows: CastRow[];
+      excluded: string[];
+      sections: { blockId: string; label: string | null; start: number }[];
+    }>(`/works/${workId}/cast`),
+  /** Settle the queue. Returns whose profiles were dropped as a result. */
+  commitCast: (
+    workId: string,
+    decisions: { id: string; characterName?: string; action?: string; drop?: boolean }[],
+  ) =>
+    post<{ ok: true; affected: string[]; pending: number }>(`/works/${workId}/cast/commit`, {
+      decisions,
+    }),
   /** Who in this cast is the same person. A proposal; nothing is written. */
   proposeIdentities: (workId: string) =>
     post<{ proposal: IdentityProposal; ms: number }>(`/works/${workId}/analysis/identities`),

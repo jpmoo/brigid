@@ -27,6 +27,7 @@ import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
 import { ReassignDialog } from "./ai/ReassignDialog.js";
 import { IdentityDialog } from "./ai/IdentityDialog.js";
+import { ReconcilePane } from "./ai/ReconcilePane.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
 /**
@@ -199,6 +200,9 @@ export function AiPane({ workId }: { workId: string }) {
               onDismiss={dismissOne}
               onNotACharacter={setRuling}
               onReconcile={() => setReconciling(true)}
+              workId={workId}
+              pending={bundle.pendingActions}
+              onCommitted={() => void reload()}
             />
           ) : (
             <RawPane workId={workId} />
@@ -671,6 +675,9 @@ function CharactersPane({
   onDismiss,
   onNotACharacter,
   onReconcile,
+  workId,
+  pending,
+  onCommitted,
 }: {
   bundle: AnalysisBundle;
   reports: AnalysisBundle["reports"];
@@ -682,6 +689,9 @@ function CharactersPane({
   onDismiss: (name: string) => Promise<void>;
   onNotACharacter: (name: string) => void;
   onReconcile: () => void;
+  workId: string;
+  pending: number;
+  onCommitted: (affected: string[]) => void;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
@@ -710,11 +720,22 @@ function CharactersPane({
 
   return (
     <>
+      <h4 className="tpl-section">What the reading gathered</h4>
+      <ReconcilePane workId={workId} pending={pending} onCommitted={onCommitted} />
+
+      <h4 className="tpl-section">Profiles</h4>
+      {pending > 0 ? (
+        <p className="tpl-note">
+          Settle the {pending} gathered {pending === 1 ? "action" : "actions"} above first.
+          Profiling before that would score charts on a record you haven&rsquo;t seen.
+        </p>
+      ) : null}
+
       <div className="be-line" style={{ marginTop: 12 }}>
         <button
           className="btn"
           type="button"
-          disabled={busy || working || judgeable.length === 0}
+          disabled={busy || working || pending > 0 || judgeable.length === 0}
           onClick={onRun}
         >
           {profiles.length > 0 ? <RefreshCw size={14} /> : <Play size={14} />}
@@ -783,45 +804,17 @@ function CharactersPane({
                     </div>
                     {/* The whole report needs room the tile hasn't got, so it
                         opens over the page rather than pushing the grid apart. */}
-                    <div className="cast-tile-tools">
-                      <button
-                        type="button"
-                        className="cast-tile-tool"
-                        title={`Profile ${profile.name} again`}
-                        aria-label={`Profile ${profile.name} again`}
-                        disabled={working}
-                        onClick={() => void onRerun(profile.name)}
-                      >
-                        <RefreshCw size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="cast-tile-tool"
-                        title={`${profile.name} is not a character`}
-                        aria-label={`${profile.name} is not a character`}
-                        onClick={() => onNotACharacter(profile.name)}
-                      >
-                        <UserX size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="cast-tile-tool"
-                        title={`Dismiss ${profile.name}'s profile`}
-                        aria-label={`Dismiss ${profile.name}'s profile`}
-                        onClick={() => void onDismiss(profile.name)}
-                      >
-                        <X size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        className="cast-tile-tool"
-                        title={`Open ${profile.name}'s full profile`}
-                        aria-label={`Open ${profile.name}'s full profile`}
-                        onClick={() => setExpanded(profile.name)}
-                      >
-                        <Maximize2 size={14} />
-                      </button>
-                    </div>
+                    {/* One control. Reassigning, dismissing, and ruling out
+                        all happen in reconcile now, where the evidence is. */}
+                    <button
+                      type="button"
+                      className="cast-tile-tool"
+                      title={`Open ${profile.name}'s full profile`}
+                      aria-label={`Open ${profile.name}'s full profile`}
+                      onClick={() => setExpanded(profile.name)}
+                    >
+                      <Maximize2 size={14} />
+                    </button>
                   </div>
 
                   <SpiderGraph

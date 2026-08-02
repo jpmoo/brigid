@@ -4537,3 +4537,144 @@ mark.hit.active {
   line-height: 1.5;
   color: var(--text-muted);
 }
+
+/* --- Settling what the reading gathered ---------------------------------- */
+
+.rec-group {
+  border-top: 1px solid var(--border);
+}
+
+.rec-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rec-head[aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}
+
+.rec-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rec-tally {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* New material is the reason to be on this screen, so it says so. */
+.rec-new {
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.rec-body {
+  padding: 0 0 10px 22px;
+}
+
+.rec-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 12px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px dashed var(--border);
+}
+
+/* A row on its way out stays legible but stops looking like a decision
+   still to be made. */
+.rec-row.dropped .rec-action,
+.rec-row.dropped .rec-empty {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.rec-at {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.rec-action {
+  width: 100%;
+  min-height: 0;
+  padding: 6px 9px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.rec-empty {
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-faint);
+}
+
+.rec-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rec-controls select {
+  width: auto;
+  max-width: 190px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+.rec-drop {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.rec-drop.on {
+  color: var(--danger, #b3261e);
+  border-color: color-mix(in srgb, var(--danger, #b3261e) 45%, var(--border));
+}
+
+/* Already settled: readable, but visibly not asking anything. */
+.rec-settled {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+.rec-was {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.rec-thin {
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
