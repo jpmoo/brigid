@@ -4764,7 +4764,7 @@ mark.hit.active {
 
 .chat-log {
   margin: 12px 0;
-  padding: 12px 14px;
+  padding: 0 14px;
   max-height: 55vh;
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -4780,22 +4780,40 @@ mark.hit.active {
   color: var(--text-faint);
 }
 
+/* Whole rows rather than a label apiece. Scrolling back through a long
+   conversation, the question you are looking for is found by its shape on the
+   page — so the two speakers get different ground to stand on, and the eye can
+   find the turn boundaries without reading anything. */
 .chat-turn {
-  margin-bottom: 14px;
+  margin: 0 -14px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
 }
 
 .chat-turn:last-of-type {
-  margin-bottom: 0;
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+
+/* The writer's turn is the tinted one: it is short, it is the thing being
+   answered, and tinting the long replies instead would make the panel a wall
+   of colour. */
+.chat-turn.user {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
 
 .chat-who {
   display: block;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
   color: var(--text-faint);
+}
+
+.chat-turn.user .chat-who {
+  color: var(--accent);
 }
 
 /* The answer is prose about prose, so it is set to be read rather than
@@ -4808,7 +4826,8 @@ mark.hit.active {
 }
 
 .chat-turn.user .chat-body {
-  color: var(--text-muted);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .chat-waiting {
