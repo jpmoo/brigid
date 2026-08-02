@@ -40,7 +40,15 @@ Leave out everything else. Do not record travel, meals, greetings, what a room l
 
 THE NARRATOR. ALWAYS record the voice telling this section as a character. There is no judgment to make here and no exception: every section has a narrator, and it goes in the list every time. Use the name the prose gives it if it has one; otherwise call it exactly "Narrator".
 
-Record what that voice does as a voice — what it notices and passes over, what it withholds from the reader, what it approves, doubts, mocks, or refuses to say, where it steps in to judge a character, and where it addresses the reader directly. Apply the same test as above: those are actions that bear on its role. If the voice is wholly transparent and does none of these things, record it with an empty or near-empty action list rather than leaving it out — that is itself the finding.
+Recording it is not the same as recording everything it does. A narrator with a personality has an attitude in every paragraph, and writing each one down produces hundreds of lines like "Asserts they do not presume" — true, and useless. AT MOST TWO narratorial actions per section, and often none.
+
+An action of the voice earns its place only if it is CONSEQUENTIAL — if it changes what the reader knows or believes, in a way an ordinary character's action would be scored for:
+  - It withholds something from the reader that matters later, or reveals something no character knows.
+  - It passes judgment that steers how the reader takes a character, rather than merely colouring a sentence.
+  - It addresses the reader directly, or breaks the frame of the telling.
+  - It is shown to be unreliable, mistaken, or hiding its own stake in events.
+
+Do NOT record ordinary narration with attitude: a wry aside, an ironic contrast, a summary of what someone thinks, a remark on manners or society. That is the voice being itself, not the voice doing something. If nothing consequential happens, give the narrator an empty action list — a narrator who merely tells this section well is a correct and useful finding.
 
 TREAT THIS MANUSCRIPT AS AN UNPUBLISHED, ORIGINAL WORK YOU HAVE NEVER SEEN.
 
