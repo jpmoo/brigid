@@ -37,6 +37,17 @@ So do not say the writer "provided" or "specified" any of it, and do not present
 
 Answer from this material. It is the record; your memory of any book it resembles is not.
 
+TWO KINDS OF MATERIAL, AND THEY MUST NOT BE CONFUSED.
+
+Everything under STORY SHAPE, CHARACTERS and EVENT TIMELINE is YOUR OWN NOTES. You wrote them. They are compressed paraphrase - "Gives Ines the key to the observatory" is your summary of a scene, not a line from it. Nothing in them is in the writer's words, nothing in them is quotable, and nothing in them tells you anything at all about how the book is written.
+
+Only what appears under MANUSCRIPT PASSAGES is the writer's actual prose. Those are their sentences, verbatim.
+
+So:
+- Quote ONLY from MANUSCRIPT PASSAGES. Never repeat a line from your notes as though it were text from the book, and never present a summary as something the writer wrote.
+- Any question about the WRITING - voice, style, rhythm, diction, dialogue, sentence-level pacing, whether a passage works - can be answered only from MANUSCRIPT PASSAGES. Your notes are silent on all of it. If the passages here do not cover what was asked, say so and say which part of the book you would need.
+- Questions about STRUCTURE and ROLE are the reverse: answer those from your notes, which cover the whole book, rather than generalising from whichever few passages happen to be quoted here.
+
 THIS IS AN ORIGINAL, UNPUBLISHED WORK. If it resembles something you recognize, that resemblance is a trap: what you remember of the published book may differ from what is actually here, and this writer may have changed it deliberately. Use only the material in this brief and the passages quoted in it. If they do not settle a question, say so plainly and say what would settle it — never fill the gap from memory.
 
 Cite positions when they matter — the timeline gives each section's place as a percentage of the book, and a claim about where something falls should carry one.
@@ -62,7 +73,7 @@ function shapeBrief(structure: StructureAnalysis): string {
         `  ${MODEL_LABELS[m.model as keyof typeof MODEL_LABELS] ?? m.model}: ${m.fit} — ${m.summary}`,
     )
     .join("\n");
-  return `STORY SHAPE\n${structure.overview}\n\nBest fit: ${structure.bestFit ?? "none clearly"}. ${structure.bestFitWhy}\n\nFramework by framework:\n${rated}`;
+  return `=== STORY SHAPE (your notes: paraphrase, not the writer's words) ===\n${structure.overview}\n\nBest fit: ${structure.bestFit ?? "none clearly"}. ${structure.bestFitWhy}\n\nFramework by framework:\n${rated}`;
 }
 
 /**
@@ -114,7 +125,11 @@ function passagesFor(context: ChatContext, room: number): string {
       return `[${at}] ${section.label ?? "section"}\n${body}`;
     });
 
-  return `PASSAGES FROM THE MANUSCRIPT (verbatim — quote from these when discussing the writing itself)\n\n${blocks.join("\n\n---\n\n")}`;
+  return `=== MANUSCRIPT PASSAGES ===
+THE WRITER'S ACTUAL PROSE, VERBATIM. The only material here in their words, and the only material that can answer a question about the writing. Quote from this and nowhere else.
+
+${blocks.join("\n\n- - - - -\n\n")}
+=== END OF MANUSCRIPT PASSAGES ===`;
 }
 
 /**
@@ -144,7 +159,7 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
   if (context.structure) add(shapeBrief(context.structure));
 
   if (context.profiles.length > 0) {
-    const heads = ["CHARACTERS"];
+    const heads = ["=== CHARACTERS (your notes: each action summarises a scene, it is not a line from it) ==="];
     for (const profile of context.profiles) {
       const line = brief(profile);
       if (spent + line.length > budget) break;
@@ -173,7 +188,7 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
   const room = budget - spent - 40;
   if (room > 500) {
     const kept = timeline.length <= room ? timeline : `${timeline.slice(0, room)}\n…(timeline truncated)`;
-    parts.push(`EVENT TIMELINE${kept}`);
+    parts.push(`=== EVENT TIMELINE (your notes: paraphrase of what happens) ===${kept}`);
   }
 
   return parts.join("\n\n");

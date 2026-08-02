@@ -5084,3 +5084,10 @@ mark.hit.active {
   color: var(--text-faint);
   white-space: nowrap;
 }
+
+/* Offered only while a reply is still arriving and the reader has scrolled
+   away from it — the one moment following was stopped and there is more to see. */
+.chat-catchup {
+  margin: -4px 0 8px;
+  font-size: 12.5px;
+}

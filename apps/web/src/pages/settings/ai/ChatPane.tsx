@@ -52,10 +52,21 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
     };
   }, [workId, ready]);
 
-  // Follow the answer as it arrives, which is the point of streaming it.
+  /**
+   * Follow the answer only while the reader is at the bottom.
+   *
+   * Scrolling up during a long reply means wanting to read what has already
+   * arrived, and yanking the view back down every time a token lands makes that
+   * impossible — the reader loses a fight with the machine. So the log is
+   * pinned to the bottom only if it was at the bottom to begin with, and
+   * scrolling away silently stops the following until you come back.
+   */
+  const log = useRef<HTMLDivElement | null>(null);
+  const [pinned, setPinned] = useState(true);
+
   useEffect(() => {
-    foot.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
+    if (pinned) foot.current?.scrollIntoView({ block: "end" });
+  }, [messages, pinned]);
 
   async function send() {
     const asked = draft.trim();
@@ -170,7 +181,16 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
         </div>
       ) : null}
 
-      <div className="chat-log">
+      <div
+        className="chat-log"
+        ref={log}
+        onScroll={() => {
+          const el = log.current;
+          if (!el) return;
+          // A little slack: "at the bottom" should survive a stray pixel.
+          setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 48);
+        }}
+      >
         {messages.length === 0 ? (
           <p className="chat-empty">
             Try: &ldquo;Where does the midpoint actually fall?&rdquo; &middot; &ldquo;Who
@@ -201,6 +221,19 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
         ))}
         <div ref={foot} />
       </div>
+
+      {!pinned && streaming ? (
+        <button
+          className="btn ghost chat-catchup"
+          type="button"
+          onClick={() => {
+            setPinned(true);
+            foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+          }}
+        >
+          Jump to the latest
+        </button>
+      ) : null}
 
       <div className="chat-ask">
         <textarea
