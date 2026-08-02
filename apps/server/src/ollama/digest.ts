@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { foldName } from "./analysis.js";
 import type { DigestCharacter, DigestEvent, SectionDigest } from "@brigid/shared";
 import { charBudget, generateJson } from "./client.js";
 
@@ -37,7 +38,9 @@ Write each as one plain sentence naming who did what to whom: "Gives Ines the ke
 
 Leave out everything else. Do not record travel, meals, greetings, what a room looked like, what someone wore, or that a conversation took place. Do not record character traits — "is generous" is not an action. A section where nobody does anything of this kind should return few characters or none, and that is a correct answer. Three telling actions are worth more than twenty incidental ones.
 
-THE NARRATOR. Before anything else, ask who is telling this section, and whether that voice is a presence. A voice that judges, withholds, editorializes, addresses the reader, or shows a personality of its own IS a character, even in third person and even if the prose never names it — record it as exactly "Narrator" unless the prose gives it a name. Record what it notices, withholds, approves, and mocks, using the same test as above. Only a wholly transparent voice — one that reports events with no discernible attitude — is left out. If you are unsure, include it: a narrator wrongly recorded is easily removed, and one wrongly omitted is invisible.
+THE NARRATOR. ALWAYS record the voice telling this section as a character. There is no judgment to make here and no exception: every section has a narrator, and it goes in the list every time. Use the name the prose gives it if it has one; otherwise call it exactly "Narrator".
+
+Record what that voice does as a voice — what it notices and passes over, what it withholds from the reader, what it approves, doubts, mocks, or refuses to say, where it steps in to judge a character, and where it addresses the reader directly. Apply the same test as above: those are actions that bear on its role. If the voice is wholly transparent and does none of these things, record it with an empty or near-empty action list rather than leaving it out — that is itself the finding.
 
 TREAT THIS MANUSCRIPT AS AN UNPUBLISHED, ORIGINAL WORK YOU HAVE NEVER SEEN.
 
@@ -294,6 +297,13 @@ export function ground(
   };
 
   const characters = digest.characters.filter((character) => {
+    /**
+     * The narrating voice is never named in the prose it narrates, so the test
+     * below would delete it every time — which is precisely how it went missing
+     * before. It is recorded unconditionally now, and the writer discards it on
+     * reconcile if this book's narrator is not a character.
+     */
+    if (foldName(character.name) === "narrator") return true;
     if (established.has(character.name.trim().toLowerCase())) return true;
     if (mentioned(character.name)) return true;
     return (character.aliases ?? []).some((alias) => mentioned(alias));

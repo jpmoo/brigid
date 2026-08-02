@@ -263,5 +263,10 @@ check(
 // A title alone must not ground anyone: "Mr" is on every other page.
 check("a title alone does not ground a name", grounded([{ name: "Mr Fairfax" }]).length === 0);
 
+// The narrating voice is never named in the prose it narrates, so grounding
+// would delete it every time — which is how it went missing in the first place.
+check("the narrator survives grounding", grounded([{ name: "Narrator" }]).length === 1);
+check("and so does a titled form of it", grounded([{ name: "The Narrator" }]).length === 1);
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);
