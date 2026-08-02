@@ -4722,3 +4722,52 @@ mark.hit.active {
 .rec-pick .rec-at {
   grid-column: auto;
 }
+
+/* Thrown-out lines, kept so they can be put back. Set quiet — they are not
+   asking anything, they are only available. */
+.rec-binned {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.rec-binned li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-top: 1px dashed var(--border);
+}
+
+.rec-binned li span {
+  flex: 1;
+  opacity: 0.75;
+}
+
+.rec-binned select {
+  width: auto;
+  max-width: 170px;
+  padding: 5px 8px;
+  font-size: 12.5px;
+}
+
+.rec-restore {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.rec-restore:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--border-strong);
+}

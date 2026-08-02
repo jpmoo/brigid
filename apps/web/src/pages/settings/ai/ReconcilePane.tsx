@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Trash2, Users } from "lucide-react";
+import { Check, ChevronRight, RotateCcw, Trash2, Users } from "lucide-react";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
 
@@ -42,6 +42,8 @@ export function ReconcilePane({
   /** A batch action waiting on its confirmation. */
   const [confirming, setConfirming] = useState<null | { kind: "drop" | "move"; to?: string }>(null);
   const [moveTo, setMoveTo] = useState("");
+  /** Who each thrown-out line would come back to. */
+  const [revive, setRevive] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -77,6 +79,7 @@ export function ReconcilePane({
     if (!rows) return [];
     const by = new Map<string, { name: string; pending: CastRow[]; committed: CastRow[] }>();
     for (const row of rows) {
+      if (row.state === "dropped") continue;
       const key = row.characterName.trim().toLowerCase();
       const held = by.get(key) ?? { name: row.characterName.trim(), pending: [], committed: [] };
       // A draft may have moved this row to someone else since it loaded.
@@ -114,6 +117,7 @@ export function ReconcilePane({
   const thin = useMemo(() => {
     const tally = new Map<string, { name: string; actions: number; sections: Set<string> }>();
     for (const row of rows ?? []) {
+      if (row.state === "dropped") continue;
       const settled = draft[row.id];
       if (settled?.drop) continue;
       const name = (settled?.characterName ?? row.characterName).trim();
@@ -127,6 +131,20 @@ export function ReconcilePane({
       (t) => t.actions < MIN_ACTIONS || t.sections.size < MIN_SECTIONS,
     );
   }, [rows, draft]);
+
+  /** Put a thrown-out line back. Takes effect at once — it only re-queues it. */
+  async function restore(id: string, characterName?: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.commitCast(workId, [{ id, restore: true, characterName }]);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not put that back");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function commit() {
     setBusy(true);
@@ -151,6 +169,7 @@ export function ReconcilePane({
   if (!rows) return <p className="tpl-note">{error ?? "Loading…"}</p>;
 
   const waiting = rows.filter((r) => r.state === "pending").length;
+  const binned = rows.filter((r) => r.state === "dropped");
   const dropping = Object.values(draft).filter((d) => d.drop).length;
 
   return (
@@ -381,6 +400,48 @@ export function ReconcilePane({
           </div>
         );
       })}
+
+      {binned.length > 0 ? (
+        <>
+          <h6 className="cast-axes-head">Thrown out</h6>
+          <p className="tpl-note">
+            Kept rather than deleted, so a line thrown out in a batch of forty can come
+            back without re-reading the section. Restoring one puts it back in the queue
+            to be settled again.
+          </p>
+          <ul className="rec-binned">
+            {binned.map((row) => (
+              <li key={row.id}>
+                <span>{row.action || <em>present, nothing recorded</em>}</span>
+                {/* Put it back somewhere, not just back. A line usually gets
+                    thrown out because it was filed under the wrong person, so
+                    reviving it without saying who did it invites the same
+                    decision a second time. */}
+                <select
+                  value={revive[row.id] ?? row.characterName}
+                  onChange={(e) => setRevive({ ...revive, [row.id]: e.target.value })}
+                >
+                  {[...new Set([row.characterName, ...names])].map((name) => (
+                    <option key={name} value={name}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="rec-restore"
+                  title="Put it back in the queue"
+                  aria-label="Put it back in the queue"
+                  disabled={busy}
+                  onClick={() => void restore(row.id, revive[row.id] ?? row.characterName)}
+                >
+                  <RotateCcw size={13} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {thin.length > 0 ? (
         <>

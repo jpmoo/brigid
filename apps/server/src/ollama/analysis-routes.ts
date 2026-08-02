@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -442,6 +442,32 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
      *
      * The prose is untouched. The walker will read it again from scratch.
      */
+    /**
+     * The character work only: profiles, and every decision about who did what.
+     * The reading survives, which is the point — re-reading is the expensive
+     * part, and starting the cast again should not cost an afternoon. Settled
+     * rows go back to pending rather than being deleted, so nothing gathered is
+     * lost, only what was decided about it.
+     */
+    if (kind === "character" && everything === "true") {
+      await db.transaction(async (tx) => {
+        await tx
+          .delete(analyses)
+          .where(and(eq(analyses.workId, workId), eq(analyses.kind, "character")));
+        await tx.delete(characterRuns).where(eq(characterRuns.workId, workId));
+        await tx
+          .update(castActions)
+          .set({
+            state: "pending",
+            characterName: sql`${castActions.originName}`,
+            action: sql`${castActions.originAction}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(castActions.workId, workId));
+      });
+      return { ok: true as const, cleared: "characters" as const };
+    }
+
     if (everything === "true") {
       await db.transaction(async (tx) => {
         await tx.delete(analyses).where(eq(analyses.workId, workId));

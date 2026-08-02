@@ -546,7 +546,13 @@ export const api = {
   /** Settle the queue. Returns whose profiles were dropped as a result. */
   commitCast: (
     workId: string,
-    decisions: { id: string; characterName?: string; action?: string; drop?: boolean }[],
+    decisions: {
+      id: string;
+      characterName?: string;
+      action?: string;
+      drop?: boolean;
+      restore?: boolean;
+    }[],
   ) =>
     post<{ ok: true; affected: string[]; pending: number }>(`/works/${workId}/cast/commit`, {
       decisions,
@@ -568,9 +574,16 @@ export const api = {
       `/works/${workId}/analysis/character/${encodeURIComponent(name)}`,
       { method: "DELETE" },
     ),
-  /** Everything AI-derived, the reading included. The prose is untouched. */
-  clearAllAnalysis: (workId: string) =>
-    request<{ ok: true }>(`/works/${workId}/analysis?everything=true`, { method: "DELETE" }),
+  /**
+   * Everything AI-derived, the reading included, or — scoped to characters —
+   * only the profiles and the decisions about who did what. The reading is the
+   * expensive part, so the narrow one leaves it alone.
+   */
+  clearAllAnalysis: (workId: string, scope?: "character") =>
+    request<{ ok: true }>(
+      `/works/${workId}/analysis?everything=true${scope ? `&kind=${scope}` : ""}`,
+      { method: "DELETE" },
+    ),
   cancelCharacterRun: (workId: string) =>
     request<{ progress: CharacterRunProgress | null }>(
       `/works/${workId}/analysis/characters/run`,

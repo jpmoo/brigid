@@ -177,7 +177,13 @@ export function AiPane({ workId }: { workId: string }) {
             />
           ) : null}
 
-          <ClearAll workId={workId} onCleared={() => void reload()} />
+          {/* Scoped to the screen it sits on: clearing from the cast means the
+              cast, and the reading — the expensive part — survives. */}
+          {tab === "characters" ? (
+            <ClearAll workId={workId} scope="character" onCleared={() => void reload()} />
+          ) : tab === "structure" ? (
+            <ClearAll workId={workId} onCleared={() => void reload()} />
+          ) : null}
         </>
       ) : null}
     </div>
@@ -193,7 +199,16 @@ export function AiPane({ workId }: { workId: string }) {
  * part of the control, since "clear all AI results" sitting under a manuscript
  * is a sentence worth being unambiguous about.
  */
-function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void }) {
+function ClearAll({
+  workId,
+  onCleared,
+  scope,
+}: {
+  workId: string;
+  onCleared: () => void;
+  /** Undefined clears everything; "character" leaves the reading alone. */
+  scope?: "character";
+}) {
   const [open, setOpen] = useState(false);
   const [understood, setUnderstood] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -203,7 +218,7 @@ function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void
     setBusy(true);
     setError(null);
     try {
-      await api.clearAllAnalysis(workId);
+      await api.clearAllAnalysis(workId, scope);
       setOpen(false);
       setUnderstood(false);
       onCleared();
@@ -223,17 +238,28 @@ function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void
         onClick={() => setOpen(!open)}
       >
         <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
-        <span className="thin-title">Clear all AI results</span>
+        <span className="thin-title">
+          {scope === "character" ? "Clear the character work" : "Clear all AI results"}
+        </span>
       </button>
 
       {open ? (
         <>
-          <p className="tpl-note">
-            Throws away the reading of this manuscript and every analysis built from it
-            &mdash; the story shape, every character profile, and the collected digest.
-            Brigid will start reading the manuscript again from the beginning, which takes
-            as long as it did the first time.
-          </p>
+          {scope === "character" ? (
+            <p className="tpl-note">
+              Throws away every character profile and every decision about who did what.
+              The reading survives, so nothing has to be read again &mdash; the gathered
+              actions all return to the queue exactly as the reading first recorded them,
+              including any you had reworded or moved.
+            </p>
+          ) : (
+            <p className="tpl-note">
+              Throws away the reading of this manuscript and every analysis built from it
+              &mdash; the story shape, every character profile, the settled cast, and the
+              collected digest. Brigid will start reading the manuscript again from the
+              beginning, which takes as long as it did the first time.
+            </p>
+          )}
           <p className="tpl-note">
             <strong>Your writing is not touched.</strong> This only clears what the model
             produced.
@@ -248,8 +274,9 @@ function ClearAll({ workId, onCleared }: { workId: string; onCleared: () => void
               onChange={(e) => setUnderstood(e.target.checked)}
             />
             <span>
-              I understand this cannot be undone, and the manuscript will have to be read
-              again.
+              {scope === "character"
+                ? "I understand this cannot be undone, and the cast will have to be settled again."
+                : "I understand this cannot be undone, and the manuscript will have to be read again."}
             </span>
           </label>
 
