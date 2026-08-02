@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, RotateCcw, Trash2, Users } from "lucide-react";
+import { Check, ChevronRight, Eraser, RotateCcw, Trash2, Users } from "lucide-react";
 import { foldName } from "@brigid/shared";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
@@ -45,6 +45,8 @@ export function ReconcilePane({
   const [moveTo, setMoveTo] = useState("");
   /** Who each thrown-out line would come back to. */
   const [revive, setRevive] = useState<Record<string, string>>({});
+  /** A character whose blank-slate reset is waiting on its confirmation. */
+  const [resetting, setResetting] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -158,6 +160,22 @@ export function ReconcilePane({
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not put that back");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Every line for one character back into the queue, and the profile gone. */
+  async function reset(name: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.resetCharacter(workId, name);
+      setResetting(null);
+      await load();
+      onCommitted([name]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `could not reset ${name}`);
     } finally {
       setBusy(false);
     }
@@ -315,6 +333,41 @@ export function ReconcilePane({
         </div>
       ) : null}
 
+      {resetting ? (
+        <div className="modal-backdrop" onClick={() => setResetting(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">Start {resetting} over?</h2>
+            <p className="card-subtitle">
+              Every line ever gathered for {resetting} comes back into the queue &mdash;
+              the ones you settled and the ones you threw out &mdash; worded as the
+              reading first recorded them. Their profile is deleted.
+            </p>
+            <p className="tpl-note">
+              This is the way back from settling someone wrongly. Nothing else is touched,
+              and the manuscript does not have to be read again.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => setResetting(null)}
+              >
+                Leave it as it is
+              </button>
+              <button
+                className="btn danger"
+                type="button"
+                disabled={busy}
+                onClick={() => void reset(resetting)}
+              >
+                {busy ? "Resetting…" : "Start over"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {groups.map((group) => {
         const isOpen = open.has(group.name);
         return (
@@ -366,6 +419,18 @@ export function ReconcilePane({
                   {group.committed.length} settled
                 </span>
               </button>
+
+              {group.committed.length > 0 ? (
+                <button
+                  type="button"
+                  className="rec-reset"
+                  title={`Start ${group.name} over`}
+                  aria-label={`Start ${group.name} over`}
+                  onClick={() => setResetting(group.name)}
+                >
+                  <Eraser size={13} />
+                </button>
+              ) : null}
             </div>
 
             {isOpen ? (
@@ -453,16 +518,30 @@ export function ReconcilePane({
                 ) : null}
 
                 {group.committed.length > 0 ? (
-                  <ul className="rec-settled">
-                    {group.committed.map((row) => (
-                      <li key={row.id}>
-                        {row.action || <em>present, nothing recorded</em>}
-                        {row.originName ? (
-                          <span className="rec-was"> &mdash; read as {row.originName}</span>
-                        ) : null}
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="rec-table-wrap">
+                    <table className="rec-table settled">
+                      <tbody>
+                        {group.committed.map((row) => (
+                          // Settled: shown for reference, not for editing. There
+                          // is one way to reopen these, and it is the whole
+                          // character at once — see "Start this character over".
+                          <tr className="rec-row locked" key={row.id}>
+                            <td className="rec-cell-pick" />
+                            <td className="rec-cell-at">{labels.get(row.blockId) ?? "section"}</td>
+                            <td className="rec-cell-action">
+                              {row.action || <em>present, nothing recorded</em>}
+                              {row.originName ? (
+                                <span className="rec-was"> &mdash; read as {row.originName}</span>
+                              ) : null}
+                            </td>
+                            <td className="rec-cell-to">
+                              <span className="rec-locked-note">settled</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 ) : null}
               </div>
             ) : null}

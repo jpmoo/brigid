@@ -38,7 +38,7 @@ import {
 } from "./profile-worker.js";
 import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
-import { backfill, castFor, commitCast, pendingCount } from "./cast.js";
+import { backfill, castFor, commitCast, pendingCount, resetCharacter } from "./cast.js";
 import { CHAT_SYSTEM, buildBrief } from "./chat.js";
 
 /**
@@ -544,6 +544,22 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     }
     reply.raw.end();
     return reply;
+  });
+
+  /** One character back to a blank slate: every line re-queued, profile gone. */
+  app.post("/works/:workId/cast/reset", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+    await workOr404(workId);
+
+    const restored = await resetCharacter(workId, name);
+    await db
+      .delete(analyses)
+      .where(
+        and(eq(analyses.workId, workId), eq(analyses.kind, "character"), eq(analyses.subject, name)),
+      );
+    return { ok: true as const, restored, pending: await pendingCount(workId) };
   });
 
   /** Everything gathered, for the reconcile screen. */

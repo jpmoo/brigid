@@ -536,6 +536,9 @@ export const api = {
   /** Stop the reading, set it going again, or throw it away and start over. */
   controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
+  /** One character back to a blank slate: every line re-queued, profile gone. */
+  resetCharacter: (workId: string, name: string) =>
+    post<{ ok: true; restored: number; pending: number }>(`/works/${workId}/cast/reset`, { name }),
   /** Everything gathered, for the reconcile screen. */
   getCast: (workId: string) =>
     request<{

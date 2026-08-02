@@ -4931,3 +4931,43 @@ mark.hit.active {
 .rec-shell-head .rec-new {
   margin-left: auto;
 }
+
+/* Settled lines: shown for reference, not for editing. Quiet enough to scan
+   past, legible enough to check against. */
+.rec-table.settled td {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.rec-row.locked .rec-cell-action {
+  padding-right: 12px;
+}
+
+.rec-locked-note {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* Reopening a character is the one way back out of a settled record, so it
+   sits on the character rather than on any one line. */
+.rec-reset {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+
+.rec-reset:hover {
+  color: var(--danger, #b3261e);
+  border-color: color-mix(in srgb, var(--danger, #b3261e) 45%, var(--border));
+}
