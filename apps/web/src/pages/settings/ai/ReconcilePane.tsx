@@ -212,8 +212,9 @@ export function ReconcilePane({
             {waiting} {waiting === 1 ? "action" : "actions"} to review
           </strong>{" "}
           &mdash; move any to whoever actually did it, reword it, or throw it out.
-          Tick what you have settled and commit it; the rest waits. Nothing is
-          profiled while anything here is still outstanding.
+          Tick what you have settled and commit it; the rest waits here, and can wait
+          indefinitely &mdash; only committed actions are profiled, so anything still
+          outstanding is simply not counted yet.
         </p>
       )}
 
