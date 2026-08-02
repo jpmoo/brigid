@@ -1,5 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Eraser, RotateCcw, Trash2, UserMinus } from "lucide-react";
+import {
+  Check,
+  ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
+  Eraser,
+  RotateCcw,
+  Trash2,
+  UserMinus,
+} from "lucide-react";
 import { foldName } from "@brigid/shared";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
@@ -296,6 +305,7 @@ export function ReconcilePane({
 
   const waiting = rows.filter((r) => r.state === "pending").length;
   const binned = rows.filter((r) => r.state === "dropped");
+  const allExpanded = groups.length > 0 && groups.every((g) => open.has(g.name));
 
 
   return (
@@ -372,6 +382,20 @@ export function ReconcilePane({
             />
             <span>{picked.size > 0 ? `${picked.size} selected` : "Select all"}</span>
           </label>
+
+          {/* The same control the outline and the frameworks use, because it
+              does the same job. */}
+          <button
+            className="outline-toggle-all"
+            type="button"
+            title={allExpanded ? "Collapse all characters" : "Expand all characters"}
+            aria-label={allExpanded ? "Collapse all characters" : "Expand all characters"}
+            onClick={() =>
+              setOpen(allExpanded ? new Set() : new Set(groups.map((g) => g.name)))
+            }
+          >
+            {allExpanded ? <ChevronsDownUp size={13} /> : <ChevronsUpDown size={13} />}
+          </button>
 
           {picked.size > 0 ? (
             <>
