@@ -54,6 +54,15 @@ export function ReconcilePane({
       setOrder(new Map(sections.map((s) => [s.blockId, s.start])));
       setLabels(new Map(sections.map((s) => [s.blockId, s.label ?? "section"])));
       setPicked(new Set());
+      /**
+       * Characters with new material start open, so the queue shows what it is
+       * asking about — but only as a starting position. The toggle then means
+       * what it says, which it did not when a pending row forced a group open
+       * and left the chevron pointing at something that would not move.
+       */
+      setOpen(
+        new Set(got.filter((r) => r.state === "pending").map((r) => r.characterName.trim())),
+      );
       setDraft(
         Object.fromEntries(
           got
@@ -294,7 +303,7 @@ export function ReconcilePane({
       ) : null}
 
       {groups.map((group) => {
-        const isOpen = open.has(group.name) || group.pending.length > 0;
+        const isOpen = open.has(group.name);
         return (
           <div className="rec-group" key={group.name}>
             <div className="rec-head-row">
