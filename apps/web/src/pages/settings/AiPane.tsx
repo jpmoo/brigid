@@ -669,6 +669,12 @@ function CharactersPane({
   onCommitted: (affected: string[]) => void;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
+  /**
+   * Open until there is something to come back to. Once profiles exist the queue
+   * is the thing you scroll past, so it starts folded — decided once on mount,
+   * not recomputed, so a finishing run does not fold it away under your hands.
+   */
+  const [queueOpen, setQueueOpen] = useState(reports.length === 0);
   const judgeable = bundle.roster.filter((r) => r.judgeable);
   const thin = bundle.roster.filter((r) => !r.judgeable);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -695,8 +701,26 @@ function CharactersPane({
 
   return (
     <>
-      <h4 className="tpl-section">What the reading gathered</h4>
-      <ReconcilePane workId={workId} pending={pending} onCommitted={onCommitted} />
+      {/* Collapsible as a whole, so a settled manuscript opens on its profiles
+          rather than on a queue of hundreds that has already been dealt with.
+          The default is taken once, when the tab is first shown: it should not
+          fold itself away underneath someone the moment a run finishes. */}
+      <div className="rec-shell">
+        <button
+          type="button"
+          className="rec-shell-head"
+          aria-expanded={queueOpen}
+          onClick={() => setQueueOpen(!queueOpen)}
+        >
+          <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
+          <span className="thin-title">What the reading gathered</span>
+          {pending > 0 ? <span className="rec-new">{pending} to review</span> : null}
+        </button>
+      </div>
+
+      {queueOpen ? (
+        <ReconcilePane workId={workId} pending={pending} onCommitted={onCommitted} />
+      ) : null}
 
       <h4 className="tpl-section">Profiles</h4>
       {pending > 0 ? (

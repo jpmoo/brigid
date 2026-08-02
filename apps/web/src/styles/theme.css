@@ -4904,3 +4904,30 @@ mark.hit.active {
   opacity: 0.4;
   text-decoration: line-through;
 }
+
+/* The whole gathered queue, foldable in one go. */
+.rec-shell {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.rec-shell-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rec-shell-head[aria-expanded="true"] .fit-caret {
+  transform: rotate(90deg);
+}
+
+.rec-shell-head .rec-new {
+  margin-left: auto;
+}
