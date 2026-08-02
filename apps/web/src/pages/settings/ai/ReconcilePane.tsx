@@ -335,16 +335,10 @@ export function ReconcilePane({
             Not enough yet to profile
           </h6>
           <p className="tpl-note">
-            The rubric wants citable events for any score above 1, so on this much these
-            would only produce a flat chart. They have no tick and cannot be committed
-            &mdash; committing them would settle a record that still cannot be used.
-          </p>
-          <p className="tpl-note">
-            Two things move them off this list. Later sections may bring more. And several
-            of these are usually one person the reading named twice: reassign their actions
-            to whoever they belong to and the row moves into that character straight away,
-            where it can be committed. Genuine walk-ons stay here, which is a true finding
-            about the book rather than an omission.
+            Too few actions to score a profile on, so these can&rsquo;t be committed yet.
+            Move a line to the character it belongs to and it counts towards them instead
+            &mdash; several of these are usually one person the reading named twice. The
+            rest are walk-ons, and stay here.
           </p>
           <p className="rec-thin">
             {thin
