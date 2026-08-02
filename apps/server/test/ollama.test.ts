@@ -11,6 +11,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { parseJson, thinksFrom } from "../src/ollama/client.js";
 import { buildRoster, foldName } from "../src/ollama/analysis.js";
+import { ground } from "../src/ollama/digest.js";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -229,6 +230,38 @@ function rosterOf(names: string[]) {
   check("the folded form is kept as an alias", entry!.aliases.includes("Brother Tuan"));
   check("and its record is added, not discarded", entry!.actions === 4);
 }
+
+console.log("\nkeeping the reading tied to the page");
+
+const PROSE =
+  "Tuan set down the lamp. Across the yard, Ash was still waiting, and neither of them spoke.";
+
+function grounded(characters: { name: string; aliases?: string[] }[], known: string[] = []) {
+  const digest = {
+    summary: "",
+    characters: characters.map((c) => ({ aliases: [], actions: ["did a thing"], ...c })),
+    events: [],
+  };
+  return ground(digest as never, PROSE, known).characters.map((c) => c.name);
+}
+
+check("a name in the prose is kept", grounded([{ name: "Tuan" }]).length === 1);
+check("so is a surname inside a longer form", grounded([{ name: "Colonel Ash" }]).length === 1);
+check("and one reached through an alias", grounded([{ name: "The Keeper", aliases: ["Tuan"] }]).length === 1);
+
+// The hallucination: nobody of that name is here, and the book has never
+// mentioned them either.
+check("an invented name is dropped", grounded([{ name: "Beatrice Vane" }]).length === 0);
+
+// But someone the book already established, named here from a pronoun, is
+// resolution rather than invention — which is what the known-names list is for.
+check(
+  "an established name resolved from a pronoun is kept",
+  grounded([{ name: "Beatrice Vane" }], ["Beatrice Vane"]).length === 1,
+);
+
+// A title alone must not ground anyone: "Mr" is on every other page.
+check("a title alone does not ground a name", grounded([{ name: "Mr Fairfax" }]).length === 0);
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

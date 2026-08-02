@@ -233,7 +233,7 @@ export async function digestSection(
     });
 
     ms += result.ms;
-    digests.push(normalize(result.value));
+    digests.push(ground(normalize(result.value), part, req.known ?? []));
   }
 
   return { digest: digests.length === 1 ? digests[0]! : mergeDigests(digests), ms };
@@ -244,6 +244,92 @@ export async function digestSection(
  * with a blank name or an event with no text, and one of those stored is a row
  * of noise that the judging pass has to reason around forever.
  */
+/**
+ * Throw out characters the section never mentions.
+ *
+ * Asked "who is in this section", a model has no reason not to answer, and an
+ * under-constrained one will promote a passing noun, carry someone over from a
+ * chapter it half-remembers, or invent a plausible name outright. Everything
+ * downstream inherits that: a roster entry, a spider graph, a profile scored on
+ * events that never happened.
+ *
+ * This is checkable rather than merely askable, because the text is right here.
+ * A character survives if either:
+ *
+ *  - some part of their name, or one of their aliases, appears in the prose —
+ *    a name in the text is a name the reading did not invent; or
+ *  - the book has already established them, in which case naming them from a
+ *    pronoun is resolution rather than invention, and is the behaviour the
+ *    known-names list was added to encourage.
+ *
+ * Anything meeting neither test was invented in this section, and goes.
+ */
+export function ground(
+  digest: SectionDigest,
+  text: string,
+  known: string[],
+): SectionDigest {
+  const prose = text.toLowerCase();
+  const established = new Set(known.map((k) => k.trim().toLowerCase()));
+
+  /** Any distinctive word of the name, so "Colonel Ash" matches "Ash". */
+  const mentioned = (name: string): boolean => {
+    const trimmed = name.trim().toLowerCase();
+    if (!trimmed) return false;
+    if (prose.includes(trimmed)) return true;
+    return trimmed
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !TITLE_WORDS.has(word))
+      .some((word) => prose.includes(word));
+  };
+
+  const characters = digest.characters.filter((character) => {
+    if (established.has(character.name.trim().toLowerCase())) return true;
+    if (mentioned(character.name)) return true;
+    return (character.aliases ?? []).some((alias) => mentioned(alias));
+  });
+
+  /**
+   * An event attributed to somebody who was never here is kept, but the
+   * attribution is dropped: the event may well have happened, and losing it
+   * would cost more than an unattributed line does.
+   */
+  const surviving = new Set(characters.map((c) => c.name.trim().toLowerCase()));
+  const events = digest.events.map((event) => ({
+    ...event,
+    who: (event.who ?? []).filter((who) => surviving.has(who.trim().toLowerCase())),
+  }));
+
+  return { ...digest, characters, events };
+}
+
+/** Too common to ground a name on — "Mr" appears on every other page. */
+const TITLE_WORDS = new Set([
+  "mr",
+  "mrs",
+  "ms",
+  "the",
+  "and",
+  "old",
+  "young",
+  "man",
+  "men",
+  "woman",
+  "women",
+  "boy",
+  "girl",
+  "lady",
+  "sir",
+  "one",
+  "two",
+  "his",
+  "her",
+  "who",
+  "that",
+  "them",
+  "they",
+]);
+
 export function normalize(raw: Partial<SectionDigest>): SectionDigest {
   const characters = (Array.isArray(raw.characters) ? raw.characters : [])
     .filter((c): c is DigestCharacter => Boolean(c && typeof c.name === "string" && c.name.trim()))
