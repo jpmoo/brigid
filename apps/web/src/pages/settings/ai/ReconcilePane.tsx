@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Eraser, RotateCcw, Trash2, Users } from "lucide-react";
+import { Check, ChevronRight, Eraser, RotateCcw, Trash2, UserMinus } from "lucide-react";
 import { foldName } from "@brigid/shared";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
@@ -40,13 +40,12 @@ export function ReconcilePane({
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  /** A batch action waiting on its confirmation. */
-  const [confirming, setConfirming] = useState<null | { kind: "drop" | "move"; to?: string }>(null);
-  const [moveTo, setMoveTo] = useState("");
   /** Who each thrown-out line would come back to. */
   const [revive, setRevive] = useState<Record<string, string>>({});
   /** A character whose blank-slate reset is waiting on its confirmation. */
   const [resetting, setResetting] = useState<string | null>(null);
+  /** A name whose removal from the cast is waiting on its confirmation. */
+  const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -214,6 +213,57 @@ export function ReconcilePane({
     }
   }
 
+  /**
+   * Moving a line, at once.
+   *
+   * It has to be at once: a line under a character too thin to commit could
+   * otherwise never leave, since that character has no tick. It stays pending
+   * — it now needs reviewing under whoever it landed on, which is a different
+   * question from the one just answered.
+   */
+  async function assign(id: string, characterName: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.commitCast(workId, [{ id, characterName, assign: true }]);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not move that");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Throwing one out, at once. Reversible from the list below. */
+  async function discard(id: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.commitCast(workId, [{ id, drop: true }]);
+      await load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not throw that out");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Take a name out of the cast entirely. It stays out across re-readings. */
+  async function remove(name: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await api.notACharacter(workId, name);
+      setRemoving(null);
+      await load();
+      onCommitted([name]);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `could not remove ${name}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function commit() {
     setBusy(true);
     setError(null);
@@ -246,7 +296,7 @@ export function ReconcilePane({
 
   const waiting = rows.filter((r) => r.state === "pending").length;
   const binned = rows.filter((r) => r.state === "dropped");
-  const droppingPicked = [...picked].filter((id) => draft[id]?.drop).length;
+
 
   return (
     <>
@@ -326,72 +376,45 @@ export function ReconcilePane({
           {picked.size > 0 ? (
             <>
               <span className="be-gap" />
-              <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
-                <option value="">Reassign to&hellip;</option>
-                {names.map((name) => (
-                  <option key={name} value={name}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="btn secondary"
-                type="button"
-                disabled={!moveTo}
-                onClick={() => setConfirming({ kind: "move", to: moveTo })}
-              >
-                <Users size={14} />
-                Reassign
-              </button>
-              <button
-                className="btn ghost"
-                type="button"
-                onClick={() => setConfirming({ kind: "drop" })}
-              >
-                <Trash2 size={14} />
-                Throw out
-              </button>
+              <span className="muted">
+                Ticks are for committing. Move or throw out a line with the controls
+                beside it &mdash; those take effect at once.
+              </span>
             </>
           ) : null}
         </div>
       ) : null}
 
-      {confirming ? (
-        <div className="modal-backdrop" onClick={() => setConfirming(null)} role="presentation">
+      {removing ? (
+        <div className="modal-backdrop" onClick={() => setRemoving(null)} role="presentation">
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2 className="card-title">
-              {confirming.kind === "drop"
-                ? `Throw out ${picked.size} ${picked.size === 1 ? "action" : "actions"}?`
-                : `Reassign ${picked.size} to ${confirming.to}?`}
-            </h2>
+            <h2 className="card-title">Remove {removing} from the cast?</h2>
             <p className="card-subtitle">
-              {confirming.kind === "drop"
-                ? "They stop counting towards anyone's profile. Nothing is committed yet — you can change your mind until you press Commit."
-                : `Every selected action moves to ${confirming.to}. You can still change any of them one at a time before committing.`}
+              Nothing is recorded against {removing}, so they are either not a character
+              at all &mdash; a crowd, a place, a title read as a name &mdash; or everything
+              they did has been moved to someone else.
+            </p>
+            <p className="tpl-note">
+              Removing keeps them out even when the manuscript is read again. Leaving them
+              costs nothing: they sit in the cast collecting whatever later sections bring,
+              and can be removed at any time.
             </p>
             <div className="modal-actions">
-              <button className="btn secondary" type="button" onClick={() => setConfirming(null)}>
-                Cancel
+              <button
+                className="btn secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => setRemoving(null)}
+              >
+                Leave them to gather
               </button>
               <button
-                className={confirming.kind === "drop" ? "btn danger" : "btn"}
+                className="btn danger"
                 type="button"
-                onClick={() => {
-                  const next = { ...draft };
-                  for (const id of picked) {
-                    const held = next[id];
-                    if (!held) continue;
-                    next[id] =
-                      confirming.kind === "drop"
-                        ? { ...held, drop: true }
-                        : { ...held, characterName: confirming.to!, drop: false };
-                  }
-                  setDraft(next);
-                  // Kept: the batch marks what to do, Commit is what does it.
-                  setConfirming(null);
-                }}
+                disabled={busy}
+                onClick={() => void remove(removing)}
               >
-                {confirming.kind === "drop" ? "Throw them out" : "Reassign them"}
+                {busy ? "Removing…" : "Remove"}
               </button>
             </div>
           </div>
@@ -488,6 +511,23 @@ export function ReconcilePane({
                 </span>
               </button>
 
+              {/* Nobody does anything: either a name the reading raised that is
+                  not a character, or someone whose actions have all been moved
+                  away. Removing is offered rather than done — a name with
+                  nothing yet may still be someone the book gets to. */}
+              {strength.get(foldName(group.name))?.actions === 0 ? (
+                <button
+                  type="button"
+                  className="rec-reset"
+                  title={`Remove ${group.name} from the cast`}
+                  aria-label={`Remove ${group.name} from the cast`}
+                  disabled={busy}
+                  onClick={() => setRemoving(group.name)}
+                >
+                  <UserMinus size={13} />
+                </button>
+              ) : null}
+
               {group.committed.length > 0 ? (
                 <button
                   type="button"
@@ -553,13 +593,8 @@ export function ReconcilePane({
                         <div className="rec-to-inner">
                         <select
                           value={d.characterName}
-                          disabled={d.drop}
-                          onChange={(e) =>
-                            setDraft({
-                              ...draft,
-                              [row.id]: { ...d, characterName: e.target.value },
-                            })
-                          }
+                          disabled={busy}
+                          onChange={(e) => void assign(row.id, e.target.value)}
                         >
                           {[...new Set([d.characterName, ...names])].map((name) => (
                             <option key={name} value={name}>
@@ -569,10 +604,11 @@ export function ReconcilePane({
                         </select>
                         <button
                           type="button"
-                          className={`rec-drop${d.drop ? " on" : ""}`}
-                          title={d.drop ? "Keep it after all" : "Throw this out"}
-                          aria-label={d.drop ? "Keep it after all" : "Throw this out"}
-                          onClick={() => setDraft({ ...draft, [row.id]: { ...d, drop: !d.drop } })}
+                          className="rec-drop"
+                          title="Throw this out"
+                          aria-label="Throw this out"
+                          disabled={busy}
+                          onClick={() => void discard(row.id)}
                         >
                           <Trash2 size={13} />
                         </button>
@@ -676,9 +712,7 @@ export function ReconcilePane({
                 ? "Select what to commit"
                 : `Commit ${picked.size} ${picked.size === 1 ? "action" : "actions"}`}
           </button>
-          {droppingPicked > 0 ? (
-            <span className="muted">{droppingPicked} of them will be thrown out.</span>
-          ) : null}
+
         </div>
       ) : null}
     </>

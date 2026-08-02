@@ -555,6 +555,7 @@ export const api = {
       action?: string;
       drop?: boolean;
       restore?: boolean;
+      assign?: boolean;
     }[],
   ) =>
     post<{ ok: true; affected: string[]; pending: number }>(`/works/${workId}/cast/commit`, {

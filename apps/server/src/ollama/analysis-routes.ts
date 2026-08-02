@@ -599,6 +599,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             action: z.string().max(2000).optional(),
             drop: z.boolean().optional(),
             restore: z.boolean().optional(),
+            assign: z.boolean().optional(),
           }),
         ),
       })
