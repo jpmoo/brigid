@@ -4301,17 +4301,16 @@ mark.hit.active {
 /* Pinned to the tile's corner rather than riding along with the titles: an
    epithet is one line or three, and a control that drifts down the card with it
    is a control you have to look for. */
-.cast-tile-tools {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  display: flex;
-  gap: 4px;
-}
+
 
 /* Quiet until the tile is under the cursor: three controls on every card would
    otherwise be the loudest thing in a grid whose subject is the charts. */
+/* The corner itself, since there is only one control left — the wrapper that
+   used to hold three is gone, and with it the positioning. */
 .cast-tile-tool {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   opacity: 0.35;
   transition: opacity 0.12s, color 0.12s, border-color 0.12s, background 0.12s;
 }
