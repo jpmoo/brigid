@@ -4678,3 +4678,47 @@ mark.hit.active {
   line-height: 1.6;
   color: var(--text-muted);
 }
+
+/* The batch bar over the queue. Sticky, because selecting forty rows means
+   scrolling well past whatever you would act on them with. */
+.rec-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 10px 0 4px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.rec-bar select {
+  width: auto;
+  max-width: 200px;
+  padding: 6px 9px;
+  font-size: 13px;
+}
+
+.rec-all {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The tick sits with the section label rather than in a column of its own —
+   the label is the row's handle, so they belong together. */
+.rec-pick {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.rec-pick .rec-at {
+  grid-column: auto;
+}

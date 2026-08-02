@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Check, ChevronRight, Trash2 } from "lucide-react";
+import { Check, ChevronRight, Trash2, Users } from "lucide-react";
 import { ApiError, api } from "../../../api.js";
 import type { CastRow } from "../../../api.js";
 
@@ -38,6 +38,10 @@ export function ReconcilePane({
   const [labels, setLabels] = useState<Map<string, string>>(new Map());
   const [draft, setDraft] = useState<Record<string, Draft>>({});
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  /** A batch action waiting on its confirmation. */
+  const [confirming, setConfirming] = useState<null | { kind: "drop" | "move"; to?: string }>(null);
+  const [moveTo, setMoveTo] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +51,7 @@ export function ReconcilePane({
       setRows(got);
       setOrder(new Map(sections.map((s) => [s.blockId, s.start])));
       setLabels(new Map(sections.map((s) => [s.blockId, s.label ?? "section"])));
+      setPicked(new Set());
       setDraft(
         Object.fromEntries(
           got
@@ -167,6 +172,103 @@ export function ReconcilePane({
         </p>
       )}
 
+      {waiting > 0 ? (
+        <div className="rec-bar">
+          <label className="check rec-all">
+            <input
+              type="checkbox"
+              checked={picked.size > 0 && picked.size === waiting}
+              ref={(el) => {
+                // Some but not all: the box should say so rather than reading
+                // as "none selected" while a dozen are.
+                if (el) el.indeterminate = picked.size > 0 && picked.size < waiting;
+              }}
+              onChange={(e) =>
+                setPicked(
+                  e.target.checked
+                    ? new Set(rows.filter((r) => r.state === "pending").map((r) => r.id))
+                    : new Set(),
+                )
+              }
+            />
+            <span>{picked.size > 0 ? `${picked.size} selected` : "Select all"}</span>
+          </label>
+
+          {picked.size > 0 ? (
+            <>
+              <span className="be-gap" />
+              <select value={moveTo} onChange={(e) => setMoveTo(e.target.value)}>
+                <option value="">Reassign to&hellip;</option>
+                {names.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="btn secondary"
+                type="button"
+                disabled={!moveTo}
+                onClick={() => setConfirming({ kind: "move", to: moveTo })}
+              >
+                <Users size={14} />
+                Reassign
+              </button>
+              <button
+                className="btn ghost"
+                type="button"
+                onClick={() => setConfirming({ kind: "drop" })}
+              >
+                <Trash2 size={14} />
+                Throw out
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
+      {confirming ? (
+        <div className="modal-backdrop" onClick={() => setConfirming(null)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">
+              {confirming.kind === "drop"
+                ? `Throw out ${picked.size} ${picked.size === 1 ? "action" : "actions"}?`
+                : `Reassign ${picked.size} to ${confirming.to}?`}
+            </h2>
+            <p className="card-subtitle">
+              {confirming.kind === "drop"
+                ? "They stop counting towards anyone's profile. Nothing is committed yet — you can change your mind until you press Commit."
+                : `Every selected action moves to ${confirming.to}. You can still change any of them one at a time before committing.`}
+            </p>
+            <div className="modal-actions">
+              <button className="btn secondary" type="button" onClick={() => setConfirming(null)}>
+                Cancel
+              </button>
+              <button
+                className={confirming.kind === "drop" ? "btn danger" : "btn"}
+                type="button"
+                onClick={() => {
+                  const next = { ...draft };
+                  for (const id of picked) {
+                    const held = next[id];
+                    if (!held) continue;
+                    next[id] =
+                      confirming.kind === "drop"
+                        ? { ...held, drop: true }
+                        : { ...held, characterName: confirming.to!, drop: false };
+                  }
+                  setDraft(next);
+                  setPicked(new Set());
+                  setConfirming(null);
+                }}
+              >
+                {confirming.kind === "drop" ? "Throw them out" : "Reassign them"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {groups.map((group) => {
         const isOpen = open.has(group.name) || group.pending.length > 0;
         return (
@@ -201,7 +303,19 @@ export function ReconcilePane({
                   };
                   return (
                     <div className={`rec-row${d.drop ? " dropped" : ""}`} key={row.id}>
-                      <span className="rec-at">{labels.get(row.blockId) ?? "section"}</span>
+                      <label className="check rec-pick">
+                        <input
+                          type="checkbox"
+                          checked={picked.has(row.id)}
+                          onChange={(e) => {
+                            const next = new Set(picked);
+                            if (e.target.checked) next.add(row.id);
+                            else next.delete(row.id);
+                            setPicked(next);
+                          }}
+                        />
+                        <span className="rec-at">{labels.get(row.blockId) ?? "section"}</span>
+                      </label>
 
                       {row.action ? (
                         <textarea
