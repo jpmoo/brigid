@@ -37,6 +37,19 @@ try {
   // names of the parts rather than for whole routes — enough to notice a whole
   // group of endpoints failing to register, which is the other silent failure.
   const routes = app.printRoutes({ commonPrefix: false });
+  /**
+   * Named routes, not just route groups.
+   *
+   * A whole endpoint went missing here once and nothing noticed: the edit that
+   * added it matched no anchor, wrote nothing, and typechecked perfectly —
+   * a file that never changed still compiles. The first sign was a 404 in the
+   * browser. These are the specific paths the AI panel calls, so a route that
+   * quietly fails to register now fails here instead.
+   */
+  for (const path of ["cast", "commit", "chat", "identities", "not-a-character"]) {
+    check(`the ${path} route is registered`, routes.includes(path));
+  }
+
   for (const part of ["works", "backups", "spelling", "preferences", "compile", "ollama", "analysis"]) {
     check(`the ${part} routes are mounted`, routes.includes(part));
   }

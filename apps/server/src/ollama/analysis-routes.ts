@@ -373,6 +373,238 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * would reintroduce the entry every time its chapter was edited. Its profile
    * goes with it, since a profile of a crowd is not worth keeping.
    */
+  /** Who in this cast is the same person. A proposal; nothing is written. */
+  app.post("/works/:workId/analysis/identities", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const work = await workOr404(workId);
+    const config = await reader();
+    const sections = await readyDigest(workId);
+    const roster = rosterFromCast(
+      await castFor(workId),
+      new Map(sections.map((s) => [s.blockId, s.start])),
+      await exclusionsFor(workId),
+    );
+
+    const { result, ms } = await proposeIdentities({
+      ...config,
+      title: work.title,
+      roster,
+      sections,
+    });
+    return { proposal: result, ms };
+  });
+
+  /**
+   * Fold the approved groups together, on the settled cast.
+   *
+   * Not on the reading: the sync that keeps the queue current identifies a row
+   * by what the reading said and deletes rows that no longer match, so
+   * rewriting the digest would throw away every settled decision in each
+   * section a merge touched. Only `character_name` moves.
+   */
+  app.post("/works/:workId/analysis/identities/apply", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { groups } = z
+      .object({
+        groups: z.array(
+          z.object({ canonical: z.string().min(1), names: z.array(z.string().min(1)).min(2) }),
+        ),
+      })
+      .parse(req.body);
+    await workOr404(workId);
+    if (groups.length === 0) return { ok: true as const, reprofiling: [] };
+
+    await db.transaction(async (tx) => {
+      for (const group of groups) {
+        for (const name of group.names) {
+          if (foldName(name) !== foldName(group.canonical)) {
+            await tx
+              .update(castActions)
+              .set({ characterName: group.canonical, updatedAt: new Date() })
+              .where(and(eq(castActions.workId, workId), eq(castActions.characterName, name)));
+          }
+          await tx
+            .delete(analyses)
+            .where(
+              and(
+                eq(analyses.workId, workId),
+                eq(analyses.kind, "character"),
+                eq(analyses.subject, name),
+              ),
+            );
+        }
+      }
+    });
+
+    const canonical = [...new Set(groups.map((g) => g.canonical))];
+    const sections = await placedDigests(workId);
+    await queueCharacterRun(workId, canonical, fingerprint(sections), canonical[0]!);
+    return { ok: true as const, reprofiling: canonical };
+  });
+
+  /**
+   * Talking about the manuscript, streamed.
+   *
+   * Streamed because an answer of any length outlasts what the proxy in front
+   * will hold a silent request open for, and because watching a reply arrive is
+   * the difference between a conversation and a form submission. The brief is
+   * assembled from findings already made rather than from the prose: they carry
+   * positions and judgments that could not be recomputed per question.
+   */
+  app.post("/works/:workId/chat", async (req, reply) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { messages } = z
+      .object({
+        messages: z
+          .array(
+            z.object({
+              role: z.enum(["user", "assistant"]),
+              content: z.string().min(1).max(8000),
+            }),
+          )
+          .min(1)
+          .max(40),
+      })
+      .parse(req.body);
+
+    const work = await workOr404(workId);
+    const config = await reader();
+    const sections = await readyDigest(workId);
+
+    const stored = await db.select().from(analyses).where(eq(analyses.workId, workId));
+    const structure =
+      (stored.find((r) => r.kind === "structure")?.result as StructureAnalysis | undefined) ?? null;
+    const profiles = stored
+      .filter((r) => r.kind === "character")
+      .map((r) => r.result as unknown as CharacterAnalysis);
+
+    if (!structure || profiles.length === 0) {
+      throw badRequest("the story shape and at least one character profile are needed first");
+    }
+
+    const brief = buildBrief(
+      {
+        title: work.title,
+        totalWords: sections.reduce((sum, s) => sum + s.words, 0),
+        structure,
+        profiles,
+        sections,
+      },
+      config.numCtx,
+    );
+
+    const answer = await fetch(`${config.url}/api/chat`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: config.model,
+        stream: true,
+        ...(config.thinks ? { think: false } : {}),
+        options: {
+          ...(config.numCtx ? { num_ctx: config.numCtx } : {}),
+          temperature: 0.4,
+        },
+        messages: [{ role: "system", content: `${CHAT_SYSTEM}\n\n${brief}` }, ...messages],
+      }),
+      signal: AbortSignal.timeout(15 * 60_000),
+    });
+
+    if (!answer.ok || !answer.body) throw badRequest(`the model answered ${answer.status}`);
+
+    /**
+     * Forwarded as plain text rather than re-wrapped. Ollama sends one JSON
+     * object per line; the content is pulled out and written straight through,
+     * so the browser appends tokens instead of parsing a protocol.
+     */
+    reply.raw.writeHead(200, {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+      "x-accel-buffering": "no",
+    });
+
+    const decoder = new TextDecoder();
+    let held = "";
+    for await (const chunk of answer.body as unknown as AsyncIterable<Uint8Array>) {
+      held += decoder.decode(chunk, { stream: true });
+      const lines = held.split("\n");
+      // The last piece may be half a line; keep it for the next chunk.
+      held = lines.pop() ?? "";
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try {
+          const parsed = JSON.parse(line) as { message?: { content?: string } };
+          if (parsed.message?.content) reply.raw.write(parsed.message.content);
+        } catch {
+          // A line that isn't JSON is not worth killing the stream over.
+        }
+      }
+    }
+    reply.raw.end();
+    return reply;
+  });
+
+  /** Everything gathered, for the reconcile screen. */
+  app.get("/works/:workId/cast", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    await backfill(workId);
+
+    const sections = await placedDigests(workId);
+    return {
+      rows: await castFor(workId),
+      excluded: await exclusionsFor(workId),
+      /** Where each section sits, so the queue reads in book order. */
+      sections: sections.map((s) => ({ blockId: s.blockId, label: s.label, start: s.start })),
+    };
+  });
+
+  /**
+   * Settle the queue.
+   *
+   * Profiles are scored from committed rows, so this is the moment the record
+   * changes — and every profile of a character whose record just moved is
+   * answering a question nobody is asking any more. They are deleted rather
+   * than marked stale: a chart built on actions that have since been reassigned
+   * is not a weaker answer, it is an answer to a different question.
+   */
+  app.post("/works/:workId/cast/commit", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { decisions } = z
+      .object({
+        decisions: z.array(
+          z.object({
+            id: z.string().uuid(),
+            characterName: z.string().max(200).optional(),
+            action: z.string().max(2000).optional(),
+            drop: z.boolean().optional(),
+            restore: z.boolean().optional(),
+          }),
+        ),
+      })
+      .parse(req.body);
+    await workOr404(workId);
+
+    const touched = await commitCast(workId, decisions);
+    for (const subject of touched) {
+      await db
+        .delete(analyses)
+        .where(
+          and(
+            eq(analyses.workId, workId),
+            eq(analyses.kind, "character"),
+            eq(analyses.subject, subject),
+          ),
+        );
+    }
+
+    return { ok: true as const, affected: touched, pending: await pendingCount(workId) };
+  });
+
   app.post("/works/:workId/analysis/not-a-character", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
