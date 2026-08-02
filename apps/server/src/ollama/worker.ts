@@ -3,6 +3,7 @@ import { blocks, digestState, sectionDigests, settings, templates, works } from 
 import type { DigestProgress, PlacedDigest } from "@brigid/shared";
 import { buildOutline } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
+import { syncSection } from "./cast.js";
 import { inspectModel } from "./client.js";
 import { digestSection, hashContent } from "./digest.js";
 
@@ -272,6 +273,9 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
         .insert(sectionDigests)
         .values(values)
         .onConflictDoUpdate({ target: sectionDigests.blockId, set: values });
+
+      // Into the queue, where the writer settles it before anything is scored.
+      await syncSection(workId, section.id, digest.characters);
     }
 
     await setState(workId, { status: "idle", lastError: null, finished: true });

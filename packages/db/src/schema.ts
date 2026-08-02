@@ -406,3 +406,43 @@ export const excludedCharacters = pgTable(
   },
   (t) => ({ pk: primaryKey({ columns: [t.workId, t.nameFolded] }) }),
 );
+
+/**
+ * What the cast did, as the writer has settled it.
+ *
+ * The reading proposes and this disposes: profiles are scored only from rows
+ * the writer has committed. `origin_*` is what the reading said and is the
+ * row's identity, so re-reading an unchanged section changes nothing; the other
+ * pair is what the writer settled on, and starts as a copy.
+ */
+export const castActions = pgTable(
+  "cast_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    blockId: uuid("block_id")
+      .notNull()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    /** As the reading recorded it — with the block, the row's identity. */
+    originName: text("origin_name").notNull(),
+    originAction: text("origin_action").notNull(),
+    /** As the writer settled it. */
+    characterName: text("character_name").notNull(),
+    action: text("action").notNull(),
+    state: text("state").$type<"pending" | "committed" | "dropped">().notNull().default("pending"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({
+    origin: unique("cast_actions_work_id_block_id_origin_name_origin_action_key").on(
+      t.workId,
+      t.blockId,
+      t.originName,
+      t.originAction,
+    ),
+    byState: index("cast_actions_work_state_idx").on(t.workId, t.state),
+    byCharacter: index("cast_actions_work_character_idx").on(t.workId, t.characterName),
+  }),
+);
