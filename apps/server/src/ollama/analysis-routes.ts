@@ -13,7 +13,12 @@ import {
   works,
   excludedCharacters,
 } from "@brigid/db";
-import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/shared";
+import type {
+  AnalysisDrift,
+  CharacterAnalysis,
+  PlacedDigest,
+  StructureAnalysis,
+} from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
@@ -34,6 +39,7 @@ import {
 import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
 import { backfill, castFor, commitCast, pendingCount } from "./cast.js";
+import { CHAT_SYSTEM, buildBrief } from "./chat.js";
 
 /**
  * Running the frameworks over a finished digest.

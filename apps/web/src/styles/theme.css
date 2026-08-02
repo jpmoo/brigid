@@ -4831,3 +4831,70 @@ mark.hit.active {
   gap: 6px;
   padding-top: 8px;
 }
+
+/* --- Talking about the manuscript ---------------------------------------- */
+
+.chat-log {
+  margin: 12px 0;
+  padding: 12px 14px;
+  max-height: 55vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-sunk, var(--paper));
+}
+
+.chat-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-faint);
+}
+
+.chat-turn {
+  margin-bottom: 14px;
+}
+
+.chat-turn:last-of-type {
+  margin-bottom: 0;
+}
+
+.chat-who {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* The answer is prose about prose, so it is set to be read rather than
+   scanned — and its own newlines are kept. */
+.chat-body {
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.chat-turn.user .chat-body {
+  color: var(--text-muted);
+}
+
+.chat-waiting {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+.chat-ask {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.chat-ask textarea {
+  flex: 1;
+  resize: vertical;
+}

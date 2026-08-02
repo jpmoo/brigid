@@ -26,6 +26,7 @@ import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
 import { IdentityDialog } from "./ai/IdentityDialog.js";
 import { ReconcilePane } from "./ai/ReconcilePane.js";
+import { ChatPane } from "./ai/ChatPane.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
 /**
@@ -37,7 +38,7 @@ import { HoldToConfirm } from "../../components/HoldToConfirm.js";
  * buttons that would refuse.
  */
 
-type Tab = "structure" | "characters" | "raw";
+type Tab = "structure" | "characters" | "chat" | "raw";
 
 export function AiPane({ workId }: { workId: string }) {
   const [bundle, setBundle] = useState<AnalysisBundle | null>(null);
@@ -110,6 +111,11 @@ export function AiPane({ workId }: { workId: string }) {
   const { progress } = bundle;
   const structure = bundle.reports.find((r) => r.kind === "structure");
   const characters = bundle.reports.filter((r) => r.kind === "character");
+  /**
+   * Both analyses are the chat's context, so it has nothing to work from until
+   * they exist — the model has never seen the prose, only findings about it.
+   */
+  const chatReady = Boolean(structure) && characters.length > 0;
 
   return (
     <div className="tpl-detail">
@@ -122,6 +128,7 @@ export function AiPane({ workId }: { workId: string }) {
               [
                 ["structure", "Story shape"],
                 ["characters", "Characters"],
+                ["chat", "Chat"],
                 ["raw", "What was collected"],
               ] as const
             ).map(([key, label]) => (
@@ -162,6 +169,8 @@ export function AiPane({ workId }: { workId: string }) {
               pending={bundle.pendingActions}
               onCommitted={() => void reload()}
             />
+          ) : tab === "chat" ? (
+            <ChatPane workId={workId} ready={chatReady} />
           ) : (
             <RawPane workId={workId} />
           )}
