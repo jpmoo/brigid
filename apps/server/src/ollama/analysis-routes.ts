@@ -32,6 +32,7 @@ import {
 } from "./profile-worker.js";
 import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
+import { backfill, pendingCount } from "./cast.js";
 
 /**
  * Running the frameworks over a finished digest.
@@ -205,6 +206,18 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
     const progress = await progressOf(workId);
     const sections = await placedDigests(workId);
+
+    /**
+     * Fill the queue from whatever has already been read.
+     *
+     * The queue was added after the reading was, so a manuscript read before
+     * this existed has digests and no rows. Backfilling here rather than in a
+     * migration means it also covers a walk that was already under way when the
+     * server restarted — the sections read before the restart never passed
+     * through the sync. Safe to repeat: an already-synced section hits the
+     * unique constraint and does nothing.
+     */
+    await backfill(workId);
     const stored = await db.select().from(analyses).where(eq(analyses.workId, workId));
     const mark = fingerprint(sections);
     const now = snapshot(sections);
@@ -212,6 +225,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     return {
       progress,
       characterRun: await characterProgressOf(workId),
+      pendingActions: await pendingCount(workId),
       structureRun: await structureProgressOf(workId),
       roster: buildRoster(sections, await exclusionsFor(workId)),
       // Labels travel with the findings so the web app doesn't keep a second

@@ -143,6 +143,8 @@ export interface AnalysisBundle {
   characterRun: CharacterRunProgress | null;
   /** Whether the story-shape analysis is under way. */
   structureRun: StructureRunProgress | null;
+  /** Gathered actions waiting to be settled before anything is profiled. */
+  pendingActions: number;
   roster: RosterEntry[];
   axisLabels: Record<string, string>;
   modelLabels: Record<string, string>;
