@@ -335,10 +335,9 @@ export function ReconcilePane({
             Not enough yet to profile
           </h6>
           <p className="tpl-note">
-            Too few actions to score a profile on, so these can&rsquo;t be committed yet.
-            Move a line to the character it belongs to and it counts towards them instead
-            &mdash; several of these are usually one person the reading named twice. The
-            rest are walk-ons, and stay here.
+            Some characters don&rsquo;t have enough actions to be committed. They stay on
+            the list but you won&rsquo;t be able to profile them until you move actions to
+            them, or they receive actions from edits in the manuscript.
           </p>
           <p className="rec-thin">
             {thin
