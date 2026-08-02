@@ -94,6 +94,11 @@ export function ReconcilePane({
         pending: [...g.pending].sort((a, b) => at(a) - at(b)),
         committed: [...g.committed].sort((a, b) => at(a) - at(b)),
       }))
+      /**
+       * Most actions first. The characters with the most gathered are the ones
+       * worth settling, and the ones a mistake costs most on — a walk-on with
+       * two lines can wait at the bottom.
+       */
       .sort(
         (a, b) =>
           b.pending.length + b.committed.length - (a.pending.length + a.committed.length) ||
@@ -292,28 +297,61 @@ export function ReconcilePane({
         const isOpen = open.has(group.name) || group.pending.length > 0;
         return (
           <div className="rec-group" key={group.name}>
-            <button
-              type="button"
-              className="rec-head"
-              aria-expanded={isOpen}
-              onClick={() => {
-                const next = new Set(open);
-                if (!next.delete(group.name)) next.add(group.name);
-                setOpen(next);
-              }}
-            >
-              <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
-              <span className="rec-name">{group.name}</span>
-              <span className="rec-tally">
-                {group.pending.length > 0 ? (
-                  <span className="rec-new">{group.pending.length} new</span>
-                ) : null}
-                {group.committed.length} settled
-              </span>
-            </button>
+            <div className="rec-head-row">
+              {/* Selection is by character: the decision "everything this
+                  reading said about Tuan is wrong" is a real one, and far more
+                  common than picking rows out of a list at random. */}
+              {group.pending.length > 0 ? (
+                <input
+                  type="checkbox"
+                  aria-label={`Select every new action for ${group.name}`}
+                  checked={group.pending.every((r) => picked.has(r.id))}
+                  ref={(el) => {
+                    if (el) {
+                      const some = group.pending.some((r) => picked.has(r.id));
+                      el.indeterminate = some && !group.pending.every((r) => picked.has(r.id));
+                    }
+                  }}
+                  onChange={(e) => {
+                    const next = new Set(picked);
+                    for (const row of group.pending) {
+                      if (e.target.checked) next.add(row.id);
+                      else next.delete(row.id);
+                    }
+                    setPicked(next);
+                  }}
+                />
+              ) : (
+                <span className="rec-nopick" />
+              )}
+
+              <button
+                type="button"
+                className="rec-head"
+                aria-expanded={isOpen}
+                onClick={() => {
+                  const next = new Set(open);
+                  if (!next.delete(group.name)) next.add(group.name);
+                  setOpen(next);
+                }}
+              >
+                <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
+                <span className="rec-name">{group.name}</span>
+                <span className="rec-tally">
+                  {group.pending.length > 0 ? (
+                    <span className="rec-new">{group.pending.length} new</span>
+                  ) : null}
+                  {group.committed.length} settled
+                </span>
+              </button>
+            </div>
 
             {isOpen ? (
               <div className="rec-body">
+                {group.pending.length > 0 ? (
+                  <div className="rec-table-wrap">
+                    <table className="rec-table">
+                      <tbody>
                 {group.pending.map((row) => {
                   const d = draft[row.id] ?? {
                     characterName: row.characterName,
@@ -321,10 +359,11 @@ export function ReconcilePane({
                     drop: false,
                   };
                   return (
-                    <div className={`rec-row${d.drop ? " dropped" : ""}`} key={row.id}>
-                      <label className="check rec-pick">
+                    <tr className={`rec-row${d.drop ? " dropped" : ""}`} key={row.id}>
+                      <td className="rec-cell-pick">
                         <input
                           type="checkbox"
+                          aria-label="Select this action"
                           checked={picked.has(row.id)}
                           onChange={(e) => {
                             const next = new Set(picked);
@@ -333,9 +372,9 @@ export function ReconcilePane({
                             setPicked(next);
                           }}
                         />
-                        <span className="rec-at">{labels.get(row.blockId) ?? "section"}</span>
-                      </label>
-
+                      </td>
+                      <td className="rec-cell-at">{labels.get(row.blockId) ?? "section"}</td>
+                      <td className="rec-cell-action">
                       {row.action ? (
                         <textarea
                           className="rec-action"
@@ -352,7 +391,8 @@ export function ReconcilePane({
                         </span>
                       )}
 
-                      <div className="rec-controls">
+                      </td>
+                      <td className="rec-cell-to">
                         <select
                           value={d.characterName}
                           disabled={d.drop}
@@ -378,10 +418,15 @@ export function ReconcilePane({
                         >
                           <Trash2 size={13} />
                         </button>
-                      </div>
-                    </div>
+                      </td>
+                    </tr>
                   );
                 })}
+
+                      </tbody>
+                    </table>
+                  </div>
+                ) : null}
 
                 {group.committed.length > 0 ? (
                   <ul className="rec-settled">

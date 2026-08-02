@@ -4771,3 +4771,63 @@ mark.hit.active {
   color: var(--text);
   border-color: var(--border-strong);
 }
+
+/* The queue as a table, one character at a time. */
+.rec-head-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.rec-head-row > .rec-head {
+  flex: 1;
+}
+
+/* Keeps the titles of characters with nothing new aligned with the rest. */
+.rec-nopick {
+  display: inline-block;
+  width: 13px;
+}
+
+.rec-table-wrap {
+  overflow-x: auto;
+}
+
+.rec-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rec-table td {
+  padding: 7px 8px 7px 0;
+  border-top: 1px dashed var(--border);
+  vertical-align: top;
+}
+
+.rec-cell-pick {
+  width: 22px;
+  padding-top: 12px;
+}
+
+.rec-cell-at {
+  width: 1%;
+  white-space: nowrap;
+  padding-top: 12px;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.rec-cell-action {
+  width: 100%;
+}
+
+.rec-cell-to {
+  width: 1%;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+}
