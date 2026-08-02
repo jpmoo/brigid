@@ -243,3 +243,11 @@ pnpm dev:server   # and, in another shell, pnpm dev:web
 
 Vite proxies `/api` to port 8090, so the session cookie behaves exactly as it
 does in production.
+
+---
+
+## Licence
+
+MIT — see [LICENSE](LICENSE). Use it, change it, run it, share it. It comes with
+no warranty, which for something holding a novel is worth reading as: keep your
+own backups.
