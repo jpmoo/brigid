@@ -11,6 +11,8 @@ import type {
   ImportedParagraph,
   BlockOptions,
   PlacedDigest,
+  ReassignMove,
+  ReassignProposal,
   RosterEntry,
   StructureAnalysis,
   TemplateBody,
@@ -518,6 +520,15 @@ export const api = {
       `/works/${workId}/analysis/character`,
       body,
     ),
+  /** Where a non-character's recorded actions belong. A proposal only. */
+  proposeReassignment: (workId: string, name: string) =>
+    post<{ proposal: ReassignProposal; ms: number }>(`/works/${workId}/analysis/reassign`, { name }),
+  /** Approve it: rewrites the reading and re-profiles whoever gained actions. */
+  applyReassignment: (workId: string, name: string, moves: ReassignMove[]) =>
+    post<{ ok: true; reprofiling: string[] }>(`/works/${workId}/analysis/reassign/apply`, {
+      name,
+      moves,
+    }),
   /** Rule that an entry is not a character. Survives re-reads of its section. */
   notACharacter: (workId: string, name: string) =>
     post<{ ok: true }>(`/works/${workId}/analysis/not-a-character`, { name }),

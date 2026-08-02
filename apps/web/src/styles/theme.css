@@ -4472,3 +4472,42 @@ mark.hit.active {
 .ai-clear-head[aria-expanded="true"] .fit-caret {
   transform: rotate(90deg);
 }
+
+/* --- Reassigning a non-character's actions ------------------------------- */
+
+.reassign-row {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.reassign-row:first-of-type {
+  border-top: 0;
+}
+
+.reassign-action {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.reassign-to {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.reassign-to select {
+  width: auto;
+  min-width: 180px;
+  padding: 6px 9px;
+}
+
+/* The model's reasoning, kept small: it is context for a decision the writer is
+   making, not the decision itself. */
+.reassign-why {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--text-faint);
+}

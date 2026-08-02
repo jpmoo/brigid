@@ -251,3 +251,26 @@ export interface StructureRunProgress {
   /** Seconds it has been going, so a long wait can say so. */
   elapsedSeconds: number | null;
 }
+
+/** One recorded action, and where it should go instead. */
+export interface ReassignMove {
+  /** Which section it was recorded in, so the rewrite lands in the right place. */
+  blockId: string;
+  /** The action as the digest recorded it. */
+  action: string;
+  /** The character it belongs to, or null to drop it as belonging to nobody. */
+  to: string | null;
+  /** Why, in a few words — the writer is approving this, so it has to argue. */
+  why: string;
+}
+
+/** What the model proposes doing with a ruled-out entry's record. */
+export interface ReassignProposal {
+  /** The entry being ruled out. */
+  name: string;
+  /** Why it reads as a non-character. */
+  reason: string;
+  moves: ReassignMove[];
+  /** Distinct characters that would gain something, and so need re-profiling. */
+  affected: string[];
+}

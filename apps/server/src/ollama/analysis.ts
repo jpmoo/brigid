@@ -1,5 +1,7 @@
 import type {
   CharacterAnalysis,
+  ReassignMove,
+  ReassignProposal,
   PlacedDigest,
   RosterEntry,
   StructureAnalysis,
@@ -595,3 +597,144 @@ export function reconcilePrimacy(profiles: CharacterAnalysis[]): CharacterAnalys
 }
 
 export { MODEL_LABELS };
+
+
+const REASSIGN_SCHEMA = {
+  type: "object",
+  properties: {
+    reason: { type: "string" },
+    moves: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          action: { type: "string" },
+          to: { type: ["string", "null"] },
+          why: { type: "string" },
+        },
+        required: ["action", "to", "why"],
+      },
+    },
+  },
+  required: ["reason", "moves"],
+} as const;
+
+/**
+ * Where a ruled-out entry's actions actually belong.
+ *
+ * The writer has said this is not a character. The actions recorded against it
+ * still happened, though, and throwing them away would quietly weaken every
+ * profile that should have had them — so each one is offered to a real member
+ * of the cast, or marked as belonging to nobody.
+ *
+ * Nothing is written from this. It is a proposal, and the writer approves it.
+ */
+export async function proposeReassignment(opts: {
+  url: string;
+  model: string;
+  numCtx: number | null;
+  thinks?: boolean | null;
+  title: string;
+  name: string;
+  cast: string[];
+  sections: PlacedDigest[];
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}): Promise<{ result: ReassignProposal; ms: number }> {
+  const wanted = foldName(opts.name);
+
+  /** Every action recorded against the entry, with the section it came from. */
+  const recorded: { blockId: string; action: string }[] = [];
+  for (const section of opts.sections) {
+    for (const character of section.characters) {
+      if (foldName(character.name) !== wanted) continue;
+      for (const action of character.actions) {
+        recorded.push({ blockId: section.blockId, action });
+      }
+    }
+  }
+
+  if (recorded.length === 0) {
+    return {
+      result: { name: opts.name, reason: "Nothing was recorded against it.", moves: [], affected: [] },
+      ms: 0,
+    };
+  }
+
+  const prompt = `MANUSCRIPT: "${opts.title}"
+
+"${opts.name}" was recorded by the reading as a character, but the writer says it is not one — it may be a crowd, a place, an object, a title mistaken for a name, or something the prose personifies in passing.
+
+These are the actions recorded against it, one per line:
+${recorded.map((r, i) => `${i + 1}. ${r.action}`).join("\n")}
+
+These are the actual characters in the book:
+${opts.cast.join(", ")}
+
+For each action, decide who really did it, and return one entry per action in "moves" with the action text copied EXACTLY as given above.
+- "to": the name of the character it belongs to, spelled exactly as in the cast list above. Use null if it belongs to no single character — a thing done by a crowd, by nobody in particular, or by someone not in the cast.
+- "why": a few words on how you can tell. If you are guessing, say so, and prefer null to a guess.
+
+Do not invent characters. Do not reassign an action to someone the text does not show doing it — null is the right answer for anything unclear.
+
+Also return "reason": one sentence on what "${opts.name}" actually is, judging only by these actions.`;
+
+  const answer = await generateJson<{ reason?: string; moves?: unknown }>({
+    url: opts.url,
+    model: opts.model,
+    numCtx: opts.numCtx,
+    thinks: opts.thinks ?? null,
+    system:
+      "You are correcting a record. You reassign recorded actions to the characters who performed them, and you say plainly when you cannot tell.",
+    format: REASSIGN_SCHEMA as unknown as Record<string, unknown>,
+    prompt,
+    // Small input and a waiting writer: fail inside the proxy's window rather
+    // than past it, where the answer would have nowhere to go.
+    timeoutMs: opts.timeoutMs ?? 85_000,
+    ...(opts.signal ? { signal: opts.signal } : {}),
+  });
+
+  const castFolded = new Map(opts.cast.map((c) => [foldName(c), c]));
+  const proposed = Array.isArray(answer.value.moves) ? answer.value.moves : [];
+
+  /**
+   * Matched back to the record rather than trusted. A model asked to copy forty
+   * lines exactly will paraphrase one or two, and a move naming an action that
+   * was never recorded would rewrite nothing or, worse, the wrong thing.
+   */
+  const moves: ReassignMove[] = [];
+  const claimed = new Set<number>();
+  for (const raw of proposed as { action?: string; to?: string | null; why?: string }[]) {
+    const text = typeof raw.action === "string" ? raw.action.trim() : "";
+    const at = recorded.findIndex(
+      (r, i) => !claimed.has(i) && r.action.trim().toLowerCase() === text.toLowerCase(),
+    );
+    if (at < 0) continue;
+    claimed.add(at);
+
+    // Only a name actually in the cast. Anything else becomes "nobody".
+    const to = typeof raw.to === "string" ? (castFolded.get(foldName(raw.to)) ?? null) : null;
+    moves.push({
+      blockId: recorded[at]!.blockId,
+      action: recorded[at]!.action,
+      to,
+      why: typeof raw.why === "string" ? raw.why : "",
+    });
+  }
+
+  // Anything the model skipped stays put as unassigned rather than vanishing.
+  for (const [i, r] of recorded.entries()) {
+    if (claimed.has(i)) continue;
+    moves.push({ blockId: r.blockId, action: r.action, to: null, why: "not accounted for" });
+  }
+
+  return {
+    result: {
+      name: opts.name,
+      reason: typeof answer.value.reason === "string" ? answer.value.reason : "",
+      moves,
+      affected: [...new Set(moves.map((m) => m.to).filter((t): t is string => Boolean(t)))],
+    },
+    ms: answer.ms,
+  };
+}

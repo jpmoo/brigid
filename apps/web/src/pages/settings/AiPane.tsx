@@ -23,6 +23,7 @@ import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
+import { ReassignDialog } from "./ai/ReassignDialog.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
 /**
@@ -125,15 +126,7 @@ export function AiPane({ workId }: { workId: string }) {
    * walker re-reads changed sections and would otherwise put it back every time
    * its chapter was edited.
    */
-  async function notACharacter(name: string) {
-    setError(null);
-    try {
-      await api.notACharacter(workId, name);
-      await reload();
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : `could not rule out ${name}`);
-    }
-  }
+  const [ruling, setRuling] = useState<string | null>(null);
 
   async function cancel() {
     try {
@@ -200,11 +193,24 @@ export function AiPane({ workId }: { workId: string }) {
               onCancel={() => void cancel()}
               onRerun={rerunOne}
               onDismiss={dismissOne}
-              onNotACharacter={notACharacter}
+              onNotACharacter={setRuling}
             />
           ) : (
             <RawPane workId={workId} />
           )}
+
+          {ruling ? (
+            <ReassignDialog
+              workId={workId}
+              name={ruling}
+              cast={bundle.roster.filter((r) => r.name !== ruling).map((r) => r.name)}
+              onClose={() => setRuling(null)}
+              onApplied={() => {
+                setRuling(null);
+                void reload();
+              }}
+            />
+          ) : null}
 
           <ClearAll workId={workId} onCleared={() => void reload()} />
         </>
@@ -553,7 +559,7 @@ function CharactersPane({
   onCancel: () => void;
   onRerun: (name: string) => Promise<void>;
   onDismiss: (name: string) => Promise<void>;
-  onNotACharacter: (name: string) => Promise<void>;
+  onNotACharacter: (name: string) => void;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
@@ -664,7 +670,7 @@ function CharactersPane({
                         className="cast-tile-tool"
                         title={`${profile.name} is not a character`}
                         aria-label={`${profile.name} is not a character`}
-                        onClick={() => void onNotACharacter(profile.name)}
+                        onClick={() => onNotACharacter(profile.name)}
                       >
                         <UserX size={13} />
                       </button>

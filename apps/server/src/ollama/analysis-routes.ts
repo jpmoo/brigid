@@ -16,7 +16,12 @@ import type { AnalysisDrift, CharacterAnalysis, PlacedDigest } from "@brigid/sha
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest, notFound } from "../lib/errors.js";
-import { analyseStructure, buildRoster, foldName } from "./analysis.js";
+import {
+  analyseStructure,
+  buildRoster,
+  foldName,
+  proposeReassignment,
+} from "./analysis.js";
 import {
   cancelCharacterRun,
   characterProgressOf,
@@ -334,6 +339,140 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * would reintroduce the entry every time its chapter was edited. Its profile
    * goes with it, since a profile of a crowd is not worth keeping.
    */
+  /**
+   * What should become of a non-character's record.
+   *
+   * A proposal only — nothing is written. The actions recorded against a crowd
+   * or a mistaken title still happened, and dropping them would quietly weaken
+   * every profile that should have had them.
+   *
+   * Run in the request rather than queued, unlike everything else here: the
+   * input is one entry's action list rather than a whole book, the writer is
+   * waiting on the answer to approve it, and a proposal nobody is looking at is
+   * worth nothing. The model call is capped below the proxy's limit so it fails
+   * cleanly instead of past it.
+   */
+  app.post("/works/:workId/analysis/reassign", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { name } = z.object({ name: z.string().min(1) }).parse(req.body);
+    const work = await workOr404(workId);
+    const config = await reader();
+    const sections = await readyDigest(workId);
+
+    const roster = buildRoster(sections, await exclusionsFor(workId));
+    const cast = roster.filter((r) => foldName(r.name) !== foldName(name)).map((r) => r.name);
+
+    const { result, ms } = await proposeReassignment({
+      ...config,
+      title: work.title,
+      name,
+      cast,
+      sections,
+    });
+    return { proposal: result, ms };
+  });
+
+  /**
+   * Approve it.
+   *
+   * This is the one thing in Brigid that edits the reading, which costs an
+   * afternoon to rebuild — so it happens in a single transaction and touches
+   * only what the writer approved. Sections are rewritten in place: the entry's
+   * record is removed and each action is appended to whoever it was assigned
+   * to, creating that character's record in the section if they had none.
+   *
+   * Content hashes are deliberately left alone. They describe the prose, which
+   * has not changed, and bumping them would make the walker re-read every
+   * touched section and undo this.
+   */
+  app.post("/works/:workId/analysis/reassign/apply", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { name, moves } = z
+      .object({
+        name: z.string().min(1),
+        moves: z.array(
+          z.object({
+            blockId: z.string().uuid(),
+            action: z.string().min(1),
+            to: z.string().nullable(),
+            why: z.string().optional(),
+          }),
+        ),
+      })
+      .parse(req.body);
+    await workOr404(workId);
+
+    const wanted = foldName(name);
+    const affected = [...new Set(moves.map((m) => m.to).filter((t): t is string => Boolean(t)))];
+
+    await db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ blockId: sectionDigests.blockId, characters: sectionDigests.characters })
+        .from(sectionDigests)
+        .where(eq(sectionDigests.workId, workId));
+
+      for (const row of rows) {
+        const mine = moves.filter((m) => m.blockId === row.blockId);
+        const holdsIt = row.characters.some((c) => foldName(c.name) === wanted);
+        if (!holdsIt && mine.length === 0) continue;
+
+        // Out with the entry itself.
+        const characters = row.characters.filter((c) => foldName(c.name) !== wanted);
+
+        for (const move of mine) {
+          if (!move.to) continue;
+          const target = characters.find((c) => foldName(c.name) === foldName(move.to!));
+          if (target) {
+            if (!target.actions.includes(move.action)) target.actions.push(move.action);
+          } else {
+            // The recipient wasn't recorded in this section, but the action
+            // says they were there.
+            characters.push({ name: move.to, aliases: [], actions: [move.action] });
+          }
+        }
+
+        await tx
+          .update(sectionDigests)
+          .set({ characters, updatedAt: new Date() })
+          .where(
+            and(eq(sectionDigests.workId, workId), eq(sectionDigests.blockId, row.blockId)),
+          );
+      }
+
+      await tx
+        .insert(excludedCharacters)
+        .values({ workId, nameFolded: wanted, name: name.trim() })
+        .onConflictDoNothing();
+
+      /**
+       * The entry's own profile, and every profile that just gained actions.
+       * A profile scored before the record changed is answering a question that
+       * is no longer being asked.
+       */
+      for (const subject of [name, ...affected]) {
+        await tx
+          .delete(analyses)
+          .where(
+            and(
+              eq(analyses.workId, workId),
+              eq(analyses.kind, "character"),
+              eq(analyses.subject, subject),
+            ),
+          );
+      }
+    });
+
+    // Only the recipients, and only after the rewrite is committed.
+    if (affected.length > 0) {
+      const sections = await placedDigests(workId);
+      await queueCharacterRun(workId, affected, fingerprint(sections), affected[0]!);
+    }
+
+    return { ok: true as const, reprofiling: affected };
+  });
+
   app.post("/works/:workId/analysis/not-a-character", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
