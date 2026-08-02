@@ -4301,10 +4301,32 @@ mark.hit.active {
 /* Pinned to the tile's corner rather than riding along with the titles: an
    epithet is one line or three, and a control that drifts down the card with it
    is a control you have to look for. */
-.cast-tile-expand {
+.cast-tile-tools {
   position: absolute;
   top: 10px;
   right: 10px;
+  display: flex;
+  gap: 4px;
+}
+
+/* Quiet until the tile is under the cursor: three controls on every card would
+   otherwise be the loudest thing in a grid whose subject is the charts. */
+.cast-tile-tool {
+  opacity: 0.35;
+  transition: opacity 0.12s, color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.cast-tile:hover .cast-tile-tool,
+.cast-tile-tool:focus-visible {
+  opacity: 1;
+}
+
+.cast-tile-tool:disabled {
+  opacity: 0.2;
+  cursor: default;
+}
+
+.cast-tile-tool {
   display: grid;
   place-items: center;
   width: 26px;
@@ -4318,7 +4340,7 @@ mark.hit.active {
   transition: color 0.12s, border-color 0.12s, background 0.12s;
 }
 
-.cast-tile-expand:hover {
+.cast-tile-tool:not(:disabled):hover {
   color: var(--text);
   border-color: var(--border-strong);
   background: var(--paper);

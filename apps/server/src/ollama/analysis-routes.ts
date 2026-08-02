@@ -308,6 +308,34 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     return { progress: await characterProgressOf(workId) };
   });
 
+  /**
+   * One character's profile, thrown away.
+   *
+   * Separate from clearing everything because the reasons differ: a profile is
+   * usually dismissed because it is wrong about someone, or because the roster
+   * has since folded two names together and left a profile under the old one.
+   * The reading is untouched, so re-running is one model call rather than an
+   * afternoon.
+   */
+  app.delete("/works/:workId/analysis/character/:name", async (req) => {
+    requireUser(req);
+    const { workId, name } = z
+      .object({ workId: z.string().uuid(), name: z.string().min(1) })
+      .parse(req.params);
+    await workOr404(workId);
+
+    await db
+      .delete(analyses)
+      .where(
+        and(
+          eq(analyses.workId, workId),
+          eq(analyses.kind, "character"),
+          eq(analyses.subject, name),
+        ),
+      );
+    return { ok: true as const };
+  });
+
   app.delete("/works/:workId/analysis", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);

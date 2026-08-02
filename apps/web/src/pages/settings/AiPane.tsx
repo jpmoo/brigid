@@ -88,6 +88,35 @@ export function AiPane({ workId }: { workId: string }) {
     }
   }
 
+  /**
+   * One character, done again. A single model call rather than the whole cast,
+   * because the reading it works from is already there.
+   */
+  async function rerunOne(name: string) {
+    setError(null);
+    try {
+      await api.runCharacterAnalysis(workId, { name });
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `could not queue ${name}`);
+    }
+  }
+
+  /**
+   * A profile thrown away. No confirmation: the reading stays, so putting it
+   * back is one call — nothing like the cost of clearing everything, and a
+   * dialog for it would be theatre.
+   */
+  async function dismissOne(name: string) {
+    setError(null);
+    try {
+      await api.dismissCharacter(workId, name);
+      await reload();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : `could not dismiss ${name}`);
+    }
+  }
+
   async function cancel() {
     try {
       await api.cancelCharacterRun(workId);
@@ -151,6 +180,8 @@ export function AiPane({ workId }: { workId: string }) {
               busy={busy === "characters"}
               onRun={() => void start("characters")}
               onCancel={() => void cancel()}
+              onRerun={rerunOne}
+              onDismiss={dismissOne}
             />
           ) : (
             <RawPane workId={workId} />
@@ -491,6 +522,8 @@ function CharactersPane({
   busy,
   onRun,
   onCancel,
+  onRerun,
+  onDismiss,
 }: {
   bundle: AnalysisBundle;
   reports: AnalysisBundle["reports"];
@@ -498,6 +531,8 @@ function CharactersPane({
   busy: boolean;
   onRun: () => void;
   onCancel: () => void;
+  onRerun: (name: string) => Promise<void>;
+  onDismiss: (name: string) => Promise<void>;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
@@ -592,15 +627,36 @@ function CharactersPane({
                     </div>
                     {/* The whole report needs room the tile hasn't got, so it
                         opens over the page rather than pushing the grid apart. */}
-                    <button
-                      type="button"
-                      className="cast-tile-expand"
-                      title={`Open ${profile.name}'s full profile`}
-                      aria-label={`Open ${profile.name}'s full profile`}
-                      onClick={() => setExpanded(profile.name)}
-                    >
-                      <Maximize2 size={14} />
-                    </button>
+                    <div className="cast-tile-tools">
+                      <button
+                        type="button"
+                        className="cast-tile-tool"
+                        title={`Profile ${profile.name} again`}
+                        aria-label={`Profile ${profile.name} again`}
+                        disabled={working}
+                        onClick={() => void onRerun(profile.name)}
+                      >
+                        <RefreshCw size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="cast-tile-tool"
+                        title={`Dismiss ${profile.name}'s profile`}
+                        aria-label={`Dismiss ${profile.name}'s profile`}
+                        onClick={() => void onDismiss(profile.name)}
+                      >
+                        <X size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        className="cast-tile-tool"
+                        title={`Open ${profile.name}'s full profile`}
+                        aria-label={`Open ${profile.name}'s full profile`}
+                        onClick={() => setExpanded(profile.name)}
+                      >
+                        <Maximize2 size={14} />
+                      </button>
+                    </div>
                   </div>
 
                   <SpiderGraph

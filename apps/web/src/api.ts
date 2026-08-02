@@ -518,6 +518,12 @@ export const api = {
       `/works/${workId}/analysis/character`,
       body,
     ),
+  /** One character's profile. The reading stays, so a re-run is one call. */
+  dismissCharacter: (workId: string, name: string) =>
+    request<{ ok: true }>(
+      `/works/${workId}/analysis/character/${encodeURIComponent(name)}`,
+      { method: "DELETE" },
+    ),
   /** Everything AI-derived, the reading included. The prose is untouched. */
   clearAllAnalysis: (workId: string) =>
     request<{ ok: true }>(`/works/${workId}/analysis?everything=true`, { method: "DELETE" }),
