@@ -8,6 +8,7 @@ import {
   Play,
   Square,
   UserX,
+  Users,
   X,
   RefreshCw,
 } from "lucide-react";
@@ -25,6 +26,7 @@ import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
 import { ReassignDialog } from "./ai/ReassignDialog.js";
+import { IdentityDialog } from "./ai/IdentityDialog.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
 /**
@@ -128,6 +130,7 @@ export function AiPane({ workId }: { workId: string }) {
    * its chapter was edited.
    */
   const [ruling, setRuling] = useState<string | null>(null);
+  const [reconciling, setReconciling] = useState(false);
 
   async function cancel() {
     try {
@@ -195,6 +198,7 @@ export function AiPane({ workId }: { workId: string }) {
               onRerun={rerunOne}
               onDismiss={dismissOne}
               onNotACharacter={setRuling}
+              onReconcile={() => setReconciling(true)}
             />
           ) : (
             <RawPane workId={workId} />
@@ -208,6 +212,17 @@ export function AiPane({ workId }: { workId: string }) {
               onClose={() => setRuling(null)}
               onApplied={() => {
                 setRuling(null);
+                void reload();
+              }}
+            />
+          ) : null}
+
+          {reconciling ? (
+            <IdentityDialog
+              workId={workId}
+              onClose={() => setReconciling(false)}
+              onApplied={() => {
+                setReconciling(false);
                 void reload();
               }}
             />
@@ -404,9 +419,9 @@ function ReadingState({
 }
 
 /**
- * Starting over throws away everything read so far, so it asks first — but
- * inline rather than in a dialog. It is undone by waiting, not by a restore,
- * and the cost is time rather than work.
+ * Starting over throws away everything read so far, so it asks in a dialog
+ * rather than inline. An hour of a machine's work is not something to lose to a
+ * mis-aimed click on a control that sits beside "Stop".
  */
 function RestartReading({
   busy,
@@ -419,22 +434,41 @@ function RestartReading({
   setConfirming: (v: boolean) => void;
   onRestart: () => void;
 }) {
-  if (!confirming) {
-    return (
+  return (
+    <>
       <button className="btn ghost" type="button" disabled={busy} onClick={() => setConfirming(true)}>
         Start over
       </button>
-    );
-  }
-  return (
-    <>
-      <span className="muted">Throw away what has been read and start again?</span>
-      <button className="btn danger" type="button" disabled={busy} onClick={onRestart}>
-        {busy ? "Starting…" : "Yes, start over"}
-      </button>
-      <button className="btn ghost" type="button" disabled={busy} onClick={() => setConfirming(false)}>
-        Keep it
-      </button>
+
+      {confirming ? (
+        <div className="modal-backdrop" onClick={() => setConfirming(false)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">Read the manuscript again?</h2>
+            <p className="card-subtitle">
+              Everything read so far is thrown away and the reading starts from the first
+              section. Your writing is not touched &mdash; but the reading takes as long as
+              it did the first time.
+            </p>
+            <p className="tpl-note">
+              Worth doing after a change to how the manuscript is read. Half a book read one
+              way and half the other is not a reading to judge anything from.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn secondary"
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirming(false)}
+              >
+                Keep what has been read
+              </button>
+              <button className="btn danger" type="button" disabled={busy} onClick={onRestart}>
+                {busy ? "Starting…" : "Start over"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -636,6 +670,7 @@ function CharactersPane({
   onRerun,
   onDismiss,
   onNotACharacter,
+  onReconcile,
 }: {
   bundle: AnalysisBundle;
   reports: AnalysisBundle["reports"];
@@ -646,6 +681,7 @@ function CharactersPane({
   onRerun: (name: string) => Promise<void>;
   onDismiss: (name: string) => Promise<void>;
   onNotACharacter: (name: string) => void;
+  onReconcile: () => void;
 }) {
   const working = run?.status === "queued" || run?.status === "running";
   const judgeable = bundle.roster.filter((r) => r.judgeable);
@@ -691,6 +727,13 @@ function CharactersPane({
         {working ? (
           <button className="btn secondary" type="button" onClick={onCancel}>
             Stop
+          </button>
+        ) : null}
+        {/* Only worth asking once there is a cast to compare. */}
+        {!working && bundle.roster.length > 1 ? (
+          <button className="btn secondary" type="button" onClick={onReconcile}>
+            <Users size={14} />
+            Reconcile the cast
           </button>
         ) : null}
       </div>

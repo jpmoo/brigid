@@ -20,6 +20,7 @@ import {
   analyseStructure,
   buildRoster,
   foldName,
+  proposeIdentities,
   proposeReassignment,
 } from "./analysis.js";
 import {
@@ -352,6 +353,119 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * worth nothing. The model call is capped below the proxy's limit so it fails
    * cleanly instead of past it.
    */
+  /** Who in this cast is the same person. A proposal; nothing is written. */
+  app.post("/works/:workId/analysis/identities", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const work = await workOr404(workId);
+    const config = await reader();
+    const sections = await readyDigest(workId);
+    const roster = buildRoster(sections, await exclusionsFor(workId));
+
+    const { result, ms } = await proposeIdentities({
+      ...config,
+      title: work.title,
+      roster,
+      sections,
+    });
+    return { proposal: result, ms };
+  });
+
+  /**
+   * Fold the approved groups together.
+   *
+   * Every recorded name in a group becomes the canonical one, in the reading
+   * itself, so the merge survives — a fold applied only to today's roster would
+   * be undone the next time one of those sections was re-read. Actions are
+   * unioned rather than concatenated: the same act recorded under two names is
+   * one act.
+   *
+   * The profiles of everyone involved go, since a profile of half a person is
+   * answering a question nobody asked, and the canonical names are re-queued.
+   */
+  app.post("/works/:workId/analysis/identities/apply", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { groups } = z
+      .object({
+        groups: z.array(
+          z.object({ canonical: z.string().min(1), names: z.array(z.string().min(1)).min(2) }),
+        ),
+      })
+      .parse(req.body);
+    await workOr404(workId);
+    if (groups.length === 0) return { ok: true as const, reprofiling: [] };
+
+    /** Folded name → the name it becomes. */
+    const becomes = new Map<string, string>();
+    for (const group of groups) {
+      for (const name of group.names) becomes.set(foldName(name), group.canonical);
+    }
+
+    await db.transaction(async (tx) => {
+      const rows = await tx
+        .select({ blockId: sectionDigests.blockId, characters: sectionDigests.characters })
+        .from(sectionDigests)
+        .where(eq(sectionDigests.workId, workId));
+
+      for (const row of rows) {
+        if (!row.characters.some((c) => becomes.has(foldName(c.name)))) continue;
+
+        const merged = new Map<string, (typeof row.characters)[number]>();
+        for (const character of row.characters) {
+          const name = becomes.get(foldName(character.name)) ?? character.name;
+          const key = foldName(name);
+          const held = merged.get(key);
+          if (!held) {
+            merged.set(key, {
+              ...character,
+              name,
+              // The name this section actually used is worth keeping.
+              aliases: [
+                ...new Set([
+                  ...(character.aliases ?? []),
+                  ...(character.name !== name ? [character.name] : []),
+                ]),
+              ],
+            });
+            continue;
+          }
+          held.aliases = [
+            ...new Set([...(held.aliases ?? []), ...(character.aliases ?? []), character.name]),
+          ].filter(
+            (a) => a !== name,
+          );
+          // Unioned: the same act recorded under two names is one act.
+          held.actions = [...new Set([...held.actions, ...character.actions])];
+        }
+
+        await tx
+          .update(sectionDigests)
+          .set({ characters: [...merged.values()], updatedAt: new Date() })
+          .where(and(eq(sectionDigests.workId, workId), eq(sectionDigests.blockId, row.blockId)));
+      }
+
+      for (const group of groups) {
+        for (const name of group.names) {
+          await tx
+            .delete(analyses)
+            .where(
+              and(
+                eq(analyses.workId, workId),
+                eq(analyses.kind, "character"),
+                eq(analyses.subject, name),
+              ),
+            );
+        }
+      }
+    });
+
+    const canonical = [...new Set(groups.map((g) => g.canonical))];
+    const sections = await placedDigests(workId);
+    await queueCharacterRun(workId, canonical, fingerprint(sections), canonical[0]!);
+    return { ok: true as const, reprofiling: canonical };
+  });
+
   app.post("/works/:workId/analysis/reassign", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);

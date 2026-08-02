@@ -11,6 +11,7 @@ import type {
   ImportedParagraph,
   BlockOptions,
   PlacedDigest,
+  IdentityProposal,
   ReassignMove,
   ReassignProposal,
   RosterEntry,
@@ -523,6 +524,14 @@ export const api = {
   /** Stop the reading, set it going again, or throw it away and start over. */
   controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
+  /** Who in this cast is the same person. A proposal; nothing is written. */
+  proposeIdentities: (workId: string) =>
+    post<{ proposal: IdentityProposal; ms: number }>(`/works/${workId}/analysis/identities`),
+  /** Fold the approved groups together in the reading itself. */
+  applyIdentities: (workId: string, groups: { canonical: string; names: string[] }[]) =>
+    post<{ ok: true; reprofiling: string[] }>(`/works/${workId}/analysis/identities/apply`, {
+      groups,
+    }),
   /** Where a non-character's recorded actions belong. A proposal only. */
   proposeReassignment: (workId: string, name: string) =>
     post<{ proposal: ReassignProposal; ms: number }>(`/works/${workId}/analysis/reassign`, { name }),

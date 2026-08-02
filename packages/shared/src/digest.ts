@@ -274,3 +274,23 @@ export interface ReassignProposal {
   /** Distinct characters that would gain something, and so need re-profiling. */
   affected: string[];
 }
+
+/** Names the reading gave to one person, and what to call them. */
+export interface IdentityGroup {
+  canonical: string;
+  /** Every name to fold in, canonical included. */
+  names: string[];
+  why: string;
+}
+
+/** A name whose record reads like more than one person. */
+export interface IdentitySuspect {
+  name: string;
+  why: string;
+}
+
+/** What a reconciliation pass proposes doing to the cast. */
+export interface IdentityProposal {
+  groups: IdentityGroup[];
+  suspects: IdentitySuspect[];
+}

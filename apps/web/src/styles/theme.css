@@ -4511,3 +4511,29 @@ mark.hit.active {
   font-style: italic;
   color: var(--text-faint);
 }
+
+/* --- Reconciling the cast ------------------------------------------------ */
+
+.identity-group {
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.identity-group:first-of-type {
+  border-top: 0;
+}
+
+/* The proposal itself: two names the reading kept apart, set as an equation
+   because that is exactly the claim being made. */
+.identity-names {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.identity-why {
+  margin: 5px 0 8px 26px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
