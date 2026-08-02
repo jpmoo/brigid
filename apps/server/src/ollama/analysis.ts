@@ -477,6 +477,8 @@ export async function analyseCharacter(opts: {
   thinks?: boolean | null;
   title: string;
   name: string;
+  /** The committed record, when there is one. Falls back to the reading. */
+  dossier?: string;
   /** Lines already written for this cast, so they aren't written again. */
   taken?: string[];
   /** Whose arc to score against — one chart, one perspective. */
@@ -491,7 +493,7 @@ ${AXES}
 The focal perspective for this evaluation is ${opts.focal}. Score ${opts.name} relative to that arc.
 
 Here is everything the manuscript records ${opts.name} doing, in order, each marked with its position as a percentage of the book:
-${dossierFor(opts.sections, opts.name)}
+${opts.dossier ?? dossierFor(opts.sections, opts.name)}
 
 For wider context, the book's event timeline:${timelineFor(opts.sections)}
 
@@ -842,4 +844,88 @@ Use names exactly as spelled above. Do not introduce a name that is not in the l
     .filter((s) => s.name);
 
   return { result: { groups, suspects }, ms: answer.ms };
+}
+
+
+/**
+ * The cast, from what the writer has committed.
+ *
+ * The same shape as `buildRoster`, and the same folding, but read from settled
+ * rows rather than from the reading. This is the list profiles are drawn from,
+ * so an action the writer moved or dropped is reflected here and nowhere else
+ * has to know about it.
+ */
+export function rosterFromCast(
+  rows: { characterName: string; action: string; blockId: string; state: string }[],
+  positions: Map<string, number>,
+  excluded: string[] = [],
+): RosterEntry[] {
+  const ruledOut = new Set(excluded);
+  const byKey = new Map<string, RosterEntry>();
+
+  for (const row of rows) {
+    if (row.state !== "committed") continue;
+    const key = foldName(row.characterName);
+    if (!key || ruledOut.has(key) || !isRealCharacter(row.characterName)) continue;
+
+    const at = positions.get(row.blockId) ?? 0;
+    const held = byKey.get(key);
+    if (!held) {
+      byKey.set(key, {
+        name: row.characterName.trim(),
+        aliases: [],
+        sections: 1,
+        // A row with no action is a character recorded as present and idle.
+        actions: row.action ? 1 : 0,
+        span: { first: at, last: at },
+        judgeable: false,
+      });
+      continue;
+    }
+    if (row.action) held.actions += 1;
+    held.span.first = Math.min(held.span.first, at);
+    held.span.last = Math.max(held.span.last, at);
+  }
+
+  // Sections are counted as distinct blocks, not as rows.
+  for (const [key, entry] of byKey) {
+    entry.sections = new Set(
+      rows.filter((r) => r.state === "committed" && foldName(r.characterName) === key).map((r) => r.blockId),
+    ).size;
+  }
+
+  mergeTitled(byKey);
+
+  return [...byKey.values()]
+    .map((entry) => decideJudgeable(entry))
+    .sort((a, b) => b.actions - a.actions || a.name.localeCompare(b.name));
+}
+
+/** One character's committed record, positioned, for the profiling prompt. */
+export function dossierFromCast(
+  rows: { characterName: string; action: string; blockId: string; state: string }[],
+  sections: PlacedDigest[],
+  name: string,
+): string {
+  const wanted = foldName(name);
+  const byBlock = new Map(sections.map((s) => [s.blockId, s]));
+
+  const mine = rows
+    .filter((r) => r.state === "committed" && foldName(r.characterName) === wanted && r.action)
+    .sort((a, b) => (byBlock.get(a.blockId)?.start ?? 0) - (byBlock.get(b.blockId)?.start ?? 0));
+
+  const lines: string[] = [];
+  let lastBlock = "";
+  for (const row of mine) {
+    if (row.blockId !== lastBlock) {
+      const section = byBlock.get(row.blockId);
+      const at = section
+        ? `${Math.round(section.start * 100)}\u2013${Math.round(section.end * 100)}%`
+        : "?";
+      lines.push(`\n[${at}] ${section?.label ?? "section"}`);
+      lastBlock = row.blockId;
+    }
+    lines.push(`  \u2022 ${row.action}`);
+  }
+  return lines.join("\n");
 }

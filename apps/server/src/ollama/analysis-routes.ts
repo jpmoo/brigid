@@ -20,6 +20,7 @@ import {
   analyseStructure,
   buildRoster,
   foldName,
+  rosterFromCast,
   proposeIdentities,
   proposeReassignment,
 } from "./analysis.js";
@@ -32,7 +33,7 @@ import {
 } from "./profile-worker.js";
 import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
-import { backfill, pendingCount } from "./cast.js";
+import { backfill, castFor, commitCast, pendingCount } from "./cast.js";
 
 /**
  * Running the frameworks over a finished digest.
@@ -227,7 +228,15 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       characterRun: await characterProgressOf(workId),
       pendingActions: await pendingCount(workId),
       structureRun: await structureProgressOf(workId),
-      roster: buildRoster(sections, await exclusionsFor(workId)),
+      /**
+       * From what the writer has committed, not from the reading. An action
+       * they moved or dropped is reflected here and nowhere else has to know.
+       */
+      roster: rosterFromCast(
+        await castFor(workId),
+        new Map(sections.map((s) => [s.blockId, s.start])),
+        await exclusionsFor(workId),
+      ),
       // Labels travel with the findings so the web app doesn't keep a second
       // copy of the frameworks' names that could drift from this one.
       axisLabels: AXIS_LABELS,
@@ -285,7 +294,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const work = await workOr404(workId);
     const config = await reader();
     const sections = await readyDigest(workId);
-    const roster = buildRoster(sections, await exclusionsFor(workId));
+    const roster = rosterFromCast(
+      await castFor(workId),
+      new Map(sections.map((s) => [s.blockId, s.start])),
+      await exclusionsFor(workId),
+    );
     const judgeable = roster.filter((r) => r.judgeable);
 
     if (judgeable.length === 0) {
@@ -368,13 +381,79 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * cleanly instead of past it.
    */
   /** Who in this cast is the same person. A proposal; nothing is written. */
+  /** Everything gathered, for the reconcile screen. */
+  app.get("/works/:workId/cast", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    await backfill(workId);
+
+    const sections = await placedDigests(workId);
+    return {
+      rows: await castFor(workId),
+      excluded: await exclusionsFor(workId),
+      /** Where each section sits, so the queue can be read in book order. */
+      sections: sections.map((s) => ({
+        blockId: s.blockId,
+        label: s.label,
+        start: s.start,
+      })),
+    };
+  });
+
+  /**
+   * Settle the queue.
+   *
+   * Profiles are scored from committed rows, so this is the moment the record
+   * changes — and every profile of a character whose record just moved is
+   * answering a question nobody is asking any more. They are deleted rather
+   * than marked stale: a chart built on actions that have since been reassigned
+   * is not a weaker answer, it is the wrong one.
+   */
+  app.post("/works/:workId/cast/commit", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { decisions } = z
+      .object({
+        decisions: z.array(
+          z.object({
+            id: z.string().uuid(),
+            characterName: z.string().max(200).optional(),
+            action: z.string().max(2000).optional(),
+            drop: z.boolean().optional(),
+          }),
+        ),
+      })
+      .parse(req.body);
+    await workOr404(workId);
+
+    const touched = await commitCast(workId, decisions);
+    for (const subject of touched) {
+      await db
+        .delete(analyses)
+        .where(
+          and(
+            eq(analyses.workId, workId),
+            eq(analyses.kind, "character"),
+            eq(analyses.subject, subject),
+          ),
+        );
+    }
+
+    return { ok: true as const, affected: touched, pending: await pendingCount(workId) };
+  });
+
   app.post("/works/:workId/analysis/identities", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
     const work = await workOr404(workId);
     const config = await reader();
     const sections = await readyDigest(workId);
-    const roster = buildRoster(sections, await exclusionsFor(workId));
+    const roster = rosterFromCast(
+      await castFor(workId),
+      new Map(sections.map((s) => [s.blockId, s.start])),
+      await exclusionsFor(workId),
+    );
 
     const { result, ms } = await proposeIdentities({
       ...config,
@@ -488,7 +567,11 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const config = await reader();
     const sections = await readyDigest(workId);
 
-    const roster = buildRoster(sections, await exclusionsFor(workId));
+    const roster = rosterFromCast(
+      await castFor(workId),
+      new Map(sections.map((s) => [s.blockId, s.start])),
+      await exclusionsFor(workId),
+    );
     const cast = roster.filter((r) => foldName(r.name) !== foldName(name)).map((r) => r.name);
 
     const { result, ms } = await proposeReassignment({

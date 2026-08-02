@@ -7,7 +7,8 @@ import type {
   StructureRunProgress,
 } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
-import { analyseCharacter, analyseStructure, reconcilePrimacy } from "./analysis.js";
+import { analyseCharacter, analyseStructure, dossierFromCast, reconcilePrimacy } from "./analysis.js";
+import { castFor } from "./cast.js";
 import { placedDigests } from "./worker.js";
 
 /**
@@ -354,6 +355,9 @@ async function drainOne(workId: string, signal: AbortSignal): Promise<boolean> {
       thinks: config.thinks,
       title: work.title,
       name: next,
+      // The settled record, not the reading: an action the writer moved or
+      // dropped must not turn up in the prompt it was moved out of.
+      dossier: dossierFromCast(await castFor(workId), sections, next),
       taken,
       // Fixed for the run: one chart is one perspective.
       focal: row.focal ?? row.wanted[0] ?? next,
