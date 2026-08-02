@@ -446,3 +446,24 @@ export const castActions = pgTable(
     byCharacter: index("cast_actions_work_character_idx").on(t.workId, t.characterName),
   }),
 );
+
+/**
+ * The conversation about a manuscript.
+ *
+ * Kept because the useful questions about a book are the ones you come back to
+ * a week later, and because a follow-up needs the turn before it to have
+ * survived. Per manuscript, which is what the conversation is about.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    role: text("role").$type<"user" | "assistant">().notNull(),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byTime: index("chat_messages_work_time_idx").on(t.workId, t.createdAt) }),
+);

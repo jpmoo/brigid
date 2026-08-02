@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { Send, Square } from "lucide-react";
+import { Send, Square, Trash2 } from "lucide-react";
 import { apiUrl } from "../../../base.js";
+import { ApiError, api } from "../../../api.js";
+import { Markdown } from "./Markdown.js";
 
 /**
  * Talking about the manuscript, once both analyses are in.
@@ -26,6 +28,29 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const foot = useRef<HTMLDivElement | null>(null);
+  const [clearing, setClearing] = useState(false);
+
+  /**
+   * The conversation is kept, so returning to this tab picks up where it left
+   * off — and a follow-up like "and the other one?" still has the turn before
+   * it to refer to.
+   */
+  useEffect(() => {
+    if (!ready) return;
+    let alive = true;
+    void api
+      .getChatHistory(workId)
+      .then(({ messages: held }) => {
+        if (alive) setMessages(held);
+      })
+      .catch(() => {
+        // An empty transcript is indistinguishable from a failed read here, and
+        // neither is worth an error over an unasked question.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [workId, ready]);
 
   // Follow the answer as it arrives, which is the point of streaming it.
   useEffect(() => {
@@ -111,6 +136,40 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
 
       {error ? <div className="alert error">{error}</div> : null}
 
+      {clearing ? (
+        <div className="modal-backdrop" onClick={() => setClearing(false)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">Clear this conversation?</h2>
+            <p className="card-subtitle">
+              The whole transcript goes. Nothing else is affected &mdash; the analyses it
+              draws on are untouched, and the next question starts from them as before.
+            </p>
+            <div className="modal-actions">
+              <button className="btn secondary" type="button" onClick={() => setClearing(false)}>
+                Keep it
+              </button>
+              <button
+                className="btn danger"
+                type="button"
+                onClick={() => {
+                  void api
+                    .clearChatHistory(workId)
+                    .then(() => {
+                      setMessages([]);
+                      setClearing(false);
+                    })
+                    .catch((err: unknown) =>
+                      setError(err instanceof ApiError ? err.message : "could not clear it"),
+                    );
+                }}
+              >
+                Clear it
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <div className="chat-log">
         {messages.length === 0 ? (
           <p className="chat-empty">
@@ -125,7 +184,18 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
           <div className={`chat-turn ${message.role}`} key={i}>
             <span className="chat-who">{message.role === "user" ? "You" : "Brigid"}</span>
             <div className="chat-body">
-              {message.content || <span className="chat-waiting">Thinking&hellip;</span>}
+              {message.content ? (
+                // The writer's own words are shown as typed; the model's are
+                // rendered, because it writes Markdown whether or not anyone
+                // asked and asterisks are not emphasis.
+                message.role === "assistant" ? (
+                  <Markdown text={message.content} />
+                ) : (
+                  message.content
+                )
+              ) : (
+                <span className="chat-waiting">Thinking&hellip;</span>
+              )}
             </div>
           </div>
         ))}
@@ -147,6 +217,17 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
             }
           }}
         />
+        {messages.length > 0 && !streaming ? (
+          <button
+            className="btn ghost"
+            type="button"
+            title="Clear this conversation"
+            onClick={() => setClearing(true)}
+          >
+            <Trash2 size={14} />
+            Clear
+          </button>
+        ) : null}
         {streaming ? (
           <button className="btn secondary" type="button" onClick={() => abort.current?.abort()}>
             <Square size={14} />

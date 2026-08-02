@@ -536,6 +536,13 @@ export const api = {
   /** Stop the reading, set it going again, or throw it away and start over. */
   controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
+  /** The conversation so far, oldest first. */
+  getChatHistory: (workId: string) =>
+    request<{ messages: { role: "user" | "assistant"; content: string }[] }>(
+      `/works/${workId}/chat/history`,
+    ),
+  clearChatHistory: (workId: string) =>
+    request<{ ok: true }>(`/works/${workId}/chat/history`, { method: "DELETE" }),
   /** One character back to a blank slate: every line re-queued, profile gone. */
   resetCharacter: (workId: string, name: string) =>
     post<{ ok: true; restored: number; pending: number }>(`/works/${workId}/cast/reset`, { name }),

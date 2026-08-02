@@ -5,6 +5,7 @@ import { z } from "zod";
 import {
   analyses,
   blocks,
+  chatMessages,
   characterRuns,
   digestState,
   castActions,
@@ -544,6 +545,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
 
     const decoder = new TextDecoder();
     let held = "";
+    /** The whole reply, kept so the exchange can be saved once it is complete. */
+    let said = "";
     for await (const chunk of answer.body as unknown as AsyncIterable<Uint8Array>) {
       held += decoder.decode(chunk, { stream: true });
       const lines = held.split("\n");
@@ -553,14 +556,58 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         if (!line.trim()) continue;
         try {
           const parsed = JSON.parse(line) as { message?: { content?: string } };
-          if (parsed.message?.content) reply.raw.write(parsed.message.content);
+          if (parsed.message?.content) {
+            said += parsed.message.content;
+            reply.raw.write(parsed.message.content);
+          }
         } catch {
           // A line that isn't JSON is not worth killing the stream over.
         }
       }
     }
     reply.raw.end();
+
+    /**
+     * Saved after the fact, and both halves together.
+     *
+     * Written when the stream finishes rather than as it goes, so a reply the
+     * writer stopped or that died halfway is not kept as though it were an
+     * answer. Only the newest question is stored — the rest of `messages` came
+     * from the transcript and is already here.
+     */
+    if (said.trim()) {
+      const asked = messages.filter((m) => m.role === "user").at(-1);
+      await db.insert(chatMessages).values(
+        [
+          asked ? { workId, role: "user" as const, content: asked.content } : null,
+          { workId, role: "assistant" as const, content: said },
+        ].filter((v): v is NonNullable<typeof v> => v !== null),
+      );
+    }
+
     return reply;
+  });
+
+  /** The conversation so far, oldest first. */
+  app.get("/works/:workId/chat/history", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    const rows = await db
+      .select({ role: chatMessages.role, content: chatMessages.content })
+      .from(chatMessages)
+      .where(eq(chatMessages.workId, workId))
+      .orderBy(chatMessages.createdAt);
+    return { messages: rows };
+  });
+
+  /** Start again. Takes the lot — there is no partial forgetting. */
+  app.delete("/works/:workId/chat/history", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    await db.delete(chatMessages).where(eq(chatMessages.workId, workId));
+    return { ok: true as const };
   });
 
   /** One character back to a blank slate: every line re-queued, profile gone. */
