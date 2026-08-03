@@ -752,13 +752,20 @@ export function WorkPage() {
       // Straight into naming it. A bookmark dropped and left with its fallback
       // name is one nobody can tell from the others a week later, and the
       // moment you know why you marked the place is this one.
-      await renameBookmark(bookmark);
+      //
+      // Cancelling here means "I didn't mean to make this", not "keep it
+      // unnamed": the dialog opened by itself rather than being asked for, so
+      // the only way to back out of an accidental drop is for cancel to undo
+      // it. Cancelling a rename on an existing bookmark still just leaves it be.
+      const named = await renameBookmark(bookmark);
+      if (!named) await removeBookmark(bookmark, { confirm: false });
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not add the bookmark");
     }
   }
 
-  async function renameBookmark(bookmark: Bookmark) {
+  /** True when a name was saved, false when the writer backed out. */
+  async function renameBookmark(bookmark: Bookmark): Promise<boolean> {
     const answer = await dialogs.prompt({
       title: "This bookmark",
       fields: [
@@ -767,9 +774,9 @@ export function WorkPage() {
         { label: "Note (optional)", value: bookmark.description ?? "", rows: 4 },
       ],
     });
-    if (!answer) return;
+    if (!answer) return false;
     const name = answer[0]?.trim();
-    if (!name) return;
+    if (!name) return false;
     try {
       const { bookmark: updated } = await api.editBookmark(bookmark.id, {
         name,
@@ -777,22 +784,34 @@ export function WorkPage() {
         description: answer[1]?.trim() || null,
       });
       setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      return true;
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not rename the bookmark");
+      // Not a cancellation: the bookmark stands, and a failed save should not
+      // take a just-dropped one away with it.
+      return true;
     }
   }
 
-  async function removeBookmark(bookmark: Bookmark) {
-    // A bookmark is a note to yourself about a place, and the note is the part
-    // that cannot be reconstructed — the place you could find again.
-    const ok = await dialogs.confirm({
-      title: `Delete "${bookmark.name}"?`,
-      message: bookmark.description
-        ? `Its note goes with it: "${bookmark.description}"`
-        : "The manuscript is not affected.",
-      confirmLabel: "Delete",
-      danger: true,
-    });
+  async function removeBookmark(bookmark: Bookmark, options?: { confirm?: boolean }) {
+    /**
+     * A bookmark is a note to yourself about a place, and the note is the part
+     * that cannot be reconstructed — the place you could find again.
+     *
+     * Not asked when undoing a drop the writer has just cancelled out of. They
+     * said no a moment ago, and asking again about a bookmark that never really
+     * existed is noise.
+     */
+    const ok =
+      options?.confirm === false ||
+      (await dialogs.confirm({
+        title: `Delete "${bookmark.name}"?`,
+        message: bookmark.description
+          ? `Its note goes with it: "${bookmark.description}"`
+          : "The manuscript is not affected.",
+        confirmLabel: "Delete",
+        danger: true,
+      }));
     if (!ok) return;
     try {
       await api.deleteBookmark(bookmark.id);
