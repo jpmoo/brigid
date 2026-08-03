@@ -5,6 +5,7 @@ import {
   asProseDoc,
   autocorrectKeystroke,
   countWords,
+  foldForSearch,
   hasMark,
   normalizeProse,
   proseFromParagraphs,
@@ -59,11 +60,11 @@ const PROSE_FLAVOUR = "application/x-brigid-prose";
 // to break here, and none can be tested without a live DOM and a live
 // selection.
 
-function runsToHtml(runs: ProseText[], speller: Speller | null): string {
+function runsToHtml(runs: ProseText[], speller: Speller | null, search?: string): string {
   if (runs.length === 0) return "<br>";
   return runs
     .map((run) => {
-      const inner = speller ? markMisspellings(run.text, speller) : escapeHtml(run.text);
+      const inner = decorate(run.text, speller, search);
       const underlined = hasMark(run, "underline") ? `<u>${inner}</u>` : inner;
       const em = hasMark(run, "em") ? `<em>${underlined}</em>` : underlined;
       return hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
@@ -110,6 +111,72 @@ function markMisspellings(text: string, speller: Speller): string {
 }
 
 /**
+ * Search hits and misspellings, in one pass.
+ *
+ * Both are decoration over the text rather than a change to it, and the editor
+ * has always drawn one of them — which is the argument for drawing the other.
+ * Without it, a section open for editing showed no hits, so searching for an
+ * overused word and fixing the instances one by one meant leaving the editor
+ * between every one.
+ *
+ * Marked together rather than in two passes because they overlap: a misspelled
+ * word can also be a hit, and wrapping one result in the other produces nested
+ * tags around half a word. Walking the text once and taking whichever boundary
+ * comes next keeps every span whole.
+ */
+function decorate(text: string, speller: Speller | null, search?: string): string {
+  const hits: { at: number; length: number }[] = [];
+  if (search) {
+    // Folded on both sides, so a search behaves here as it does in the reading
+    // view — case and accents ignored, the same matches found.
+    const haystack = foldForSearch(text);
+    const needle = foldForSearch(search);
+    if (needle) {
+      for (let at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+        hits.push({ at, length: needle.length });
+      }
+    }
+  }
+
+  const wrong = new Map<number, string>();
+  if (speller) {
+    for (const { word, at } of words(text)) {
+      if (!speller.correct(word)) wrong.set(at, word);
+    }
+  }
+
+  if (hits.length === 0 && wrong.size === 0) return escapeHtml(text);
+
+  let out = "";
+  let from = 0;
+  let at = 0;
+  while (at < text.length) {
+    const hit = hits.find((h) => h.at === at);
+    const misspelt = wrong.get(at);
+
+    // A hit wins where both start together: the writer is looking for it, and
+    // the underline still shows through beneath the highlight.
+    if (hit) {
+      out += escapeHtml(text.slice(from, at));
+      out += `<mark class="hit">${escapeHtml(text.slice(at, at + hit.length))}</mark>`;
+      from = at + hit.length;
+      at = from;
+      continue;
+    }
+    if (misspelt) {
+      out += escapeHtml(text.slice(from, at));
+      out += `<span class="misspelled" data-word="${escapeHtml(misspelt)}">${escapeHtml(misspelt)}</span>`;
+      from = at + misspelt.length;
+      at = from;
+      continue;
+    }
+    at += 1;
+  }
+  out += escapeHtml(text.slice(from));
+  return out;
+}
+
+/**
  * How the manuscript sets its paragraphs: the first-line indent, and whether the
  * opening one runs flush.
  *
@@ -147,13 +214,14 @@ export function docToHtml(
   doc: ProseDoc,
   speller: Speller | null,
   layout?: ProseLayout,
+  search?: string,
 ): string {
   if (doc.content.length === 0) return `<p${paragraphAttrs(0, false, layout)}><br></p>`;
   return doc.content
     .map(
       (p, i) =>
         `<p${paragraphAttrs(i, p.blockquote === true, layout)}>` +
-        `${runsToHtml(p.content ?? [], speller)}</p>`,
+        `${runsToHtml(p.content ?? [], speller, search)}</p>`,
     )
     .join("");
 }
@@ -548,6 +616,11 @@ export interface ProseEditorProps {
   layout: ProseLayout;
   /** A word to open the suggestions on, when that is what was clicked. */
   askAbout?: string | undefined;
+  /**
+   * The current search, so hits are lit up here as they are in the reading
+   * view. Folded the same way, so the same words match.
+   */
+  search?: string | undefined;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
@@ -564,6 +637,7 @@ export interface ProseEditorProps {
 export function ProseEditor({
   blockId,
   initialSelection,
+  search,
   layout,
   askAbout,
   content,
@@ -581,6 +655,14 @@ export function ProseEditor({
   // Held in a ref: the rebuild functions are memoised on the checker, and the
   // layout must not be a reason to remake them.
   const layoutRef = useRef(layout);
+  /**
+   * Read through a ref rather than a dependency. The element is rebuilt by
+   * several unrelated paths — the spell pass, undo, a blockquote — and each has
+   * to draw the search that is current when it runs, not the one captured when
+   * it was defined.
+   */
+  const searchRef = useRef(search);
+  searchRef.current = search;
   layoutRef.current = layout;
 
   /**
@@ -609,7 +691,7 @@ export function ProseEditor({
     const doc =
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current);
     // Focusing an element scrolls it into view, and the writer has just clicked
     // on the very words they want to stay put — so the page shifted under the
     // caret at the moment it arrived. The caret is placed by offset, which
@@ -748,7 +830,7 @@ export function ProseEditor({
       historyAt.current = next;
 
       restoring.current = true;
-      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current);
+      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current, searchRef.current);
       setCaret(el, entry.caret);
       restoring.current = false;
 
@@ -772,7 +854,7 @@ export function ProseEditor({
     // editor opened — so collapsing here would throw away the passage just
     // carried in from the manuscript.
     const held = selectionOffsets(el);
-    const html = docToHtml(doc, speller, layoutRef.current);
+    const html = docToHtml(doc, speller, layoutRef.current, searchRef.current);
     if (html === el.innerHTML) return;
     el.innerHTML = html;
     if (held) setSelection(el, held.anchor, held.focus);
@@ -788,6 +870,17 @@ export function ProseEditor({
     if (!speller) return;
     recheck();
   }, [speller, recheck]);
+
+  /**
+   * Redraw when the search changes, so hits appear and clear as they are typed.
+   *
+   * `recheck` rebuilds from the model and keeps the selection, which is exactly
+   * what is wanted: the writer may be mid-edit with a passage selected while
+   * the query changes underneath them.
+   */
+  useEffect(() => {
+    recheck();
+  }, [search, recheck]);
 
   /**
    * The paragraphs the selection covers, or the one the caret sits in.
@@ -837,7 +930,7 @@ export function ProseEditor({
     // Rebuilt from the model so the class and the indent follow the attribute,
     // rather than being patched onto the element by hand in two places.
     const doc = htmlToDoc(el);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current);
     // Same reasoning: turning a passage into a blockquote should leave that
     // passage selected, not put a caret in the middle of it.
     if (held) setSelection(el, held.anchor, held.focus);

@@ -698,22 +698,6 @@ export function WorkPage() {
   }, []);
 
   /**
-   * Searching leaves the editor.
-   *
-   * A block open for editing renders its own prose with none of the search
-   * highlighting, so a hit inside it cannot be lit up and the page has nothing
-   * to scroll to. Closing as soon as there is a query means every match in the
-   * manuscript behaves the same, including the ones in whichever section
-   * happened to be open when the search started.
-   *
-   * Nothing is lost: the editor flushes on unmount, so this is the same as
-   * clicking away from it.
-   */
-  useEffect(() => {
-    if (query.trim() && editingProse) setEditingProse(null);
-  }, [query, editingProse]);
-
-  /**
    * Move to the next hit, and leave the editor if one is open.
    *
    * Stepping through results is navigation, and the editor is effectively modal
@@ -728,7 +712,6 @@ export function WorkPage() {
    */
   const stepMatch = (delta: 1 | -1) => {
     if (matches.length === 0) return;
-    setEditingProse(null);
     setMatchIndex((matchIndex + delta + matches.length) % matches.length);
   };
 
@@ -1149,6 +1132,7 @@ export function WorkPage() {
                   blockId={editingProse.id}
                   initialSelection={editingProse.selection}
                   askAbout={editingProse.askAbout}
+                  search={query.trim() || undefined}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}

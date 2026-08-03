@@ -5143,3 +5143,18 @@ mark.hit.active {
 .prose.has-bookmark {
   position: relative;
 }
+
+/* A search hit inside the editor. Lighter than the reading view's, because
+   here it sits under a caret and a selection and must not compete with them —
+   it is there to be found, not to be looked at. */
+.prose-editor [contenteditable] mark.hit {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: inherit;
+  border-radius: 2px;
+}
+
+/* A misspelled word inside a hit keeps its underline: the highlight says
+   "this is what you searched for", the underline says "and it is wrong". */
+.prose-editor [contenteditable] mark.hit .misspelled {
+  background: none;
+}
