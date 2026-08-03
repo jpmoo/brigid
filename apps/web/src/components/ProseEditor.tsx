@@ -797,11 +797,40 @@ export function ProseEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paragraphsInSelection, speller, scheduleSave]);
 
+  /**
+   * Whether the caret sits inside a real underline.
+   *
+   * Not `queryCommandState("underline")`, which asks the browser about the
+   * computed text-decoration and is therefore quite right to say yes inside a
+   * misspelling squiggle — that squiggle is a text-decoration too. The button
+   * would light up on every flagged word, and pressing it to turn the
+   * "underline" off would instead underline the word for real.
+   *
+   * So the DOM is asked the question actually meant: is there a `u` between
+   * here and the editor, or an element deliberately styled as underlined.
+   * `.misspelled` is stepped over, because it is a mark on the text rather than
+   * a property of it.
+   */
+  const underlinedAtCaret = (): boolean => {
+    const selection = window.getSelection();
+    const anchor = selection?.anchorNode;
+    if (!anchor) return false;
+
+    let node: Node | null = anchor.nodeType === Node.TEXT_NODE ? anchor.parentNode : anchor;
+    while (node && node instanceof HTMLElement) {
+      if (node.classList.contains("prose-editor")) return false;
+      if (node.tagName === "U") return true;
+      if (!node.classList.contains("misspelled") && isUnderlined(node)) return true;
+      node = node.parentNode;
+    }
+    return false;
+  };
+
   const refreshMarks = useCallback(() => {
     setMarks({
       strong: document.queryCommandState("bold"),
       em: document.queryCommandState("italic"),
-      underline: document.queryCommandState("underline"),
+      underline: underlinedAtCaret(),
     });
     refreshQuoted();
   }, [refreshQuoted]);
