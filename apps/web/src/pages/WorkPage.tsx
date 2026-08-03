@@ -697,9 +697,14 @@ export function WorkPage() {
       return;
     }
     const id = window.requestAnimationFrame(() => {
-      paneRef.current
-        ?.querySelector("mark.hit.active")
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      // .focus() auto-scrolls inline content reliably cross-browser where
+      // scrollIntoView on <mark> is broken/silent. Focus the hit, then blur
+      // after a tick so no blinking cursor remains at the search result.
+      const hit = paneRef.current?.querySelector("mark[tabindex=\"-1\"]");
+      if (hit) {
+        (hit as HTMLElement).focus();
+        setTimeout(() => ((hit as HTMLElement).blur?.()), 50);
+      }
     });
     return () => window.cancelAnimationFrame(id);
   }, [activeMatch]);

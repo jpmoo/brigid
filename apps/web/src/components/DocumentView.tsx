@@ -117,8 +117,16 @@ function highlight(
 
     const ordinal = counter.n;
     counter.n += 1;
+    // Make the active hit focusable so browsers scroll inline elements reliably.
+    // Inline <mark> does not have consistent scrollIntoView rects across engines,
+    // but document.querySelector() → .focus() works everywhere the text is actually rendered.
+    const isActive = ordinal === activeIndex;
     parts.push(
-      <mark className={ordinal === activeIndex ? "hit active" : "hit"} key={`${start}-${ordinal}`}>
+      <mark
+        className={isActive ? "hit active" : "hit"}
+        tabIndex={isActive ? -1 : undefined}
+        key={`${start}-${ordinal}`}
+      >
         {text.slice(start, end)}
       </mark>,
     );
