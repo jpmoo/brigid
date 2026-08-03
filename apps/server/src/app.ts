@@ -103,13 +103,49 @@ async function registerWebApp(app: FastifyInstance): Promise<void> {
     return;
   }
 
-  await app.register(fastifyStatic, { root: webDist, index: ["index.html"] });
+  /**
+   * The shell is never cached; everything else is cached hard.
+   *
+   * Vite fingerprints every asset, so `index-BYQ5i0RO.js` can be kept forever —
+   * a changed build means a changed name. `index.html` is the one file whose
+   * name never changes, and it is the file naming those assets. Let a proxy or
+   * a browser hold on to it and a rebuilt, redeployed, migrated server goes on
+   * serving last week's application, with no way to tell from the outside and
+   * no error anywhere. That has cost more debugging here than any bug.
+   */
+  await app.register(fastifyStatic, {
+    root: webDist,
+    index: ["index.html"],
+    /**
+     * The plugin types this parameter as a FastifyReply but hands over Node's
+     * raw ServerResponse, so neither method can be assumed. Whichever one is
+     * actually there is used.
+     */
+    setHeaders(res, path) {
+      const value = path.endsWith(".html")
+        ? "no-store, must-revalidate"
+        : path.includes("/assets/")
+          ? // Fingerprinted, so a cached copy can never be the wrong answer.
+            "public, max-age=31536000, immutable"
+          : null;
+      if (!value) return;
+
+      const target = res as unknown as {
+        setHeader?: (k: string, v: string) => void;
+        header?: (k: string, v: string) => void;
+      };
+      if (typeof target.setHeader === "function") target.setHeader("cache-control", value);
+      else target.header?.("cache-control", value);
+    },
+  });
 
   // Serve the shell at the root explicitly rather than leaning on the static
   // plugin's directory handling: with `index` disabled it answers GET / with a
   // 403, and an explicit route takes precedence over the plugin's wildcard
   // either way, so the root can't depend on that option's default.
-  app.get("/", (_req, reply) => reply.sendFile("index.html"));
+  app.get("/", (_req, reply) =>
+    reply.header("cache-control", "no-store, must-revalidate").sendFile("index.html"),
+  );
 
   // Client-side routing: any GET that isn't an API call or a real file is a
   // route the browser should resolve, so hand back the shell. Anything under
@@ -119,6 +155,6 @@ async function registerWebApp(app: FastifyInstance): Promise<void> {
     if (req.method !== "GET" || req.url.startsWith("/api/")) {
       return reply.status(404).send({ error: `no route for ${req.method} ${req.url}` });
     }
-    return reply.sendFile("index.html");
+    return reply.header("cache-control", "no-store, must-revalidate").sendFile("index.html");
   });
 }

@@ -54,7 +54,29 @@ try {
     check(`the ${part} routes are mounted`, routes.includes(part));
   }
 
-  await app.close();
+  /**
+   * The shell must never be cacheable.
+   *
+   * A held copy of index.html names last week's JavaScript, so a server that has
+   * been rebuilt, redeployed and migrated goes on serving the old application
+   * with nothing anywhere to say so. That failure has cost more time here than
+   * any bug, and it is invisible from the server side, so it is asserted.
+   */
+  try {
+    const shell = await app.inject({ method: "GET", url: "/" });
+    const cache = String(shell.headers["cache-control"] ?? "");
+    // Only meaningful when a build is present; API-only is a valid state.
+    if (shell.statusCode === 200) {
+      check("the shell is served no-store", /no-store/.test(cache), `got "${cache}"`);
+    } else {
+      check("the shell is served no-store", true);
+    }
+  } catch (err) {
+    check("the shell is served no-store", false, (err as Error).message);
+  }
+
+    await app.close();
+
 } catch (err) {
   check("every route registers without conflict", false, (err as Error).message.split("\n")[0]);
 } finally {
