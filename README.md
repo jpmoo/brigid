@@ -14,6 +14,8 @@ Nothing leaves your machine or server until you're ready to compile into a Word 
 and no company that can change the terms later. If you use the AI features, the
 model runs on hardware you control too.
 
+'This is a vibe-coded app. Claude did most of the heavy lifting.
+
 ---
 
 ## What you need
