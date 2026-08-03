@@ -280,6 +280,60 @@ export function WorkPage() {
   // server so it is right on every other machine too. Held back until the
   // server's own answer has arrived, or the default would overwrite it in the
   // moment between the first render and the response.
+  /**
+   * Where the reader was, across a change of text size.
+   *
+   * Resizing reflows the whole manuscript, so the scroll offset that had you at
+   * chapter nine now has you somewhere else entirely — the further in, the
+   * further it throws you. Nobody changes text size in order to go somewhere;
+   * they change it to read the same passage more comfortably.
+   *
+   * So the block nearest the top of the view is noted with its distance from
+   * that edge, and after the reflow the page is scrolled to put it back exactly
+   * there. A block rather than a paragraph: it is what the document already
+   * marks in the DOM, and at this granularity a line or two of drift is
+   * invisible while a chapter of drift is the whole problem.
+   */
+  const holdPosition = useRef<{ blockId: string; fromTop: number } | null>(null);
+
+  const rememberPosition = useCallback(() => {
+    const pane = paneRef.current;
+    if (!pane) return;
+    const edge = pane.getBoundingClientRect().top;
+    for (const el of pane.querySelectorAll<HTMLElement>("[data-block-id]")) {
+      const box = el.getBoundingClientRect();
+      // The first block still on screen: its bottom has not passed the top edge.
+      if (box.bottom > edge) {
+        const blockId = el.dataset.blockId;
+        if (blockId) holdPosition.current = { blockId, fromTop: box.top - edge };
+        return;
+      }
+    }
+  }, []);
+
+  /**
+   * Restored after the browser has laid the new size out, not after React has
+   * rendered it — a layout effect would measure the old boxes.
+   */
+  useEffect(() => {
+    const held = holdPosition.current;
+    if (!held) return;
+    holdPosition.current = null;
+
+    const id = window.requestAnimationFrame(() => {
+      const pane = paneRef.current;
+      const el = pane?.querySelector<HTMLElement>(`[data-block-id="${held.blockId}"]`);
+      if (!pane || !el) return;
+      const moved = el.getBoundingClientRect().top - pane.getBoundingClientRect().top - held.fromTop;
+      // Whatever is actually scrolling: the pane in one view, the window in the
+      // other. Asking both and letting the one that cannot move ignore it is
+      // simpler than working out which is which.
+      pane.scrollBy({ top: moved });
+      window.scrollBy({ top: moved });
+    });
+    return () => window.cancelAnimationFrame(id);
+  }, [scaleIndex]);
+
   const scaleLoaded = useRef(false);
 
   useEffect(() => {
@@ -794,7 +848,7 @@ export function WorkPage() {
           </button>
         </div>
 
-        <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} />
+        <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} onResize={rememberPosition} />
 
         <SearchBar
           open={searchOpen}
@@ -1015,7 +1069,7 @@ export function WorkPage() {
                 </button>
               </div>
 
-              <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} />
+              <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} onResize={rememberPosition} />
 
               <span className="zen-words">{wordFmt.format(totalWords)} words</span>
 
@@ -1117,9 +1171,12 @@ export function WorkPage() {
 function TextSize({
   scaleIndex,
   setScaleIndex,
+  onResize,
 }: {
   scaleIndex: number;
   setScaleIndex: (fn: (i: number) => number) => void;
+  /** Called before the size changes, to note where the reader is. */
+  onResize: () => void;
 }) {
   return (
     <div className="text-size" role="group" aria-label="Text size">
@@ -1127,7 +1184,10 @@ function TextSize({
         type="button"
         title="Smaller text"
         disabled={scaleIndex === 0}
-        onClick={() => setScaleIndex((i) => Math.max(0, i - 1))}
+        onClick={() => {
+          onResize();
+          setScaleIndex((i) => Math.max(0, i - 1));
+        }}
       >
         A
       </button>
@@ -1135,7 +1195,10 @@ function TextSize({
         type="button"
         title="Larger text"
         disabled={scaleIndex === SCALE_STEPS.length - 1}
-        onClick={() => setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1))}
+        onClick={() => {
+          onResize();
+          setScaleIndex((i) => Math.min(SCALE_STEPS.length - 1, i + 1));
+        }}
       >
         A
       </button>
