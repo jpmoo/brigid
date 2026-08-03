@@ -5117,7 +5117,10 @@ mark.hit.active {
    children would all land on the same spot, which is the thing being fixed. */
 .doc-bookmarks {
   position: absolute;
-  left: -22px;
+  /* Out in the margin rather than crowding the text. Far enough that the eye
+     reads it as an annotation beside the page instead of punctuation inside
+     the line, and the measure stays clean to scan down. */
+  left: -44px;
   top: 2px;
   display: flex;
   flex-direction: column;

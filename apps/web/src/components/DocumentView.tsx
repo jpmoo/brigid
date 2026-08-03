@@ -359,7 +359,7 @@ function Nodes({
                             key={b.id}
                             title={b.description ? `${b.name}\n\n${b.description}` : b.name}
                           >
-                            <BookmarkIcon size={13} />
+                            <BookmarkIcon size={13} fill="currentColor" />
                           </span>
                         ))}
                       </span>
@@ -624,7 +624,7 @@ export function DocumentView({
                     key={b.id}
                     title={b.description ? `${b.name}\n\n${b.description}` : b.name}
                   >
-                    <BookmarkIcon size={13} />
+                    <BookmarkIcon size={13} fill="currentColor" />
                   </span>
                   ))}
               </span>
