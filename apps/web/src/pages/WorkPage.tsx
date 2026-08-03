@@ -712,37 +712,35 @@ export function WorkPage() {
     }
     const id = window.requestAnimationFrame(() => {
       const pane = paneRef.current;
-      if (!pane) return;
+      if (!pane || !activeMatch) return;
 
       /**
-       * `focus()` scrolls inline content where `scrollIntoView` on a `mark` is
-       * unreliable — but it also takes the keyboard, and this effect runs on
-       * every keystroke as the match moves. Focusing the hit therefore emptied
-       * the search box mid-word.
+       * Scrolled by hand, and deliberately.
        *
-       * So whoever had the keyboard gets it straight back. Restored rather than
-       * blurred: blurring leaves the focus nowhere, which is just as useless to
-       * someone in the middle of typing a query.
+       * `scrollIntoView` is unreliable on an inline element, which a hit is —
+       * that is the fault this replaced. Focusing the hit does scroll it, but
+       * focus is also the keyboard, and this runs on every keystroke as the
+       * match moves: it emptied the search box mid-word, and with a section
+       * open it fought the editor for the caret.
+       *
+       * Measuring and scrolling the pane needs neither. It works for inline
+       * elements, and it leaves whoever is typing exactly where they were.
        */
       const hit = pane.querySelector<HTMLElement>("mark.hit.active");
-      if (hit) {
-        const held = document.activeElement as HTMLElement | null;
-        hit.focus();
-        if (held && held !== hit) held.focus({ preventScroll: true });
-        else hit.blur();
-        return;
-      }
+      const target =
+        hit ??
+        // No mark: the block is open in the editor, which renders its own prose
+        // without the search highlighting. Nothing can be lit up, but the
+        // passage can still be brought on screen.
+        pane.querySelector<HTMLElement>(`[data-block-id="${activeMatch.blockId}"]`);
+      if (!target) return;
 
-      /**
-       * No mark to focus. The block holding the match is open in the editor,
-       * which renders its own prose and none of the search highlighting — so
-       * the hit does not exist as an element. Scrolling to the block is the
-       * honest answer: it puts the passage on screen, which is what was asked
-       * for, even though nothing can be lit up inside it.
-       */
-      pane
-        .querySelector(`[data-block-id="${activeMatch.blockId}"]`)
-        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const paneBox = pane.getBoundingClientRect();
+      const box = target.getBoundingClientRect();
+      const delta = box.top - paneBox.top - Math.max(0, paneBox.height - box.height) / 2;
+      // Already where it should be: a keystroke that leaves the match alone
+      // must not nudge the page.
+      if (Math.abs(delta) > 2) pane.scrollBy({ top: delta, behavior: "smooth" });
     });
     return () => window.cancelAnimationFrame(id);
   }, [activeMatch]);
