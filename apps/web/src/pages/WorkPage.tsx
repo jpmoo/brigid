@@ -659,9 +659,38 @@ export function WorkPage() {
     }
   }
 
-  async function addBookmark(blockId: string) {
+  /**
+   * The line a bookmark marks, rather than the block containing it.
+   *
+   * The stored index is tried first, then checked against the snippet taken
+   * when the bookmark was made. If they disagree, paragraphs have been added or
+   * removed above and the snippet is what still identifies the place — so the
+   * paragraph matching it wins, and failing that the block does, which is where
+   * bookmarks have always landed.
+   */
+  function scrollToParagraph(bookmark: Bookmark) {
+    const block = paneRef.current?.querySelector(`[data-block-id="${bookmark.blockId}"]`);
+    if (!block) return;
+
+    const paragraphs = [...block.querySelectorAll("p")];
+    if (paragraphs.length === 0) return;
+
+    const wanted = (bookmark.paragraphText ?? "").trim();
+    let target = paragraphs[bookmark.paragraphIndex ?? 0];
+
+    if (wanted && (target?.textContent ?? "").trim().slice(0, wanted.length) !== wanted) {
+      const moved = paragraphs.find((p) => (p.textContent ?? "").trim().startsWith(wanted));
+      if (moved) target = moved;
+    }
+
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
     try {
-      const { bookmark } = await api.createBookmark(id, blockId);
+      const { bookmark } = await api.createBookmark(id, blockId, {
+        ...(paragraph ? { paragraphIndex: paragraph.index, paragraphText: paragraph.text } : {}),
+      });
       setBookmarks((prev) => [...prev, bookmark]);
       setActiveBookmark(bookmark.id);
     } catch (err) {
@@ -671,13 +700,22 @@ export function WorkPage() {
 
   async function renameBookmark(bookmark: Bookmark) {
     const answer = await dialogs.prompt({
-      title: "Name this bookmark",
-      fields: [{ label: "Name", value: bookmark.name }],
+      title: "This bookmark",
+      fields: [
+        { label: "Name", value: bookmark.name },
+        // What the name cannot hold: why this place was worth marking.
+        { label: "Note (optional)", value: bookmark.description ?? "" },
+      ],
     });
-    const name = answer?.[0]?.trim();
+    if (!answer) return;
+    const name = answer[0]?.trim();
     if (!name) return;
     try {
-      const { bookmark: updated } = await api.renameBookmark(bookmark.id, name);
+      const { bookmark: updated } = await api.editBookmark(bookmark.id, {
+        name,
+        // Empty clears it, which is the only way to take one back off.
+        description: answer[1]?.trim() || null,
+      });
       setBookmarks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not rename the bookmark");
@@ -811,6 +849,10 @@ export function WorkPage() {
             onGo={(bookmark) => {
               setActiveBookmark(bookmark.id);
               selectAndScroll(bookmark.blockId);
+              // The block first, then the line within it once it is on screen.
+              if (bookmark.paragraphIndex !== null) {
+                window.requestAnimationFrame(() => scrollToParagraph(bookmark));
+              }
             }}
             onRename={(bookmark) => void renameBookmark(bookmark)}
             onDelete={(bookmark) => void removeBookmark(bookmark)}
@@ -899,7 +941,7 @@ export function WorkPage() {
               null
             }
             bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
-            onDropBookmark={(blockId) => void addBookmark(blockId)}
+            onDropBookmark={(blockId, paragraph) => void addBookmark(blockId, paragraph)}
             search={foldForSearch(query.trim())}
             activeMatch={activeMatch}
             speller={spelling.speller}

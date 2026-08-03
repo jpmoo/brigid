@@ -425,7 +425,7 @@ export interface DocumentViewProps {
    */
   baseTypography: Typography | null;
   bookmarkedBlockIds: Set<string>;
-  onDropBookmark: (blockId: string) => void;
+  onDropBookmark: (blockId: string, paragraph?: { index: number; text: string }) => void;
   /** Lowercased needle, or empty when not searching. */
   search: string;
   activeMatch: { blockId: string; indexInBlock: number } | null;
@@ -450,6 +450,36 @@ export interface DocumentViewProps {
    * renderer knows it — it depends on the view mode and on the break above.
    */
   editor: (layout: ProseLayout) => ReactNode;
+}
+
+/**
+ * Which paragraph the marker was dropped on.
+ *
+ * By vertical position rather than by `elementFromPoint`, because the pointer
+ * may well be over a text node, a `<em>`, or the gap between lines — the
+ * question is which paragraph's band of the page the cursor is in, and that is
+ * answered by comparing against each one's box.
+ *
+ * Undefined when the block has no paragraphs to speak of, which leaves the
+ * bookmark pointing at the block as bookmarks always have.
+ */
+function paragraphUnder(
+  block: HTMLElement,
+  clientY: number,
+): { index: number; text: string } | undefined {
+  const paragraphs = [...block.querySelectorAll("p")];
+  if (paragraphs.length === 0) return undefined;
+
+  let at = 0;
+  for (const [i, p] of paragraphs.entries()) {
+    const box = p.getBoundingClientRect();
+    // The last paragraph whose top is above the cursor: dropping in the gap
+    // below a paragraph means that paragraph, not the next one.
+    if (box.top <= clientY) at = i;
+  }
+
+  const text = (paragraphs[at]?.textContent ?? "").trim().slice(0, 400);
+  return text ? { index: at, text } : undefined;
 }
 
 export function DocumentView({
@@ -550,7 +580,7 @@ export function DocumentView({
               if (!e.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
               e.preventDefault();
               setDropTarget(null);
-              onDropBookmark(item.block.id);
+              onDropBookmark(item.block.id, paragraphUnder(e.currentTarget, e.clientY));
             }}
           >
             {bookmarkedBlockIds.has(item.block.id) ? (
