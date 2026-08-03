@@ -79,7 +79,15 @@ export function BookmarkStrip({
         <ul className="bm-list">
           {bookmarks.map((b) => (
             <li key={b.id} className={b.id === activeId ? "active" : ""}>
-              <button type="button" className="bm-go" onClick={() => onGo(b)} title={b.name}>
+              <button
+                type="button"
+                className="bm-go"
+                onClick={() => onGo(b)}
+                /* The description is what the writer wanted to remember about
+                   the place, which a name rarely holds on its own. It is worth
+                   more on hover than the name, which is already on screen. */
+                title={b.description ? `${b.name}\n\n${b.description}` : b.name}
+              >
                 <BookmarkIcon size={11} />
                 <span>{b.name}</span>
               </button>

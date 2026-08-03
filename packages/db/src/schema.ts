@@ -172,9 +172,17 @@ export const templates = pgTable(
 );
 
 /**
- * Named places to come back to. A bookmark points at a *block*, not an offset
- * into prose: a block survives editing, an offset doesn't. Deleting the block
- * takes its bookmarks with it, which is right — the place is gone.
+ * Named places to come back to.
+ *
+ * A bookmark points at a block, and optionally at a paragraph within it. Not at
+ * a character offset: a block survives editing where an offset does not, and an
+ * offset-anchored bookmark drifts or dies the first time the paragraph above it
+ * is rewritten. A paragraph sits between the two — stable under ordinary
+ * editing, and carrying a snippet of its own text so it can be found again if
+ * paragraphs are added above it.
+ *
+ * Deleting the block takes its bookmarks with it, which is right — the place is
+ * gone.
  */
 export const bookmarks = pgTable(
   "bookmarks",
@@ -187,6 +195,15 @@ export const bookmarks = pgTable(
       .notNull()
       .references((): AnyPgColumn => blocks.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
+    /**
+     * Which paragraph within the block, and enough of its text to find it again
+     * if paragraphs are added above. Null means the block as a whole — which is
+     * what every bookmark meant before this existed.
+     */
+    paragraphIndex: integer("paragraph_index"),
+    paragraphText: text("paragraph_text"),
+    /** What the writer wanted to remember about the place. Shown on hover. */
+    description: text("description"),
     sortKey: text("sort_key").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

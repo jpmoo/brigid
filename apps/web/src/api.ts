@@ -221,6 +221,11 @@ export interface Bookmark {
   workId: string;
   blockId: string;
   name: string;
+  /** What the writer wanted to remember about the place. Shown on hover. */
+  description: string | null;
+  /** Which paragraph in the block. Null means the block as a whole. */
+  paragraphIndex: number | null;
+  paragraphText: string | null;
   sortKey: string;
   createdAt: string;
   updatedAt: string;
@@ -373,8 +378,24 @@ export const api = {
 
   listBookmarks: (workId: string) =>
     request<{ bookmarks: Bookmark[] }>(`/works/${workId}/bookmarks`),
-  createBookmark: (workId: string, blockId: string, name?: string) =>
-    post<{ bookmark: Bookmark }>(`/works/${workId}/bookmarks`, { blockId, ...(name ? { name } : {}) }),
+  createBookmark: (
+    workId: string,
+    blockId: string,
+    extra?: {
+      name?: string;
+      description?: string;
+      /** Which paragraph, when the writer dropped it on a line rather than a block. */
+      paragraphIndex?: number;
+      paragraphText?: string;
+    },
+  ) =>
+    post<{ bookmark: Bookmark }>(`/works/${workId}/bookmarks`, { blockId, ...extra }),
+  /** Both fields are optional: send only what changed. */
+  editBookmark: (id: string, patch: { name?: string; description?: string | null }) =>
+    request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
   renameBookmark: (id: string, name: string) =>
     request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {
       method: "PATCH",

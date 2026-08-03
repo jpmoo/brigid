@@ -25,7 +25,15 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
     const body = z
-      .object({ blockId: z.string().uuid(), name: z.string().max(200).optional() })
+      .object({
+        blockId: z.string().uuid(),
+        name: z.string().max(200).optional(),
+        description: z.string().max(2000).optional(),
+        /** Which paragraph in the block, if the writer dropped it on a line. */
+        paragraphIndex: z.number().int().min(0).optional(),
+        /** Its opening words, so it can be found again if paragraphs shift. */
+        paragraphText: z.string().max(400).optional(),
+      })
       .parse(req.body);
 
     const [block] = await db
@@ -52,6 +60,11 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
         workId,
         blockId: body.blockId,
         name: (body.name ?? fallback).slice(0, 200),
+        description: body.description?.trim() || null,
+        paragraphIndex: body.paragraphIndex ?? null,
+        // Kept only alongside an index; on its own it anchors nothing.
+        paragraphText:
+          body.paragraphIndex === undefined ? null : (body.paragraphText?.slice(0, 400) ?? null),
         sortKey: generateKeyBetween(existing[existing.length - 1]?.sortKey ?? null, null),
       })
       .returning();
@@ -63,10 +76,21 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/bookmarks/:id", async (req) => {
     requireUser(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    const body = z.object({ name: z.string().min(1).max(200) }).parse(req.body);
+    const body = z
+      .object({
+        name: z.string().min(1).max(200).optional(),
+        description: z.string().max(2000).nullable().optional(),
+      })
+      .parse(req.body);
     const [row] = await db
       .update(bookmarks)
-      .set({ name: body.name, updatedAt: new Date() })
+      .set({
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.description !== undefined
+          ? { description: body.description?.trim() || null }
+          : {}),
+        updatedAt: new Date(),
+      })
       .where(eq(bookmarks.id, id))
       .returning();
     if (!row) throw notFound("bookmark");
