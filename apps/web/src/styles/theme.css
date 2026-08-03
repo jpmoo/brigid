@@ -5134,3 +5134,9 @@ mark.hit.active {
 .doc-bookmarks .doc-bookmark:hover {
   opacity: 1;
 }
+
+/* A paragraph carrying its own marker needs the margin the stack sits in, and
+   the stack aligns to that line rather than to the top of the section. */
+.prose.has-bookmark {
+  position: relative;
+}

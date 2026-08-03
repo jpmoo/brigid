@@ -783,6 +783,17 @@ export function WorkPage() {
   }
 
   async function removeBookmark(bookmark: Bookmark) {
+    // A bookmark is a note to yourself about a place, and the note is the part
+    // that cannot be reconstructed — the place you could find again.
+    const ok = await dialogs.confirm({
+      title: `Delete "${bookmark.name}"?`,
+      message: bookmark.description
+        ? `Its note goes with it: "${bookmark.description}"`
+        : "The manuscript is not affected.",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await api.deleteBookmark(bookmark.id);
       setBookmarks((prev) => prev.filter((b) => b.id !== bookmark.id));

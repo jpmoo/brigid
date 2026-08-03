@@ -147,8 +147,11 @@ function Nodes({
   editing = false,
   editor,
   onEditProse,
+  bookmarks = [],
 }: {
   nodes: ResolvedNode[];
+  /** This block's bookmarks, so the ones naming a line can sit beside it. */
+  bookmarks?: { id: string; name: string; description: string | null; paragraphIndex: number | null }[];
   prose?: string;
   /** The structured prose, when the block has it. Carries bold and italic. */
   proseDoc?: Record<string, unknown> | null;
@@ -337,12 +340,30 @@ function Nodes({
                   // first-line indent, whatever the block's setting.
                   const isQuote = quoted[j] === true;
                   const flush = isQuote || (j === 0 && !indentFirst);
+                  const here = bookmarks.filter((b) => b.paragraphIndex === j);
                   return (
                   <p
-                    className={`prose${flush && !isQuote ? " flush" : ""}${isQuote ? " blockquote" : ""}`}
+                    className={`prose${flush && !isQuote ? " flush" : ""}${isQuote ? " blockquote" : ""}${
+                      here.length > 0 ? " has-bookmark" : ""
+                    }`}
                     key={j}
                     style={indent !== undefined && !flush ? { textIndent: indent } : undefined}
                   >
+                    {/* Beside the line it marks, rather than at the top of the
+                        section — which is the whole point of storing a line. */}
+                    {here.length > 0 ? (
+                      <span className="doc-bookmarks" contentEditable={false}>
+                        {here.map((b) => (
+                          <span
+                            className="doc-bookmark"
+                            key={b.id}
+                            title={b.description ? `${b.name}\n\n${b.description}` : b.name}
+                          >
+                            <BookmarkIcon size={13} />
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
                       const marked = highlight(text, search, counter, activeIndex, speller);
@@ -425,7 +446,10 @@ export interface DocumentViewProps {
    */
   baseTypography: Typography | null;
   /** Every bookmark on a block, oldest first — they stack in the margin. */
-  bookmarksByBlock: Map<string, { id: string; name: string; description: string | null }[]>;
+  bookmarksByBlock: Map<
+    string,
+    { id: string; name: string; description: string | null; paragraphIndex: number | null }[]
+  >;
   onDropBookmark: (blockId: string, paragraph?: { index: number; text: string }) => void;
   /** Lowercased needle, or empty when not searching. */
   search: string;
@@ -584,12 +608,17 @@ export function DocumentView({
               onDropBookmark(item.block.id, paragraphUnder(e.currentTarget, e.clientY));
             }}
           >
-            {bookmarksByBlock.has(item.block.id) ? (
-              /* Stacked, oldest at the top: the order they were made is the
-                 only order that means anything here, and it keeps a marker
-                 from moving when a new one is added below it. */
+            {(bookmarksByBlock.get(item.block.id) ?? []).some((b) => b.paragraphIndex === null) ? (
+              /* Only the ones marking the section as a whole. Anything naming a
+                 line is drawn beside that line instead. Stacked oldest at the
+                 top: the order they were made is the only order that means
+                 anything, and it keeps a marker from moving when a newer one
+                 appears below it. */
               <span className="doc-bookmarks">
-                {bookmarksByBlock.get(item.block.id)?.map((b) => (
+                {bookmarksByBlock
+                  .get(item.block.id)
+                  ?.filter((b) => b.paragraphIndex === null)
+                  .map((b) => (
                   <span
                     className="doc-bookmark"
                     key={b.id}
@@ -597,7 +626,7 @@ export function DocumentView({
                   >
                     <BookmarkIcon size={13} />
                   </span>
-                ))}
+                  ))}
               </span>
             ) : null}
             {item.sectionStart ? (
@@ -611,6 +640,7 @@ export function DocumentView({
             <Nodes
               nodes={item.nodes}
               proseDoc={item.block.content}
+              bookmarks={bookmarksByBlock.get(item.block.id)}
               speller={speller}
               prose={item.block.contentText}
               editing={editingId === item.block.id}
