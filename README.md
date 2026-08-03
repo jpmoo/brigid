@@ -1,4 +1,4 @@
-<p align="center"<img width="591" height="215" alt="image" src="https://github.com/user-attachments/assets/b5bf6302-4e80-4b36-be29-2297628c8569" /></p>
+<p align="center"><img width="591" height="215" alt="image" src="https://github.com/user-attachments/assets/b5bf6302-4e80-4b36-be29-2297628c8569" /></p>
 
 
 A web application for writing novels and short stories that you run on your own hardware or network. Named after the Celtic
