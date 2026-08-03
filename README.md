@@ -1,6 +1,6 @@
 # Brigid
 
-A writing application for novels, that you run yourself. Named after the Celtic
+A writing application for novels and short stories that you run yourself. Named after the Celtic
 goddess of poetry.
 
 Brigid keeps a manuscript as a structured outline rather than one long file, so
