@@ -319,22 +319,52 @@ function Nodes({
               const { clientX, clientY } = event;
 
               /**
-               * Read on the next frame, not on this one.
+               * Whatever was last selected here, not whatever is selected now.
                *
-               * A pointer release arrives before the browser has finished
-               * settling the selection it ended — `pointerup` precedes
-               * `mouseup`, and the selection is finalised somewhere between
-               * them. Reading it here caught the caret rather than the drag,
-               * which is why a passage selected in the manuscript arrived in
-               * the editor as a single point.
+               * Reading the live selection cannot be made to work by choosing a
+               * better moment, because there is no good moment. At `pointerup`
+               * the browser has not finished settling the drag — that happens
+               * between there and `mouseup` — and by the next animation frame
+               * the trailing `click` has collapsed it to a caret. Both events
+               * are in the same task, so deferring steps over the finalised
+               * selection and lands after it has been destroyed.
+               *
+               * So the selection is remembered as it is made, by a
+               * `selectionchange` listener, and read from there. Nothing here
+               * depends on the order pointer, mouse and click events arrive in.
                */
-              requestAnimationFrame(() => {
-                onEditProse(selectionIn(root, clientX, clientY), word);
-              });
+              /**
+               * Only a selection made inside this block, during this press.
+               * Anything remembered from before the pointer went down belongs
+               * to a drag already finished with, and a plain click on a block
+               * should put the caret where it was clicked rather than restoring
+               * whatever was highlighted a minute ago.
+               */
+              const held = lastSelection.current;
+              const carried =
+                held &&
+                held.root === root &&
+                pressedAt.current !== null &&
+                held.at >= pressedAt.current
+                  ? { anchor: held.anchor, focus: held.focus }
+                  : null;
+
+              onEditProse(carried ?? pointIn(root, clientX, clientY), word);
             };
 
             return written ? (
-              <div className="prose-body" key={i} onPointerUp={enter}>
+              <div
+                className="prose-body"
+                key={i}
+                /* Marks this element as one the selection watcher should claim
+                   a drag for, and gives it something to compare roots against. */
+                data-prose-root=""
+                onPointerDown={() => {
+                  watchSelection();
+                  pressedAt.current = Date.now();
+                }}
+                onPointerUp={enter}
+              >
                 {paragraphs.map((runs, j) => {
                   // An extract is inset as a whole and never carries a
                   // first-line indent, whatever the block's setting.
@@ -410,22 +440,78 @@ function Nodes({
  * Each block is its own editor, so there is no other honest answer; the part
  * outside cannot be edited here whatever we do with it.
  */
-function selectionIn(
-  root: HTMLElement,
-  x: number,
-  y: number,
-): { anchor: number; focus: number } {
-  const selection = window.getSelection();
-  if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-    const { anchorNode, focusNode } = selection;
-    if (anchorNode && focusNode && root.contains(anchorNode) && root.contains(focusNode)) {
-      const anchor = offsetOfPosition(root, anchorNode, selection.anchorOffset);
-      const focus = offsetOfPosition(root, focusNode, selection.focusOffset);
-      if (anchor !== null && focus !== null) return { anchor, focus };
-    }
-  }
+/**
+ * The last selection the writer actually made, and when.
+ *
+ * Module-level because there is only ever one selection in a document, and a
+ * single listener is cheaper than one per block. `selectionchange` fires while
+ * the drag is happening — well before the pointer is released and long before
+ * the click that collapses it — so this holds the real thing at a moment when
+ * nothing has yet had a chance to destroy it.
+ */
+const lastSelection: {
+  current: { root: HTMLElement; anchor: number; focus: number; at: number } | null;
+} = { current: null };
+
+/** When the current press began, so a remembered selection can be dated. */
+const pressedAt: { current: number | null } = { current: null };
+
+let watching = false;
+
+/**
+ * Start remembering, once.
+ *
+ * The listener asks each prose root whether the selection is inside it, which
+ * is cheap: the selection either is or is not within a given element, and the
+ * first one that claims it wins.
+ */
+function watchSelection(): void {
+  if (watching || typeof document === "undefined") return;
+  watching = true;
+
+  document.addEventListener("selectionchange", () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return;
+
+    const node = selection.anchorNode;
+    if (!node) return;
+    const element = node.nodeType === Node.TEXT_NODE ? node.parentElement : (node as HTMLElement);
+    const root = element?.closest<HTMLElement>("[data-prose-root]");
+    if (!root) return;
+
+    const held = liveSelection(root);
+    if (held) lastSelection.current = { root, ...held, at: Date.now() };
+  });
+}
+
+/** A plain click: the caret goes where the pointer was released. */
+function pointIn(root: HTMLElement, x: number, y: number): { anchor: number; focus: number } {
   const at = offsetOfPoint(root, x, y);
   return { anchor: at, focus: at };
+}
+
+/**
+ * The live selection, converted to offsets, if it lies inside this block.
+ *
+ * Null when there is nothing usable — no selection, a collapsed one, or one
+ * that started outside. A selection running past the block is kept only as far
+ * as the block goes: each block is its own editor, so there is no other honest
+ * answer, and the part outside cannot be edited here whatever is done with it.
+ *
+ * Anchor and focus stay in the order the writer made them, so a backwards drag
+ * stays backwards and the next shift-arrow extends from the end they were on.
+ */
+function liveSelection(root: HTMLElement): { anchor: number; focus: number } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) return null;
+
+  const { anchorNode, focusNode } = selection;
+  if (!anchorNode || !focusNode) return null;
+  if (!root.contains(anchorNode) || !root.contains(focusNode)) return null;
+
+  const anchor = offsetOfPosition(root, anchorNode, selection.anchorOffset);
+  const focus = offsetOfPosition(root, focusNode, selection.focusOffset);
+  return anchor !== null && focus !== null ? { anchor, focus } : null;
 }
 
 /** Breaks register under this key so the outline can scroll to one. */
