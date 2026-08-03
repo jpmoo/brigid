@@ -16,11 +16,9 @@ model runs on hardware you control too.
 
 **This is a vibe-coded app. Claude did most of the heavy lifting.**
 
-<img width="50%" alt="SCR-20260803-guux" src="https://github.com/user-attachments/assets/60e0fb70-1a02-4088-b1f7-ad78b7dbfe46" />
-<img width="50%" alt="SCR-20260803-gvct" src="https://github.com/user-attachments/assets/8f60837b-9136-4973-9b38-e97b8de00858" />
-<img width="50%" alt="SCR-20260803-gvhk" src="https://github.com/user-attachments/assets/7bc56b36-a4b5-4371-8db2-f475b308a3b5" />
-<img width="50%" alt="SCR-20260803-gvnk" src="https://github.com/user-attachments/assets/c3d4c56b-138a-4a35-9673-c7857230e87b" />
-<img width="50%" alt="SCR-20260803-gvwa" src="https://github.com/user-attachments/assets/6cd13000-affe-4126-9b92-8bce5781cff5" />
+<p align="center"><img width="40%" alt="SCR-20260803-guux" src="https://github.com/user-attachments/assets/60e0fb70-1a02-4088-b1f7-ad78b7dbfe46" /> &nbsp; <img width="40%" alt="SCR-20260803-gvct" src="https://github.com/user-attachments/assets/8f60837b-9136-4973-9b38-e97b8de00858" />
+<img width="40%" alt="SCR-20260803-gvhk" src="https://github.com/user-attachments/assets/7bc56b36-a4b5-4371-8db2-f475b308a3b5" />&nbsp;<img width="40%" alt="SCR-20260803-gvnk" src="https://github.com/user-attachments/assets/c3d4c56b-138a-4a35-9673-c7857230e87b" />
+<img width="40%" alt="SCR-20260803-gvwa" src="https://github.com/user-attachments/assets/6cd13000-affe-4126-9b92-8bce5781cff5" /></p>
 
 
 ---
