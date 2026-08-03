@@ -680,8 +680,22 @@ export function WorkPage() {
     });
   }, []);
 
+  /**
+   * Move to the next hit, and leave the editor if one is open.
+   *
+   * Stepping through results is navigation, and the editor is effectively modal
+   * over its block: it renders its own prose with none of the search
+   * highlighting, so a hit inside the section being edited could be scrolled to
+   * but never lit up, and stepping past it kept snapping back. Closing first
+   * means every hit behaves the same way — highlighted, in place, and left
+   * behind when you move on.
+   *
+   * Nothing is lost by closing. The editor saves as it goes, so leaving it is
+   * the same act as clicking away from it, which is how it is usually left.
+   */
   const stepMatch = (delta: 1 | -1) => {
     if (matches.length === 0) return;
+    setEditingProse(null);
     setMatchIndex((matchIndex + delta + matches.length) % matches.length);
   };
 
