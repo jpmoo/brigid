@@ -145,5 +145,50 @@ function parseWorks(dumped: string): { id: string; title: string }[] {
   check("sequence resets are dropped", staged.length, 3);
 }
 
+console.log("\nthe hour the writer meant");
+
+// The reported fault. A server in UTC firing "1am" fires it at 1am UTC, which
+// is 9pm the evening before in New York — four hours early, with nothing
+// anywhere to say why.
+{
+  // Noon UTC on a summer day: New York is four hours behind.
+  const noon = new Date("2026-08-03T12:00:00Z");
+  const at = nextRun(noon, 1, 0, "America/New_York");
+  check("1am in New York is 05:00 UTC", at.toISOString(), "2026-08-04T05:00:00.000Z");
+}
+
+{
+  // And five behind in winter, which a fixed offset would get wrong.
+  const noon = new Date("2026-12-03T12:00:00Z");
+  const at = nextRun(noon, 1, 0, "America/New_York");
+  check("and 06:00 UTC in winter", at.toISOString(), "2026-12-04T06:00:00.000Z");
+}
+
+{
+  // Today's slot when it has not passed yet: 3am UTC is 10pm the night before
+  // in New York, so 1am there is still to come today.
+  const early = new Date("2026-08-03T03:00:00Z");
+  const at = nextRun(early, 1, 0, "America/New_York");
+  check("today's slot is taken when it is still ahead", at.toISOString(), "2026-08-03T05:00:00.000Z");
+}
+
+{
+  // A zone ahead of UTC, where the date there is already tomorrow: 20:00 UTC is
+  // 05:00 on the 4th in Tokyo, so 1am on the 4th has gone and the next slot is
+  // 1am on the 5th — which is 16:00 UTC on the 4th.
+  const at = nextRun(new Date("2026-08-03T20:00:00Z"), 1, 0, "Asia/Tokyo");
+  check("a zone ahead of UTC is handled the same way", at.toISOString(), "2026-08-04T16:00:00.000Z");
+}
+
+// No zone means the host clock, which is what it always did.
+{
+  const after = new Date("2026-08-03T12:00:00Z");
+  const at = nextRun(after, 1, 0);
+  const local = new Date(after);
+  local.setHours(1, 0, 0, 0);
+  if (local <= after) local.setDate(local.getDate() + 1);
+  check("no zone still uses the host clock", at.toISOString(), local.toISOString());
+}
+
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

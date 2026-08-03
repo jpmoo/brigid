@@ -67,6 +67,28 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
         minute: z.number().int().min(0).max(59).optional(),
         // One is the floor: keeping none would delete the backup just taken.
         keep: z.number().int().min(1).max(200).optional(),
+        /**
+         * Checked against the runtime's own zone list rather than a pattern:
+         * a name Intl does not know would be accepted, stored, and then throw
+         * every time the scheduler tried to use it.
+         */
+        timezone: z
+          .string()
+          .max(80)
+          .nullable()
+          .optional()
+          .refine(
+            (tz) => {
+              if (!tz) return true;
+              try {
+                new Intl.DateTimeFormat("en-US", { timeZone: tz });
+                return true;
+              } catch {
+                return false;
+              }
+            },
+            { message: "unknown time zone" },
+          ),
       })
       .parse(req.body);
 
@@ -78,6 +100,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
     if (body.hour !== undefined) patch.backupHour = body.hour;
     if (body.minute !== undefined) patch.backupMinute = body.minute;
     if (body.keep !== undefined) patch.backupKeep = body.keep;
+    if (body.timezone !== undefined) patch.backupTimezone = body.timezone;
 
     await db.update(settings).set(patch).where(eq(settings.id, row.id));
 

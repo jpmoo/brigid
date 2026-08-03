@@ -80,6 +80,12 @@ export const settings = pgTable("settings", {
   backupHour: integer("backup_hour").notNull().default(1),
   backupMinute: integer("backup_minute").notNull().default(0),
   backupKeep: integer("backup_keep").notNull().default(10),
+  /**
+   * The IANA zone the backup hour is read in. Null means the host's own clock —
+   * right when the machine is set to the writer's time, wrong when it is a
+   * server sitting in UTC, which is the common case and the reason this exists.
+   */
+  backupTimezone: text("backup_timezone"),
   /** Free-form UI preferences (panel pinned, panel width, theme, …). */
   preferences: jsonb("preferences").$type<Record<string, unknown>>().notNull().default({}),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

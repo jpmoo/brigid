@@ -108,10 +108,11 @@ export interface WorkLevel {
 
 export interface BackupSchedule {
   enabled: boolean;
-  /** On the server's own clock, which is what "1am" was meant in. */
   hour: number;
   minute: number;
   keep: number;
+  /** The zone the hour is read in. Null means the server's own clock. */
+  timezone: string | null;
 }
 
 export interface BackupFile {

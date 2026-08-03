@@ -6,6 +6,24 @@ import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 import { useDialogs } from "../../components/Dialogs.js";
 import { useSavedFlash } from "../../useSavedFlash.js";
 
+/**
+ * Every zone the browser knows, which is the same list the server validates
+ * against. Read from the runtime rather than hard-coded: a list in the source
+ * goes stale the next time a government moves its clocks.
+ *
+ * The guess below is only a default for the menu's benefit — nothing is saved
+ * until the writer picks.
+ */
+const ZONES: string[] = (() => {
+  const supported = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] })
+    .supportedValuesOf;
+  try {
+    return supported ? supported("timeZone") : [];
+  } catch {
+    return [];
+  }
+})();
+
 const KEEP_MIN = 1;
 const KEEP_MAX = 200;
 
@@ -157,6 +175,24 @@ export function BackupPane({ workId }: { workId: string | null }) {
               void patch({ hour: Number(h), minute: Number(m) });
             }}
           />
+        </label>
+        <label className="bk-field">
+          <span>in</span>
+          {/* The zone the hour is read in. Without it, "1am" meant 1am on the
+              server's clock — which on a server is usually UTC, so the backup
+              ran hours out with nothing anywhere to say why. */}
+          <select
+            value={schedule.timezone ?? ""}
+            disabled={!schedule.enabled}
+            onChange={(e) => void patch({ timezone: e.target.value || null })}
+          >
+            <option value="">the server&rsquo;s own clock</option>
+            {ZONES.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
         </label>
         <label className="bk-field">
           <span>keeping</span>
