@@ -574,7 +574,7 @@ export interface DocumentViewProps {
  * Undefined when the block has no paragraphs to speak of, which leaves the
  * bookmark pointing at the block as bookmarks always have.
  */
-function paragraphUnder(
+export function paragraphUnder(
   block: HTMLElement,
   clientY: number,
 ): { index: number; text: string } | undefined {

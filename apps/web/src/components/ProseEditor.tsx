@@ -317,6 +317,27 @@ export function offsetOfPosition(
   return found ? offset : null;
 }
 
+/**
+ * Both ends of the selection, in the offsets the caret travels in.
+ *
+ * The counterpart to `caretOffset`, which answers for one end only. Rebuilding
+ * the element and then restoring a caret is right for a caret and quietly
+ * destructive for a selection — it throws away the passage the writer had
+ * highlighted, which on the first block of a session is exactly the passage
+ * they dragged in from the manuscript.
+ */
+export function selectionOffsets(root: HTMLElement): { anchor: number; focus: number } | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const { anchorNode, focusNode } = selection;
+  if (!anchorNode || !focusNode) return null;
+  if (!root.contains(anchorNode) || !root.contains(focusNode)) return null;
+
+  const anchor = offsetOfPosition(root, anchorNode, selection.anchorOffset);
+  const focus = offsetOfPosition(root, focusNode, selection.focusOffset);
+  return anchor !== null && focus !== null ? { anchor, focus } : null;
+}
+
 export function caretOffset(root: HTMLElement): number | null {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) return null;
@@ -746,11 +767,15 @@ export function ProseEditor({
     const el = ref.current;
     if (!el || !speller) return;
     const doc = htmlToDoc(el);
-    const offset = caretOffset(el);
+    // Both ends, not just the caret. This runs the moment the dictionary
+    // arrives — which on the first block of a session is a beat after the
+    // editor opened — so collapsing here would throw away the passage just
+    // carried in from the manuscript.
+    const held = selectionOffsets(el);
     const html = docToHtml(doc, speller, layoutRef.current);
     if (html === el.innerHTML) return;
     el.innerHTML = html;
-    if (offset !== null) setCaret(el, offset);
+    if (held) setSelection(el, held.anchor, held.focus);
   }, [speller]);
 
   /**
@@ -802,6 +827,7 @@ export function ProseEditor({
 
     remember();
     const offset = caretOffset(el);
+    const held = selectionOffsets(el);
     const allQuoted = paragraphs.every((p) => p.dataset.blockquote === "1");
     for (const paragraph of paragraphs) {
       if (allQuoted) delete paragraph.dataset.blockquote;
@@ -812,7 +838,10 @@ export function ProseEditor({
     // rather than being patched onto the element by hand in two places.
     const doc = htmlToDoc(el);
     el.innerHTML = docToHtml(doc, speller, layoutRef.current);
-    if (offset !== null) setCaret(el, offset);
+    // Same reasoning: turning a passage into a blockquote should leave that
+    // passage selected, not put a caret in the middle of it.
+    if (held) setSelection(el, held.anchor, held.focus);
+    else if (offset !== null) setCaret(el, offset);
 
     setQuoted(!allQuoted);
     scheduleSave();
