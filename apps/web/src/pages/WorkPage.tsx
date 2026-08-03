@@ -153,6 +153,19 @@ export function WorkPage() {
   // Set when the index moved because the page scrolled, so the effect that
   // scrolls to the active hit doesn't chase it back.
   const fromScroll = useRef(false);
+  /**
+   * Until when the scroll tracker should keep quiet.
+   *
+   * A smooth scroll is an animation: it fires scroll events the whole way, and
+   * the tracker reads each one as "the writer moved the page" and resets the
+   * match to whatever is passing by. That is the bounce — stepping forward
+   * scrolled toward the next hit, the tracker caught the page mid-flight and
+   * put the index back, and the next press started the same journey again.
+   *
+   * `fromScroll` cannot cover this: it is a one-shot flag for the opposite
+   * direction, and one flag cannot suppress a stream of events. A deadline can.
+   */
+  const scrollingUntil = useRef(0);
   // The tracker below runs off a listener bound once, so it reads the current
   // index here rather than closing over a stale one.
   const matchIndexRef = useRef(0);
@@ -568,6 +581,10 @@ export function WorkPage() {
         if (box.bottom >= rect.top && box.top <= rect.bottom) return;
       }
 
+      // Mid-flight on a scroll we asked for. Where the page happens to be
+      // partway through does not mean the writer went there.
+      if (Date.now() < scrollingUntil.current) return;
+
       // Scrolled away from it: pick up again at the first one in view.
       for (let i = 0; i < marks.length; i += 1) {
         const mark = marks[i];
@@ -756,7 +773,13 @@ export function WorkPage() {
       const delta = box.top - paneBox.top - Math.max(0, paneBox.height - box.height) / 2;
       // Already where it should be: a keystroke that leaves the match alone
       // must not nudge the page.
-      if (Math.abs(delta) > 2) pane.scrollBy({ top: delta, behavior: "smooth" });
+      if (Math.abs(delta) > 2) {
+        // Long enough to cover the animation. Overshooting only means the
+        // tracker resumes a moment late, which nobody can see; undershooting
+        // means the bounce comes back.
+        scrollingUntil.current = Date.now() + 800;
+        pane.scrollBy({ top: delta, behavior: "smooth" });
+      }
     });
     return () => window.cancelAnimationFrame(id);
   }, [activeMatch]);
