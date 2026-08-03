@@ -164,9 +164,7 @@ export function OllamaPane() {
                 numCtx ? (
                   <p className="tpl-note">
                     Using its full context window of{" "}
-                    <strong>{numCtx.toLocaleString()} tokens</strong>. Ollama would
-                    otherwise serve a fraction of that and quietly cut off the rest of
-                    each chapter.
+                    <strong>{numCtx.toLocaleString()} tokens</strong>.
                   </p>
                 ) : (
                   <p className="tpl-note">
