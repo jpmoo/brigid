@@ -21,6 +21,8 @@ model runs on hardware you control too.
 <img width="40%" alt="SCR-20260803-gvhk" src="https://github.com/user-attachments/assets/7bc56b36-a4b5-4371-8db2-f475b308a3b5" />&nbsp;<img width="40%" alt="SCR-20260803-gvnk" src="https://github.com/user-attachments/assets/c3d4c56b-138a-4a35-9673-c7857230e87b" />
 <img width="40%" alt="SCR-20260803-gvwa" src="https://github.com/user-attachments/assets/6cd13000-affe-4126-9b92-8bce5781cff5" /></p>
 
+<p align="center"><a href="https://www.buymeacoffee.com/jpmoo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="45" /></a></p>
+
 
 ---
 
@@ -259,3 +261,7 @@ does in production.
 MIT — see [LICENSE](LICENSE). Use it, change it, run it, share it. It comes with
 no warranty, which for something holding a novel is worth reading as: keep your
 own backups.
+
+---
+
+<p align="center"><a href="https://www.buymeacoffee.com/jpmoo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="45" /></a></p>
