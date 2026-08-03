@@ -264,6 +264,7 @@ export function offsetOfPosition(
 
   let offset = 0;
   let found = false;
+  let seenParagraph = false;
 
   const walk = (node: Node) => {
     if (found) return;
@@ -278,7 +279,28 @@ export function offsetOfPosition(
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     const el = node as HTMLElement;
-    if (el !== root && el.tagName === "P" && el !== root.firstChild) offset += 1;
+
+    /**
+     * Decoration, not prose. A bookmark marker is drawn inside the paragraph it
+     * marks — but only in the reading view, never in the editor. These offsets
+     * are measured against the reading view and then applied to the editor, so
+     * anything present in one tree and absent from the other has to contribute
+     * nothing, or every offset after it lands short and a selection carried
+     * into edit mode comes out shifted.
+     */
+    if (el.classList.contains("doc-bookmarks")) return;
+
+    /**
+     * The newline between paragraphs. Counted from whether a paragraph has been
+     * seen rather than from `el !== root.firstChild`, which only meant "the
+     * first paragraph" for as long as nothing was ever rendered ahead of it —
+     * and a section-level bookmark marker is rendered exactly there, which
+     * silently added a character to every offset in the block.
+     */
+    if (el !== root && el.tagName === "P") {
+      if (seenParagraph) offset += 1;
+      seenParagraph = true;
+    }
     if (node === container) {
       // The position sits between children rather than inside a text node.
       for (let i = 0; i < within; i += 1) {
