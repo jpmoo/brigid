@@ -722,12 +722,12 @@ export function WorkPage() {
    * paragraph matching it wins, and failing that the block does, which is where
    * bookmarks have always landed.
    */
-  function scrollToParagraph(bookmark: Bookmark) {
+  function scrollToParagraph(bookmark: Bookmark): boolean {
     const block = paneRef.current?.querySelector(`[data-block-id="${bookmark.blockId}"]`);
-    if (!block) return;
+    if (!block) return false;
 
     const paragraphs = [...block.querySelectorAll("p")];
-    if (paragraphs.length === 0) return;
+    if (paragraphs.length === 0) return false;
 
     const wanted = (bookmark.paragraphText ?? "").trim();
     let target = paragraphs[bookmark.paragraphIndex ?? 0];
@@ -737,7 +737,9 @@ export function WorkPage() {
       if (moved) target = moved;
     }
 
-    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (!target) return false;
+    target.scrollIntoView({ behavior: "smooth", block: "center" });
+    return true;
   }
 
   async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
@@ -747,6 +749,10 @@ export function WorkPage() {
       });
       setBookmarks((prev) => [...prev, bookmark]);
       setActiveBookmark(bookmark.id);
+      // Straight into naming it. A bookmark dropped and left with its fallback
+      // name is one nobody can tell from the others a week later, and the
+      // moment you know why you marked the place is this one.
+      await renameBookmark(bookmark);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not add the bookmark");
     }
@@ -758,7 +764,7 @@ export function WorkPage() {
       fields: [
         { label: "Name", value: bookmark.name },
         // What the name cannot hold: why this place was worth marking.
-        { label: "Note (optional)", value: bookmark.description ?? "" },
+        { label: "Note (optional)", value: bookmark.description ?? "", rows: 4 },
       ],
     });
     if (!answer) return;
@@ -902,10 +908,18 @@ export function WorkPage() {
             activeId={activeBookmark}
             onGo={(bookmark) => {
               setActiveBookmark(bookmark.id);
-              selectAndScroll(bookmark.blockId);
-              // The block first, then the line within it once it is on screen.
-              if (bookmark.paragraphIndex !== null) {
-                window.requestAnimationFrame(() => scrollToParagraph(bookmark));
+              /**
+               * A line bookmark scrolls straight to its line. Doing the block
+               * first and the line after was the obvious order and the wrong
+               * one: the block scroll is smooth, so it was still animating when
+               * the line scroll ran, and then finished on top of it — landing
+               * at the top of the section every time, which is exactly what the
+               * line was meant to improve on.
+               */
+              if (bookmark.paragraphIndex !== null && scrollToParagraph(bookmark)) {
+                setSelectedId(bookmark.blockId);
+              } else {
+                selectAndScroll(bookmark.blockId);
               }
             }}
             onRename={(bookmark) => void renameBookmark(bookmark)}
@@ -994,7 +1008,16 @@ export function WorkPage() {
               templates.find((t) => t.builtinKey === "regular-text")?.formatSettings?.typography ??
               null
             }
-            bookmarkedBlockIds={new Set(bookmarks.map((b) => b.blockId))}
+            bookmarksByBlock={
+              new Map(
+                [...new Set(bookmarks.map((b) => b.blockId))].map((blockId) => [
+                  blockId,
+                  bookmarks
+                    .filter((b) => b.blockId === blockId)
+                    .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+                ]),
+              )
+            }
             onDropBookmark={(blockId, paragraph) => void addBookmark(blockId, paragraph)}
             search={foldForSearch(query.trim())}
             activeMatch={activeMatch}

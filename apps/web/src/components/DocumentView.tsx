@@ -424,7 +424,8 @@ export interface DocumentViewProps {
    * this rather than the app's interface font.
    */
   baseTypography: Typography | null;
-  bookmarkedBlockIds: Set<string>;
+  /** Every bookmark on a block, oldest first — they stack in the margin. */
+  bookmarksByBlock: Map<string, { id: string; name: string; description: string | null }[]>;
   onDropBookmark: (blockId: string, paragraph?: { index: number; text: string }) => void;
   /** Lowercased needle, or empty when not searching. */
   search: string;
@@ -491,7 +492,7 @@ export function DocumentView({
   onEditBreak,
   textScale,
   baseTypography,
-  bookmarkedBlockIds,
+  bookmarksByBlock,
   onDropBookmark,
   search,
   activeMatch,
@@ -562,7 +563,7 @@ export function DocumentView({
           <div
             className={`doc-block${item.block.id === selectedId ? " selected" : ""}${
               dropTarget === item.block.id ? " drop-target" : ""
-            }${bookmarkedBlockIds.has(item.block.id) ? " bookmarked" : ""}`}
+            }${bookmarksByBlock.has(item.block.id) ? " bookmarked" : ""}`}
             key={item.block.id}
             data-block-id={item.block.id}
             ref={(el) => registerRef(item.block.id, el)}
@@ -583,9 +584,20 @@ export function DocumentView({
               onDropBookmark(item.block.id, paragraphUnder(e.currentTarget, e.clientY));
             }}
           >
-            {bookmarkedBlockIds.has(item.block.id) ? (
-              <span className="doc-bookmark" title="Bookmarked">
-                <BookmarkIcon size={13} />
+            {bookmarksByBlock.has(item.block.id) ? (
+              /* Stacked, oldest at the top: the order they were made is the
+                 only order that means anything here, and it keeps a marker
+                 from moving when a new one is added below it. */
+              <span className="doc-bookmarks">
+                {bookmarksByBlock.get(item.block.id)?.map((b) => (
+                  <span
+                    className="doc-bookmark"
+                    key={b.id}
+                    title={b.description ? `${b.name}\n\n${b.description}` : b.name}
+                  >
+                    <BookmarkIcon size={13} />
+                  </span>
+                ))}
               </span>
             ) : null}
             {item.sectionStart ? (

@@ -14,6 +14,8 @@ export interface PromptField {
   label: string;
   value?: string;
   type?: "text" | "number";
+  /** Lines tall. Anything above one renders a textarea rather than an input. */
+  rows?: number;
   placeholder?: string;
   min?: number;
   max?: number;
@@ -117,19 +119,31 @@ export function DialogProvider({ children }: { children: ReactNode }) {
                     <label className="field-label" htmlFor={`dlg-${i}`}>
                       {field.label}
                     </label>
-                    <input
-                      id={`dlg-${i}`}
-                      ref={i === 0 ? firstField : undefined}
-                      type={field.type ?? "text"}
-                      min={field.min}
-                      max={field.max}
-                      placeholder={field.placeholder}
-                      value={values[i] ?? ""}
-                      autoFocus={i === 0}
-                      onChange={(e) =>
-                        setValues((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
-                      }
-                    />
+                    {field.rows && field.rows > 1 ? (
+                      <textarea
+                        id={`dlg-${i}`}
+                        rows={field.rows}
+                        placeholder={field.placeholder}
+                        value={values[i] ?? ""}
+                        onChange={(e) =>
+                          setValues((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                        }
+                      />
+                    ) : (
+                      <input
+                        id={`dlg-${i}`}
+                        ref={i === 0 ? firstField : undefined}
+                        type={field.type ?? "text"}
+                        min={field.min}
+                        max={field.max}
+                        placeholder={field.placeholder}
+                        value={values[i] ?? ""}
+                        autoFocus={i === 0}
+                        onChange={(e) =>
+                          setValues((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                        }
+                      />
+                    )}
                     {field.hint ? <p className="field-hint">{field.hint}</p> : null}
                   </div>
                 ))

@@ -5109,3 +5109,28 @@ mark.hit.active {
   margin: -4px 0 8px;
   font-size: 12.5px;
 }
+
+/* Several bookmarks on one place stack down the margin rather than sitting on
+   top of each other. Oldest first, so adding one never moves the others.
+
+   The position moves here from the marker itself: absolutely positioned
+   children would all land on the same spot, which is the thing being fixed. */
+.doc-bookmarks {
+  position: absolute;
+  left: -22px;
+  top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.doc-bookmarks .doc-bookmark {
+  position: static;
+  left: auto;
+  top: auto;
+}
+
+/* Each is its own place to point at, so each answers to the cursor. */
+.doc-bookmarks .doc-bookmark:hover {
+  opacity: 1;
+}
