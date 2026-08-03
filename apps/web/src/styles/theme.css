@@ -5158,3 +5158,10 @@ mark.hit.active {
 .prose-editor [contenteditable] mark.hit .misspelled {
   background: none;
 }
+
+/* The hit being stepped through, inside the editor. Stronger than its
+   neighbours for the same reason as in the reading view: several hits are on
+   screen at once and only one of them is where you are. */
+.prose-editor [contenteditable] mark.hit.active {
+  background: color-mix(in srgb, var(--accent) 45%, transparent);
+}

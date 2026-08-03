@@ -60,11 +60,17 @@ const PROSE_FLAVOUR = "application/x-brigid-prose";
 // to break here, and none can be tested without a live DOM and a live
 // selection.
 
-function runsToHtml(runs: ProseText[], speller: Speller | null, search?: string): string {
+function runsToHtml(
+  runs: ProseText[],
+  speller: Speller | null,
+  search?: string,
+  counter?: { n: number },
+  activeHit?: number | null,
+): string {
   if (runs.length === 0) return "<br>";
   return runs
     .map((run) => {
-      const inner = decorate(run.text, speller, search);
+      const inner = decorate(run.text, speller, search, counter, activeHit);
       const underlined = hasMark(run, "underline") ? `<u>${inner}</u>` : inner;
       const em = hasMark(run, "em") ? `<em>${underlined}</em>` : underlined;
       return hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
@@ -124,7 +130,13 @@ function markMisspellings(text: string, speller: Speller): string {
  * tags around half a word. Walking the text once and taking whichever boundary
  * comes next keeps every span whole.
  */
-function decorate(text: string, speller: Speller | null, search?: string): string {
+function decorate(
+  text: string,
+  speller: Speller | null,
+  search?: string,
+  counter?: { n: number },
+  activeHit?: number | null,
+): string {
   const hits: { at: number; length: number }[] = [];
   if (search) {
     // Folded on both sides, so a search behaves here as it does in the reading
@@ -158,7 +170,11 @@ function decorate(text: string, speller: Speller | null, search?: string): strin
     // the underline still shows through beneath the highlight.
     if (hit) {
       out += escapeHtml(text.slice(from, at));
-      out += `<mark class="hit">${escapeHtml(text.slice(at, at + hit.length))}</mark>`;
+      // Numbered as they are drawn, so the one the writer is standing on can
+      // be told apart from the rest — which is what the page scrolls to.
+      const ordinal = counter ? counter.n++ : -1;
+      const cls = ordinal === activeHit ? "hit active" : "hit";
+      out += `<mark class="${cls}">${escapeHtml(text.slice(at, at + hit.length))}</mark>`;
       from = at + hit.length;
       at = from;
       continue;
@@ -215,13 +231,17 @@ export function docToHtml(
   speller: Speller | null,
   layout?: ProseLayout,
   search?: string,
+  activeHit?: number | null,
 ): string {
   if (doc.content.length === 0) return `<p${paragraphAttrs(0, false, layout)}><br></p>`;
+  // Counted across the whole block, since a hit's position is a fact about the
+  // block rather than about the paragraph it happens to fall in.
+  const counter = { n: 0 };
   return doc.content
     .map(
       (p, i) =>
         `<p${paragraphAttrs(i, p.blockquote === true, layout)}>` +
-        `${runsToHtml(p.content ?? [], speller, search)}</p>`,
+        `${runsToHtml(p.content ?? [], speller, search, counter, activeHit)}</p>`,
     )
     .join("");
 }
@@ -621,6 +641,11 @@ export interface ProseEditorProps {
    * view. Folded the same way, so the same words match.
    */
   search?: string | undefined;
+  /**
+   * Which hit within this block is the current one, counted from zero. Null
+   * when the active hit is elsewhere in the manuscript, or there isn't one.
+   */
+  activeHit?: number | null | undefined;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
@@ -638,6 +663,7 @@ export function ProseEditor({
   blockId,
   initialSelection,
   search,
+  activeHit,
   layout,
   askAbout,
   content,
@@ -663,6 +689,8 @@ export function ProseEditor({
    */
   const searchRef = useRef(search);
   searchRef.current = search;
+  const activeHitRef = useRef(activeHit);
+  activeHitRef.current = activeHit;
   layoutRef.current = layout;
 
   /**
@@ -691,7 +719,7 @@ export function ProseEditor({
     const doc =
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
     // Focusing an element scrolls it into view, and the writer has just clicked
     // on the very words they want to stay put — so the page shifted under the
     // caret at the moment it arrived. The caret is placed by offset, which
@@ -830,7 +858,7 @@ export function ProseEditor({
       historyAt.current = next;
 
       restoring.current = true;
-      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current, searchRef.current);
+      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
       setCaret(el, entry.caret);
       restoring.current = false;
 
@@ -854,7 +882,7 @@ export function ProseEditor({
     // editor opened — so collapsing here would throw away the passage just
     // carried in from the manuscript.
     const held = selectionOffsets(el);
-    const html = docToHtml(doc, speller, layoutRef.current, searchRef.current);
+    const html = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
     if (html === el.innerHTML) return;
     el.innerHTML = html;
     if (held) setSelection(el, held.anchor, held.focus);
@@ -880,7 +908,7 @@ export function ProseEditor({
    */
   useEffect(() => {
     recheck();
-  }, [search, recheck]);
+  }, [search, activeHit, recheck]);
 
   /**
    * The paragraphs the selection covers, or the one the caret sits in.
@@ -930,7 +958,7 @@ export function ProseEditor({
     // Rebuilt from the model so the class and the indent follow the attribute,
     // rather than being patched onto the element by hand in two places.
     const doc = htmlToDoc(el);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
     // Same reasoning: turning a passage into a blockquote should leave that
     // passage selected, not put a caret in the middle of it.
     if (held) setSelection(el, held.anchor, held.focus);

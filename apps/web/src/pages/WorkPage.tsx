@@ -475,6 +475,24 @@ export function WorkPage() {
   const matches = useMemo(() => findMatches(searchable, query), [searchable, query]);
   const activeMatch = matches[matchIndex] ?? null;
 
+  /**
+   * Which hit inside the block being edited is the current one.
+   *
+   * The editor draws one block and knows nothing of the rest, so it cannot work
+   * out that a hit is "the fourth of eleven in the manuscript". It is told the
+   * position within its own block instead, counted here where the whole list is
+   * in view. Null when the active hit is somewhere else — or nowhere.
+   */
+  const activeHitInEditor = useMemo(() => {
+    if (!editingProse || !activeMatch || activeMatch.blockId !== editingProse.id) return null;
+    let n = 0;
+    for (const match of matches) {
+      if (match === activeMatch) return n;
+      if (match.blockId === editingProse.id) n += 1;
+    }
+    return null;
+  }, [matches, activeMatch, editingProse]);
+
   useEffect(() => {
     setMatchIndex(0);
   }, [query]);
@@ -1133,6 +1151,7 @@ export function WorkPage() {
                   initialSelection={editingProse.selection}
                   askAbout={editingProse.askAbout}
                   search={query.trim() || undefined}
+                  activeHit={activeHitInEditor}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}
