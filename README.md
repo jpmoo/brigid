@@ -3,14 +3,14 @@
 A writing application for novels and short stories that you run yourself. Named after the Celtic
 goddess of poetry.
 
-Brigid keeps a manuscript as a structured outline rather than one long file, so
+Brigid keeps your manuscript as a structured outline rather than one long file, so
 you can move a chapter without cutting and pasting twenty pages. It handles the
 things a novel needs and a word processor doesn't: parts and chapters and scenes
 that know what they are, formatting decided once and applied everywhere,
 compiling to a submission manuscript, and — if you want it — a local AI that
-reads the book and tells you what shape it has.
+reads the book and tells you what shape it has, maps your characters to archetypes, and lets you chat about your work.
 
-Nothing leaves your machine. There is no account with anyone, no subscription,
+Nothing leaves your machine or server until you're ready to compile into a Word document or a PDF. There is no account with anyone, no subscription,
 and no company that can change the terms later. If you use the AI features, the
 model runs on hardware you control too.
 
