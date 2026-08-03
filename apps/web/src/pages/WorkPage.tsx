@@ -697,14 +697,38 @@ export function WorkPage() {
       return;
     }
     const id = window.requestAnimationFrame(() => {
-      // .focus() auto-scrolls inline content reliably cross-browser where
-      // scrollIntoView on <mark> is broken/silent. Focus the hit, then blur
-      // after a tick so no blinking cursor remains at the search result.
-      const hit = paneRef.current?.querySelector("mark[tabindex=\"-1\"]");
+      const pane = paneRef.current;
+      if (!pane) return;
+
+      /**
+       * `focus()` scrolls inline content where `scrollIntoView` on a `mark` is
+       * unreliable — but it also takes the keyboard, and this effect runs on
+       * every keystroke as the match moves. Focusing the hit therefore emptied
+       * the search box mid-word.
+       *
+       * So whoever had the keyboard gets it straight back. Restored rather than
+       * blurred: blurring leaves the focus nowhere, which is just as useless to
+       * someone in the middle of typing a query.
+       */
+      const hit = pane.querySelector<HTMLElement>("mark.hit.active");
       if (hit) {
-        (hit as HTMLElement).focus();
-        setTimeout(() => ((hit as HTMLElement).blur?.()), 50);
+        const held = document.activeElement as HTMLElement | null;
+        hit.focus();
+        if (held && held !== hit) held.focus({ preventScroll: true });
+        else hit.blur();
+        return;
       }
+
+      /**
+       * No mark to focus. The block holding the match is open in the editor,
+       * which renders its own prose and none of the search highlighting — so
+       * the hit does not exist as an element. Scrolling to the block is the
+       * honest answer: it puts the passage on screen, which is what was asked
+       * for, even though nothing can be lit up inside it.
+       */
+      pane
+        .querySelector(`[data-block-id="${activeMatch.blockId}"]`)
+        ?.scrollIntoView({ behavior: "smooth", block: "center" });
     });
     return () => window.cancelAnimationFrame(id);
   }, [activeMatch]);
