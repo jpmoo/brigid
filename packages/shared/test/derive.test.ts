@@ -573,5 +573,25 @@ check("decimal points are not an ellipsis", typed("1.5.2"), "1.5.2");
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
+console.log("\nquotes after a space the browser substituted");
+
+// The reported bug. Typing a space at the end of a text node in a
+// contenteditable gives U+00A0 rather than U+0020 — the browser does it so the
+// space cannot be collapsed — and a set listing " " does not contain it, so the
+// quote closed instead of opening: It says, \u201DI am the thing.
+const NBSP = "\u00A0";
+check("a quote after a non-breaking space opens", autocorrectKeystroke('"', `says,${NBSP}`)?.text, "\u201C");
+check("and so does a single one", autocorrectKeystroke("'", `says,${NBSP}`)?.text, "\u2018");
+
+check("an ordinary space still opens", autocorrectKeystroke('"', "said, ")?.text, "\u201C");
+check("the start of a paragraph opens", autocorrectKeystroke('"', "")?.text, "\u201C");
+
+// The other half of the rule has to keep working.
+check("after a letter it closes", autocorrectKeystroke('"', "thing")?.text, "\u201D");
+check("after a full stop it closes", autocorrectKeystroke('"', "done.")?.text, "\u201D");
+// A dash cuts both ways and only the sweep can see which; while typing there is
+// no next character, and closing is the commoner case.
+check("after a dash it closes", autocorrectKeystroke('"', "Stop\u2014")?.text, "\u201D");
+
 process.exit(failures === 0 ? 0 : 1);
 

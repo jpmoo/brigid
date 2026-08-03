@@ -12,7 +12,23 @@
  * way, which is worse than leaving it straight.
  */
 
-const OPENERS = new Set([" ", "\t", "\n", "(", "[", "{", "—", "–", "“", "‘"]);
+/**
+ * What a quote opens after.
+ *
+ * A regex rather than a set of characters, because of the non-breaking space.
+ * Typing a space at the end of a text node in a contenteditable gives you
+ * U+00A0, not U+0020 — the browser does it so the space cannot be collapsed —
+ * and a set listing " " does not contain it. The effect was that a quote typed
+ * after a space at the end of a line closed instead of opening: It says, ”I am
+ * the thing. JavaScript's \s matches U+00A0, so asking the question this way
+ * covers every space the browser might have substituted.
+ *
+ * Dashes are deliberately absent. A dash cuts both ways — «He turned—"Wait!"»
+ * opens and «"Wait—"» closes — so it is decided by what follows, which only the
+ * sweep can see. While typing there is no next character yet, and closing is the
+ * commoner case.
+ */
+const OPENS_AFTER = /[\s([{“‘]/u;
 const DASHES = new Set(["—", "–"]);
 
 /** Letters or digits, so an apostrophe inside a word can be recognised. */
@@ -45,7 +61,7 @@ export function smartenText(input: string): string {
       // guessing — a letter after the quote means speech is starting.
       const opening =
         prev === undefined ||
-        (DASHES.has(prev) ? next !== undefined && /[\p{L}\p{N}]/u.test(next) : OPENERS.has(prev));
+        (DASHES.has(prev) ? next !== undefined && /[\p{L}\p{N}]/u.test(next) : OPENS_AFTER.test(prev));
       out += opening ? "“" : "”";
       continue;
     }
@@ -66,7 +82,7 @@ export function smartenText(input: string): string {
         out += "’";
         continue;
       }
-      const opening = prev === undefined || OPENERS.has(prev);
+      const opening = prev === undefined || OPENS_AFTER.test(prev);
       out += opening ? "‘" : "’";
       continue;
     }
@@ -77,7 +93,7 @@ export function smartenText(input: string): string {
   return out;
 }
 
-const TYPED_OPENERS = new Set([" ", "\t", "\n", "(", "[", "{", "“", "‘", ""]);
+
 
 /**
  * What a typed character should actually become, given what precedes it, or
@@ -93,12 +109,13 @@ export function autocorrectKeystroke(typed: string, before: string): { text: str
   const prev2 = before.slice(-2);
 
   if (typed === '"') {
-    return { text: TYPED_OPENERS.has(prev) ? "“" : "”", replace: 0 };
+    // Nothing before the caret means the start of a paragraph, which opens.
+    return { text: prev === "" || OPENS_AFTER.test(prev) ? "“" : "”", replace: 0 };
   }
   if (typed === "'") {
     // Inside a word it's an apostrophe: don't, o'clock, Maren's.
     if (/[\p{L}\p{N}]/u.test(prev)) return { text: "’", replace: 0 };
-    return { text: TYPED_OPENERS.has(prev) ? "‘" : "’", replace: 0 };
+    return { text: prev === "" || OPENS_AFTER.test(prev) ? "‘" : "’", replace: 0 };
   }
   // An elided decade — '90s, '73 — reads as an opening quote until the digit
   // arrives, which is only one keystroke later. Turning it round then is
