@@ -258,7 +258,7 @@ does in production.
 
 ---
 
-## Licence
+## License
 
 MIT — see [LICENSE](LICENSE). Use it, change it, run it, share it. It comes with
 no warranty, which for something holding a novel is worth reading as: keep your
