@@ -1152,6 +1152,8 @@ export function WorkPage() {
                   askAbout={editingProse.askAbout}
                   search={query.trim() || undefined}
                   activeHit={activeHitInEditor}
+                  // The block keeps its markers while it is being edited.
+                  bookmarks={bookmarks.filter((b) => b.blockId === editingProse.id)}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}

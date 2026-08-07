@@ -208,10 +208,48 @@ export interface ProseLayout {
   indentFirst?: boolean | undefined;
 }
 
+/** One gathered bookmark, as the editor needs to draw it. */
+export interface EditorBookmark {
+  id: string;
+  name: string;
+  description: string | null;
+  paragraphIndex: number | null;
+}
+
+/**
+ * A bookmark marker, as markup.
+ *
+ * The reading view draws these with a React component, but the editor builds
+ * its paragraphs as an HTML string, so the same marker has to exist in both
+ * forms. It carries the class the reading view uses, so one rule styles both
+ * and a marker does not jump when the editor opens.
+ *
+ * `contenteditable="false"` because it is furniture rather than prose: without
+ * it the caret can be put inside the icon and typing would edit the marker.
+ * It is also skipped when offsets are measured, so it adds no characters.
+ */
+function bookmarkMarkup(here: EditorBookmark[]): string {
+  if (here.length === 0) return "";
+  const marks = here
+    .map((b) => {
+      const title = escapeHtml(b.description ? `${b.name}\n\n${b.description}` : b.name);
+      return (
+        `<span class="doc-bookmark" title="${title}">` +
+        `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" ` +
+        `stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">` +
+        `<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>`
+      );
+    })
+    .join("");
+  return `<span class="doc-bookmarks" contenteditable="false">${marks}</span>`;
+}
+
 function paragraphAttrs(
   index: number,
   quoted: boolean,
   layout: ProseLayout | undefined,
+  /** Needs the margin the marker stack sits in, and something to anchor it to. */
+  bookmarked = false,
 ): string {
   // The clipboard asks for bare paragraphs, but a blockquote has to survive a
   // copy, so that much is written either way.
@@ -220,7 +258,12 @@ function paragraphAttrs(
   // A quoted paragraph is inset as a whole and never takes a first-line indent.
   const flush = quoted || (index === 0 && layout.indentFirst === false);
   const indent = !flush && layout.indent ? ` style="text-indent:${layout.indent}"` : "";
-  const classes = ["prose", flush && !quoted ? "flush" : "", quoted ? "blockquote" : ""]
+  const classes = [
+    "prose",
+    flush && !quoted ? "flush" : "",
+    quoted ? "blockquote" : "",
+    bookmarked ? "has-bookmark" : "",
+  ]
     .filter(Boolean)
     .join(" ");
   return ` class="${classes}"${indent}${quote}`;
@@ -232,6 +275,7 @@ export function docToHtml(
   layout?: ProseLayout,
   search?: string,
   activeHit?: number | null,
+  bookmarks?: EditorBookmark[],
 ): string {
   if (doc.content.length === 0) return `<p${paragraphAttrs(0, false, layout)}><br></p>`;
   // Counted across the whole block, since a hit's position is a fact about the
@@ -240,7 +284,8 @@ export function docToHtml(
   return doc.content
     .map(
       (p, i) =>
-        `<p${paragraphAttrs(i, p.blockquote === true, layout)}>` +
+        `<p${paragraphAttrs(i, p.blockquote === true, layout, (bookmarks ?? []).some((b) => b.paragraphIndex === i))}>` +
+        `${bookmarkMarkup((bookmarks ?? []).filter((b) => b.paragraphIndex === i))}` +
         `${runsToHtml(p.content ?? [], speller, search, counter, activeHit)}</p>`,
     )
     .join("");
@@ -646,6 +691,8 @@ export interface ProseEditorProps {
    * when the active hit is elsewhere in the manuscript, or there isn't one.
    */
   activeHit?: number | null | undefined;
+  /** This block's bookmarks, so a marker does not vanish while it is edited. */
+  bookmarks?: EditorBookmark[] | undefined;
   content: Record<string, unknown> | null;
   /** Fallback for blocks whose prose predates the structured document. */
   fallbackText: string;
@@ -664,6 +711,7 @@ export function ProseEditor({
   initialSelection,
   search,
   activeHit,
+  bookmarks,
   layout,
   askAbout,
   content,
@@ -691,6 +739,8 @@ export function ProseEditor({
   searchRef.current = search;
   const activeHitRef = useRef(activeHit);
   activeHitRef.current = activeHit;
+  const bookmarksRef = useRef(bookmarks);
+  bookmarksRef.current = bookmarks;
   layoutRef.current = layout;
 
   /**
@@ -719,7 +769,7 @@ export function ProseEditor({
     const doc =
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
     // Focusing an element scrolls it into view, and the writer has just clicked
     // on the very words they want to stay put — so the page shifted under the
     // caret at the moment it arrived. The caret is placed by offset, which
@@ -858,7 +908,7 @@ export function ProseEditor({
       historyAt.current = next;
 
       restoring.current = true;
-      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
+      el.innerHTML = docToHtml(entry.doc, speller, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
       setCaret(el, entry.caret);
       restoring.current = false;
 
@@ -882,7 +932,7 @@ export function ProseEditor({
     // editor opened — so collapsing here would throw away the passage just
     // carried in from the manuscript.
     const held = selectionOffsets(el);
-    const html = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
+    const html = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
     if (html === el.innerHTML) return;
     el.innerHTML = html;
     if (held) setSelection(el, held.anchor, held.focus);
@@ -908,7 +958,7 @@ export function ProseEditor({
    */
   useEffect(() => {
     recheck();
-  }, [search, activeHit, recheck]);
+  }, [search, activeHit, bookmarks, recheck]);
 
   /**
    * The paragraphs the selection covers, or the one the caret sits in.
@@ -958,7 +1008,7 @@ export function ProseEditor({
     // Rebuilt from the model so the class and the indent follow the attribute,
     // rather than being patched onto the element by hand in two places.
     const doc = htmlToDoc(el);
-    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current);
+    el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
     // Same reasoning: turning a passage into a blockquote should leave that
     // passage selected, not put a caret in the middle of it.
     if (held) setSelection(el, held.anchor, held.focus);

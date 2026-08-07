@@ -5165,3 +5165,10 @@ mark.hit.active {
 .prose-editor [contenteditable] mark.hit.active {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
 }
+
+/* The markers the editor draws for itself. Same rules as the reading view, so
+   a bookmark does not move or change when the section is opened for editing —
+   only the tree it lives in differs. */
+.prose-editor .doc-bookmarks {
+  user-select: none;
+}
