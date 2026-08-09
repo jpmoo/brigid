@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ChevronDown, ChevronUp, Search, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, SpellCheck, X } from "lucide-react";
 import { foldForSearch } from "@brigid/shared";
 
 export interface SearchMatch {
@@ -49,6 +49,7 @@ export function SearchBar({
   onClose,
   onQuery,
   onStep,
+  onNextMisspelling,
 }: {
   open: boolean;
   query: string;
@@ -58,6 +59,11 @@ export function SearchBar({
   onClose: () => void;
   onQuery: (value: string) => void;
   onStep: (delta: 1 | -1) => void;
+  /**
+   * Jump to the next word the checker doesn't know, wherever it is. Absent when
+   * checking is switched off, in which case the control isn't offered.
+   */
+  onNextMisspelling?: (() => void) | undefined;
 }) {
   const input = useRef<HTMLInputElement>(null);
 
@@ -102,6 +108,20 @@ export function SearchBar({
                 : `${activeIndex + 1} of ${matches.length}`}
           </span>
 
+          {/* Nothing to do with the query: a pass through the misspellings is
+              the other way of walking a manuscript, and this is where the
+              walking controls already are. */}
+          {onNextMisspelling ? (
+            <button
+              className="btn ghost"
+              type="button"
+              title="Next misspelling"
+              aria-label="Go to the next misspelling"
+              onClick={onNextMisspelling}
+            >
+              <SpellCheck size={15} />
+            </button>
+          ) : null}
           <button
             className="btn ghost"
             type="button"

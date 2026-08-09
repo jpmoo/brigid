@@ -836,16 +836,24 @@ export function WorkPage() {
    * where it left off rather than making the writer find it again.
    */
   const continueSpellingAfter = useCallback(
-    (blockId: string) => {
+    (blockId: string | null) => {
       const speller = spelling.speller;
       if (!speller) return;
 
       const order = items.filter((i) => i.kind === "block");
-      const from = order.findIndex((i) => i.kind === "block" && i.block.id === blockId);
-      if (from < 0) return;
+      const from = blockId
+        ? order.findIndex((i) => i.kind === "block" && i.block.id === blockId)
+        : -1;
 
-      for (const item of order.slice(from + 1)) {
+      /**
+       * Everything after where we are, then everything before it. Wrapping
+       * rather than stopping: a pass started halfway down should still reach
+       * the beginning, and refusing to move because the rest happens to be
+       * clean is not an answer anyone wants.
+       */
+      for (const item of [...order.slice(from + 1), ...order.slice(0, Math.max(0, from + 1))]) {
         if (item.kind !== "block") continue;
+        if (item.block.id === blockId) continue;
         const flagged = words(item.block.contentText).find(
           (w) => isCheckable(w.word) && !speller.correct(w.word),
         );
@@ -1268,6 +1276,9 @@ export function WorkPage() {
                 }}
                 onQuery={setQuery}
                 onStep={stepMatch}
+            onNextMisspelling={
+              spelling.speller ? () => continueSpellingAfter(selectedId) : undefined
+            }
               />
 
               <ThemeToggle />
