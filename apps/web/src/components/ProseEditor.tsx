@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Bold, Italic, Quote, Redo2, SpellCheck, Underline, Undo2 } from "lucide-react";
+import { Bold, Italic, Quote, Redo2, SpellCheck, Underline, Undo2, ChevronRight } from "lucide-react";
 import {
   asProseDoc,
   autocorrectKeystroke,
@@ -1279,6 +1279,41 @@ export function ProseEditor({
     }, 0);
   };
 
+  /**
+   * Correct this one and open the next.
+   *
+   * Different from settling a word, in two ways that decide the arithmetic. A
+   * correction takes effect at once — the checker already knows the suggestion
+   * is a word, so nothing waits on the server — and it fixes only the instance
+   * clicked. So the next misspelling may well be the same word again, and is
+   * simply whatever follows in the list.
+   *
+   * Which makes position reliable here where it was not before: one entry
+   * leaves the list, so after the redraw the next one has moved into the place
+   * this one occupied.
+   */
+  const replaceAndAdvance = (word: string, replacement: string) => {
+    const el = ref.current;
+    const spans = el ? [...el.querySelectorAll(".misspelled")] : [];
+    const at = spans.findIndex(
+      (span) => (span.getAttribute("data-word") ?? span.textContent) === word,
+    );
+
+    replaceWord(word, replacement);
+
+    window.setTimeout(() => {
+      const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
+      const next = at >= 0 ? now[at] : now[0];
+      if (!next) return;
+      setMenu(
+        placeSpellMenu(
+          next.getAttribute("data-word") ?? next.textContent ?? "",
+          next.getBoundingClientRect(),
+        ),
+      );
+    }, 0);
+  };
+
   const replaceWord = (word: string, replacement: string) => {
     const el = ref.current;
     if (!el) return;
@@ -1471,14 +1506,29 @@ export function ProseEditor({
           >
             {speller?.suggest(menu.word).length ? (
               speller.suggest(menu.word).map((suggestion) => (
-                <button
-                  key={suggestion}
-                  type="button"
-                  role="menuitem"
-                  onClick={() => replaceWord(menu.word, suggestion)}
-                >
-                  {suggestion}
-                </button>
+                <div className="menu-suggestion" key={suggestion}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => replaceWord(menu.word, suggestion)}
+                  >
+                    {suggestion}
+                  </button>
+                  {/* The same correction, then straight on. Two ways to take a
+                      suggestion, matching the two ways to settle a word — a
+                      pass through a section wants one, fixing a single word
+                      wants the other. */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="menu-onward"
+                    title={`Use "${suggestion}" and go to the next`}
+                    aria-label={`Use "${suggestion}" and go to the next misspelling`}
+                    onClick={() => replaceAndAdvance(menu.word, suggestion)}
+                  >
+                    <ChevronRight size={13} />
+                  </button>
+                </div>
               ))
             ) : (
               <span className="menu-note">No suggestions</span>

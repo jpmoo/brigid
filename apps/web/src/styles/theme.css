@@ -5189,3 +5189,28 @@ mark.hit.active {
 .prose-editor .doc-bookmarks {
   user-select: none;
 }
+
+/* A suggestion, and the same suggestion taken onward. The word fills the row so
+   it stays the easy target; the chevron is a deliberate second choice rather
+   than something to hit by accident. */
+.menu-suggestion {
+  display: flex;
+  align-items: stretch;
+}
+
+.menu-suggestion > button:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.menu-onward {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  color: var(--text-faint);
+}
+
+.menu-suggestion:hover .menu-onward {
+  color: var(--accent);
+}
