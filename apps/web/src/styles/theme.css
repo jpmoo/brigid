@@ -580,6 +580,18 @@ input::placeholder {
   left: 0;
   z-index: 8;
   box-shadow: var(--shadow-lift);
+
+  /**
+   * Given its own compositor layer for the slide.
+   *
+   * The panel animates `transform` while carrying a `backdrop-filter`, so
+   * without this the browser re-reads and re-blurs the manuscript behind it on
+   * every frame — and the sheet is `zoom`ed, which turns that re-rasterising
+   * into a visible shimmer along the text. Promoting the panel lets the
+   * compositor slide a finished layer instead.
+   */
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 /* Retracted, a visible strip stays behind as the hover target — 10px was a mean

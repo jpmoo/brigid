@@ -1206,6 +1206,47 @@ export function ProseEditor({
     );
   };
 
+  /**
+   * Deal with this word and open the next one.
+   *
+   * Checking a section is a pass through it, not a series of separate
+   * decisions: having taught the checker one name, the useful next thing is
+   * almost always the word after it. Doing that by hand means closing the menu,
+   * finding the next red underline, and clicking it — three actions to repeat
+   * the one you just performed.
+   *
+   * Which word is "next" is settled before the change, because the change is
+   * what makes the current word stop being flagged: its position among the
+   * misspellings is noted first, and afterwards the word now at that position
+   * is the next one. No arithmetic, and it holds however many instances of the
+   * word the section contained.
+   */
+  const settleAndAdvance = (word: string, settle: (word: string) => void) => {
+    const el = ref.current;
+    const flagged = el ? [...el.querySelectorAll(".misspelled")] : [];
+    const at = flagged.findIndex(
+      (span) => (span.getAttribute("data-word") ?? span.textContent) === word,
+    );
+
+    settle(word);
+    setMenu(null);
+
+    window.setTimeout(() => {
+      recheck();
+      const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
+      // Whatever has taken that place. Nothing there means the section is clean
+      // from here on, and the menu stays shut.
+      const next = at >= 0 ? now[at] : now[0];
+      if (!next) return;
+      setMenu(
+        placeSpellMenu(
+          next.getAttribute("data-word") ?? next.textContent ?? "",
+          next.getBoundingClientRect(),
+        ),
+      );
+    }, 0);
+  };
+
   const replaceWord = (word: string, replacement: string) => {
     const el = ref.current;
     if (!el) return;
@@ -1425,6 +1466,13 @@ export function ProseEditor({
             <button
               type="button"
               role="menuitem"
+              onClick={() => settleAndAdvance(menu.word, onAddWord)}
+            >
+              Add and go to next
+            </button>
+            <button
+              type="button"
+              role="menuitem"
               onClick={() => {
                 onIgnoreWord(menu.word);
                 setMenu(null);
@@ -1432,6 +1480,13 @@ export function ProseEditor({
               }}
             >
               Ignore for now
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => settleAndAdvance(menu.word, onIgnoreWord)}
+            >
+              Ignore and go to next
             </button>
           </div>
             </>,
