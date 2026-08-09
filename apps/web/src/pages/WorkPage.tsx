@@ -867,6 +867,16 @@ export function WorkPage() {
         );
         if (!flagged) continue;
 
+        /**
+         * The search is called off first.
+         *
+         * A query open closes any editor — that is what makes a hit inside an
+         * edited section highlightable — so opening one here would have it shut
+         * again in the same breath. Walking the misspellings and walking the
+         * matches are two different passes, and starting one ends the other.
+         */
+        setQuery("");
+
         // The section on screen first; the editor then puts the word itself
         // in view and opens its menu.
         selectAndScroll(item.block.id);
