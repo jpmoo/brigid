@@ -835,6 +835,17 @@ export function WorkPage() {
    * order. Opened with that word already asked about, so the pass carries on
    * where it left off rather than making the writer find it again.
    */
+  /**
+   * Sections already offered during this pass.
+   *
+   * A section can hand the pass straight back — the page picks it by scanning
+   * the plain text and the editor marks the rendered prose, and where those
+   * disagree the editor arrives, finds nothing, and asks for the next one. Left
+   * unbounded that walks the manuscript for ever once it wraps. Cleared when a
+   * pass is started by hand.
+   */
+  const passTried = useRef<Set<string>>(new Set());
+
   const continueSpellingAfter = useCallback(
     (blockId: string | null) => {
       /**
@@ -862,6 +873,7 @@ export function WorkPage() {
       for (const item of [...order.slice(from + 1), ...order.slice(0, Math.max(0, from + 1))]) {
         if (item.kind !== "block") continue;
         if (item.block.id === blockId) continue;
+        if (passTried.current.has(item.block.id)) continue;
         const flagged = words(item.block.contentText).find(
           (w) => isCheckable(w.word) && !speller.correct(w.word),
         );
@@ -876,6 +888,7 @@ export function WorkPage() {
          * matches are two different passes, and starting one ends the other.
          */
         setQuery("");
+        passTried.current.add(item.block.id);
 
         /**
          * Selected, not scrolled to.
@@ -899,6 +912,7 @@ export function WorkPage() {
 
       // Nothing further: the pass is finished, and closing says so more
       // plainly than a menu that refuses to open.
+      passTried.current.clear();
       setEditingProse(null);
     },
     [items, spelling],
@@ -1061,7 +1075,12 @@ export function WorkPage() {
           onQuery={setQuery}
           onStep={stepMatch}
           onNextMisspelling={
-            spelling.enabled ? () => continueSpellingAfter(selectedId) : undefined
+            spelling.enabled
+              ? () => {
+                  passTried.current.clear();
+                  continueSpellingAfter(selectedId);
+                }
+              : undefined
           }
         />
 
@@ -1314,7 +1333,13 @@ export function WorkPage() {
                gating on the speller hid the control exactly when it was the
                thing you wanted to press. */
             onNextMisspelling={
-              spelling.enabled ? () => continueSpellingAfter(selectedId) : undefined
+              spelling.enabled
+                ? () => {
+                    // A fresh pass: every section is worth offering again.
+                    passTried.current.clear();
+                    continueSpellingAfter(selectedId);
+                  }
+                : undefined
             }
               />
 

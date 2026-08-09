@@ -811,14 +811,27 @@ export function ProseEditor({
 
     // The word that was clicked, already underlined in what was just rendered.
     if (!askAbout) return;
-    for (const span of el.querySelectorAll(".misspelled")) {
-      if ((span.getAttribute("data-word") ?? span.textContent) !== askAbout) continue;
-      // Arrived from elsewhere in the manuscript, so it is very likely off
-      // screen: the menu would otherwise open against a word nobody can see.
-      bringIntoView(span);
-      setMenu(placeSpellMenu(askAbout, span.getBoundingClientRect()));
-      break;
+    const asked = [...el.querySelectorAll(".misspelled")].find(
+      (span) => (span.getAttribute("data-word") ?? span.textContent) === askAbout,
+    );
+
+    if (!asked) {
+      /**
+       * Sent here for a word this block does not actually flag.
+       *
+       * The page decides where to go by scanning the plain text, and the editor
+       * marks the rendered prose — they agree almost always, and "almost" is
+       * the problem: a mismatch used to end the pass in silence, with an editor
+       * open on nothing. Moving on is the honest response.
+       */
+      onNoMoreHere?.();
+      return;
     }
+
+    // Arrived from elsewhere in the manuscript, so it is very likely off
+    // screen: the menu would otherwise open against a word nobody can see.
+    bringIntoView(asked);
+    setMenu(placeSpellMenu(askAbout, asked.getBoundingClientRect()));
     // Only when the block changes: re-running this on every keystroke, or when
     // the checker learns a word, would throw away what is being typed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
