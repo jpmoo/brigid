@@ -1286,14 +1286,22 @@ export function ProseEditor({
     settle(word);
 
     if (!next) {
+      /**
+       * Nothing further in this block, so the pass moves on.
+       *
+       * Decided from the list as it stood, not from what is left after a
+       * redraw. Settling a word is a round trip to the server, so a moment
+       * later it is still flagged and the block still looks unfinished —
+       * waiting to see it empty meant the hand-off never happened, and the
+       * pass simply stopped at the last word of every section.
+       *
+       * It also covers the case where everything remaining in the block is the
+       * same word again: settling it settles those too, so there is genuinely
+       * nothing left here to ask about.
+       */
       setMenu(null);
-      window.setTimeout(() => {
-        recheck();
-        // Settling the last one may have been the last one anywhere in this
-        // block, so the question is asked after the redraw rather than before.
-        const left = ref.current?.querySelectorAll(".misspelled").length ?? 0;
-        if (left === 0) onNoMoreHere?.();
-      }, 0);
+      window.setTimeout(recheck, 0);
+      onNoMoreHere?.();
       return;
     }
 
@@ -1351,9 +1359,14 @@ export function ProseEditor({
 
     window.setTimeout(() => {
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
+      /**
+       * Whatever moved into this one's place. Nothing there means this was the
+       * last misspelling in the block — earlier ones do not count, since a
+       * pass goes forwards — so the pass moves to the next section.
+       */
       const next = at >= 0 ? now[at] : now[0];
       if (!next) {
-        if (now.length === 0) onNoMoreHere?.();
+        onNoMoreHere?.();
         return;
       }
       bringIntoView(next);
