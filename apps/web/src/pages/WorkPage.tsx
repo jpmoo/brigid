@@ -877,9 +877,18 @@ export function WorkPage() {
          */
         setQuery("");
 
-        // The section on screen first; the editor then puts the word itself
-        // in view and opens its menu.
-        selectAndScroll(item.block.id);
+        /**
+         * Selected, not scrolled to.
+         *
+         * `selectAndScroll` glides the section into view, and the editor then
+         * brings the word itself into view when it opens — but it measures
+         * while that glide is still animating, so it scrolls by a delta taken
+         * from a moving target and the two compound into a long overshoot.
+         *
+         * One scroll, aimed at the word rather than the section, which is the
+         * more useful destination anyway.
+         */
+        setSelectedId(item.block.id);
         setEditingProse({
           id: item.block.id,
           selection: { anchor: 0, focus: 0 },
@@ -892,7 +901,7 @@ export function WorkPage() {
       // plainly than a menu that refuses to open.
       setEditingProse(null);
     },
-    [items, spelling, selectAndScroll],
+    [items, spelling],
   );
 
   async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
