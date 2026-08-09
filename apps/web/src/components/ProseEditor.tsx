@@ -1192,6 +1192,17 @@ export function ProseEditor({
 
   const onClickBody = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
+
+    /**
+     * Not a press on the manuscript at all.
+     *
+     * The menu is drawn through a portal, but a React portal's events bubble
+     * through the React tree rather than the DOM one — so pressing a menu item
+     * arrives here, finds no misspelling under the pointer, and closes the menu
+     * the press was meant for.
+     */
+    if (target.closest(".spell-menu")) return;
+
     const flagged = target.closest(".misspelled");
     if (!flagged) {
       setMenu(null);
@@ -1227,32 +1238,44 @@ export function ProseEditor({
    */
   const settleAndAdvance = (word: string, settle: (word: string) => void) => {
     const el = ref.current;
-    const words = el
-      ? [...el.querySelectorAll(".misspelled")].map(
-          (span) => span.getAttribute("data-word") ?? span.textContent ?? "",
-        )
-      : [];
+    const spans = el ? [...el.querySelectorAll(".misspelled")] : [];
+    const wordOf = (span: Element) => span.getAttribute("data-word") ?? span.textContent ?? "";
 
-    const at = words.indexOf(word);
-    const next = at >= 0 ? words.slice(at + 1).find((w) => w !== word) : undefined;
+    const at = spans.findIndex((span) => wordOf(span) === word);
+    // Skipping the rest of this word: settling it settles all of them.
+    const next = at >= 0 ? spans.slice(at + 1).find((span) => wordOf(span) !== word) : undefined;
 
     settle(word);
-    setMenu(null);
 
-    if (!next) return;
+    if (!next) {
+      setMenu(null);
+      window.setTimeout(recheck, 0);
+      return;
+    }
 
     /**
-     * Found again after the redraw rather than held onto: `recheck` rebuilds
-     * the element from the model, so any node captured beforehand is detached
-     * by now and its position means nothing.
+     * Opened now, from where the next word currently is.
+     *
+     * Not after a redraw. Teaching the checker a word is a round trip to the
+     * server, so nothing about the block has changed yet — the next word is on
+     * screen, in place, and its position is good. Waiting for the rebuild
+     * before opening was what left the menu shut, or back on the word just
+     * dealt with.
+     */
+    const nextWord = wordOf(next);
+    setMenu(placeSpellMenu(nextWord, next.getBoundingClientRect()));
+
+    /**
+     * The redraw still has to happen, to take the underline off what was just
+     * settled — and it moves nothing, so the menu stays where it was put. It is
+     * re-placed anyway if the word can be found again, in case reflowing did
+     * shift the line.
      */
     window.setTimeout(() => {
       recheck();
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
-      const span = now.find(
-        (candidate) => (candidate.getAttribute("data-word") ?? candidate.textContent) === next,
-      );
-      if (span) setMenu(placeSpellMenu(next, span.getBoundingClientRect()));
+      const again = now.find((span) => wordOf(span) === nextWord);
+      if (again) setMenu(placeSpellMenu(nextWord, again.getBoundingClientRect()));
     }, 0);
   };
 
