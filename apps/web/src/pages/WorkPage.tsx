@@ -837,8 +837,16 @@ export function WorkPage() {
    */
   const continueSpellingAfter = useCallback(
     (blockId: string | null) => {
+      /**
+       * Nothing can be found before the dictionary is here. Asking for it is
+       * the useful response rather than doing nothing: it arrives in a moment,
+       * and the writer can press again.
+       */
       const speller = spelling.speller;
-      if (!speller) return;
+      if (!speller) {
+        void spelling.reload();
+        return;
+      }
 
       const order = items.filter((i) => i.kind === "block");
       const from = blockId
@@ -872,7 +880,7 @@ export function WorkPage() {
       // plainly than a menu that refuses to open.
       setEditingProse(null);
     },
-    [items, spelling.speller],
+    [items, spelling],
   );
 
   async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
@@ -1031,6 +1039,9 @@ export function WorkPage() {
           }}
           onQuery={setQuery}
           onStep={stepMatch}
+          onNextMisspelling={
+            spelling.enabled ? () => continueSpellingAfter(selectedId) : undefined
+          }
         />
 
         <ThemeToggle />
@@ -1276,8 +1287,13 @@ export function WorkPage() {
                 }}
                 onQuery={setQuery}
                 onStep={stepMatch}
+            /* Offered whenever checking is switched on, not only once the
+               dictionary has arrived. It is fetched when checking is first
+               wanted — which, before any section is opened, is never — so
+               gating on the speller hid the control exactly when it was the
+               thing you wanted to press. */
             onNextMisspelling={
-              spelling.speller ? () => continueSpellingAfter(selectedId) : undefined
+              spelling.enabled ? () => continueSpellingAfter(selectedId) : undefined
             }
               />
 
