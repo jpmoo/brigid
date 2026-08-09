@@ -1001,7 +1001,7 @@ export function WorkPage() {
 
       {error ? <div className="alert error work-error">{error}</div> : null}
 
-      <div className={`work-body${showPanel ? "" : " panel-hidden"}`}>
+      <div className={`work-body${zen ? " zen" : ""}${showPanel ? "" : " panel-hidden"}`}>
         <aside
           className={`outline-panel${zen ? " floating" : " docked"}`}
           // Hovering the retracted edge brings it back, which is only a gesture

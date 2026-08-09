@@ -893,10 +893,15 @@ input::placeholder {
   overflow-anchor: none;
 }
 
-/* The retracted panel floats above the document rather than taking a column, so
-   without this its strip sits over the left margin and the manuscript is no
-   longer centered between equal margins. */
-.work-body.panel-hidden .document-pane {
+/* Room for the strip the retracted panel leaves behind, kept whether or not the
+   panel is out.
+   
+   Reserved permanently rather than added when it retracts. The panel floats in
+   zen and never takes a column, so the manuscript has no reason to move at all
+   — but compensating only while hidden meant the text slid eighteen pixels left
+   on every expand and back again on every collapse, which is a lot of movement
+   to pay for a margin nobody was measuring. */
+.work-body.zen .document-pane {
   padding-left: 38px;
 }
 
@@ -3200,7 +3205,7 @@ mark.hit.active {
   /* Both are pointer affordances: the strip left behind when the panel
      retracts, and the margin correction that went with it. */
   .work-body.panel-hidden::after,
-  .work-body.panel-hidden .document-pane {
+  .work-body.zen .document-pane {
     display: revert;
     padding-left: revert;
   }
