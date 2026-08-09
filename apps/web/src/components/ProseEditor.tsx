@@ -1211,39 +1211,48 @@ export function ProseEditor({
    *
    * Checking a section is a pass through it, not a series of separate
    * decisions: having taught the checker one name, the useful next thing is
-   * almost always the word after it. Doing that by hand means closing the menu,
-   * finding the next red underline, and clicking it — three actions to repeat
-   * the one you just performed.
+   * almost always the word after it. By hand that meant closing the menu,
+   * finding the next red underline and clicking it — three actions to repeat
+   * the one just performed.
    *
-   * Which word is "next" is settled before the change, because the change is
-   * what makes the current word stop being flagged: its position among the
-   * misspellings is noted first, and afterwards the word now at that position
-   * is the next one. No arithmetic, and it holds however many instances of the
-   * word the section contained.
+   * The next word is chosen from the list as it stands *before* the change, and
+   * by name rather than by position. Teaching the checker a word is a round
+   * trip to the server, so a moment later it has not learned it yet and the
+   * word is still flagged and still in the same place — reading the list again
+   * and taking whatever sits at that index just finds the same word and opens
+   * the menu on it again, which is what "doesn't advance" looked like.
+   *
+   * Further instances of the same word are skipped, because settling it settles
+   * all of them.
    */
   const settleAndAdvance = (word: string, settle: (word: string) => void) => {
     const el = ref.current;
-    const flagged = el ? [...el.querySelectorAll(".misspelled")] : [];
-    const at = flagged.findIndex(
-      (span) => (span.getAttribute("data-word") ?? span.textContent) === word,
-    );
+    const words = el
+      ? [...el.querySelectorAll(".misspelled")].map(
+          (span) => span.getAttribute("data-word") ?? span.textContent ?? "",
+        )
+      : [];
+
+    const at = words.indexOf(word);
+    const next = at >= 0 ? words.slice(at + 1).find((w) => w !== word) : undefined;
 
     settle(word);
     setMenu(null);
 
+    if (!next) return;
+
+    /**
+     * Found again after the redraw rather than held onto: `recheck` rebuilds
+     * the element from the model, so any node captured beforehand is detached
+     * by now and its position means nothing.
+     */
     window.setTimeout(() => {
       recheck();
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
-      // Whatever has taken that place. Nothing there means the section is clean
-      // from here on, and the menu stays shut.
-      const next = at >= 0 ? now[at] : now[0];
-      if (!next) return;
-      setMenu(
-        placeSpellMenu(
-          next.getAttribute("data-word") ?? next.textContent ?? "",
-          next.getBoundingClientRect(),
-        ),
+      const span = now.find(
+        (candidate) => (candidate.getAttribute("data-word") ?? candidate.textContent) === next,
       );
+      if (span) setMenu(placeSpellMenu(next, span.getBoundingClientRect()));
     }, 0);
   };
 
