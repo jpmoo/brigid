@@ -704,6 +704,11 @@ export interface ProseEditorProps {
   onDone: () => void;
   onAddWord: (word: string) => void;
   onIgnoreWord: (word: string) => void;
+  /**
+   * Nothing left to check in this block. The editor knows only its own prose,
+   * so carrying the pass into the next section is the page's business.
+   */
+  onNoMoreHere?: (() => void) | undefined;
 }
 
 export function ProseEditor({
@@ -723,6 +728,7 @@ export function ProseEditor({
   onDone,
   onAddWord,
   onIgnoreWord,
+  onNoMoreHere,
 }: ProseEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -1278,7 +1284,13 @@ export function ProseEditor({
 
     if (!next) {
       setMenu(null);
-      window.setTimeout(recheck, 0);
+      window.setTimeout(() => {
+        recheck();
+        // Settling the last one may have been the last one anywhere in this
+        // block, so the question is asked after the redraw rather than before.
+        const left = ref.current?.querySelectorAll(".misspelled").length ?? 0;
+        if (left === 0) onNoMoreHere?.();
+      }, 0);
       return;
     }
 
@@ -1337,7 +1349,10 @@ export function ProseEditor({
     window.setTimeout(() => {
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
       const next = at >= 0 ? now[at] : now[0];
-      if (!next) return;
+      if (!next) {
+        if (now.length === 0) onNoMoreHere?.();
+        return;
+      }
       bringIntoView(next);
       setMenu(
         placeSpellMenu(

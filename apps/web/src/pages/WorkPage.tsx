@@ -30,7 +30,7 @@ import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { ProseEditor } from "../components/ProseEditor.js";
-import { useSpelling } from "../spelling.js";
+import { isCheckable, useSpelling, words } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { PHONE, useMediaQuery } from "../useMediaQuery.js";
 import {
@@ -823,6 +823,50 @@ export function WorkPage() {
     return true;
   }
 
+  /**
+   * Carry a spelling pass into the next section.
+   *
+   * The editor knows only its own block, so it runs out at the end of a section
+   * and stops — which reads as the pass having broken rather than as a section
+   * being finished. Finding where to go next needs the whole manuscript, so it
+   * is answered here.
+   *
+   * The next section holding something the checker does not know, in reading
+   * order. Opened with that word already asked about, so the pass carries on
+   * where it left off rather than making the writer find it again.
+   */
+  const continueSpellingAfter = useCallback(
+    (blockId: string) => {
+      const speller = spelling.speller;
+      if (!speller) return;
+
+      const order = items.filter((i) => i.kind === "block");
+      const from = order.findIndex((i) => i.kind === "block" && i.block.id === blockId);
+      if (from < 0) return;
+
+      for (const item of order.slice(from + 1)) {
+        if (item.kind !== "block") continue;
+        const flagged = words(item.block.contentText).find(
+          (w) => isCheckable(w.word) && !speller.correct(w.word),
+        );
+        if (!flagged) continue;
+
+        setSelectedId(item.block.id);
+        setEditingProse({
+          id: item.block.id,
+          selection: { anchor: 0, focus: 0 },
+          askAbout: flagged.word,
+        });
+        return;
+      }
+
+      // Nothing further: the pass is finished, and closing says so more
+      // plainly than a menu that refuses to open.
+      setEditingProse(null);
+    },
+    [items, spelling.speller],
+  );
+
   async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
     try {
       const { bookmark } = await api.createBookmark(id, blockId, {
@@ -1154,6 +1198,7 @@ export function WorkPage() {
                   activeHit={activeHitInEditor}
                   // The block keeps its markers while it is being edited.
                   bookmarks={bookmarks.filter((b) => b.blockId === editingProse.id)}
+                  onNoMoreHere={() => continueSpellingAfter(editingProse.id)}
                   content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
                   fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
                   speller={spelling.speller}
