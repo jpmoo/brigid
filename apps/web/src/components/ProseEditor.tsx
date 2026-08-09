@@ -1218,6 +1218,35 @@ export function ProseEditor({
   };
 
   /**
+   * Put a word on screen before opening its menu.
+   *
+   * Stepping through a section walks past the fold within a paragraph or two,
+   * and a menu placed at a rect outside the viewport is clamped to the edge —
+   * so it appears with no word beside it and the page never moves, which is
+   * indistinguishable from nothing having happened.
+   *
+   * Scrolled instantly rather than smoothly, and deliberately. The menu is
+   * positioned from the word's rect immediately afterwards, and a smooth scroll
+   * is still animating at that point: the menu would be placed against where
+   * the word was rather than where it is going. Stepping through corrections
+   * wants the next one *there*, not gliding towards there.
+   */
+  const bringIntoView = (el: Element): void => {
+    let pane: HTMLElement | null = el.parentElement;
+    while (pane && pane.scrollHeight <= pane.clientHeight) pane = pane.parentElement;
+    if (!pane) return;
+
+    const paneBox = pane.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    // Room for the menu underneath, so the word is not left at the very bottom
+    // with its own menu pushed off the screen.
+    const margin = Math.min(220, paneBox.height / 3);
+    if (box.top >= paneBox.top + 40 && box.bottom <= paneBox.bottom - margin) return;
+
+    pane.scrollBy({ top: box.top - paneBox.top - Math.max(0, paneBox.height - box.height) / 2 });
+  };
+
+  /**
    * Deal with this word and open the next one.
    *
    * Checking a section is a pass through it, not a series of separate
@@ -1263,6 +1292,7 @@ export function ProseEditor({
      * dealt with.
      */
     const nextWord = wordOf(next);
+    bringIntoView(next);
     setMenu(placeSpellMenu(nextWord, next.getBoundingClientRect()));
 
     /**
@@ -1275,7 +1305,10 @@ export function ProseEditor({
       recheck();
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
       const again = now.find((span) => wordOf(span) === nextWord);
-      if (again) setMenu(placeSpellMenu(nextWord, again.getBoundingClientRect()));
+      if (again) {
+        bringIntoView(again);
+        setMenu(placeSpellMenu(nextWord, again.getBoundingClientRect()));
+      }
     }, 0);
   };
 
@@ -1305,6 +1338,7 @@ export function ProseEditor({
       const now = ref.current ? [...ref.current.querySelectorAll(".misspelled")] : [];
       const next = at >= 0 ? now[at] : now[0];
       if (!next) return;
+      bringIntoView(next);
       setMenu(
         placeSpellMenu(
           next.getAttribute("data-word") ?? next.textContent ?? "",
