@@ -1504,6 +1504,12 @@ export function ProseEditor({
               ...(menu.bottom === undefined ? { top: menu.top } : { bottom: menu.bottom }),
             }}
           >
+            {/* The word being dealt with, named.
+                Every one of these menus looks the same apart from its
+                suggestions, so stepping to a nearby word moved the menu barely
+                at all and read as nothing having happened. Saying which word it
+                is makes the step visible. */}
+            <div className="menu-heading">{menu.word}</div>
             {speller?.suggest(menu.word).length ? (
               speller.suggest(menu.word).map((suggestion) => (
                 <div className="menu-suggestion" key={suggestion}>

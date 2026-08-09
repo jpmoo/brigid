@@ -5214,3 +5214,17 @@ mark.hit.active {
 .menu-suggestion:hover .menu-onward {
   color: var(--accent);
 }
+
+/* Which word the spelling menu is about. Small and quiet — it is there to make
+   a step visible, not to be read every time. */
+.spell-menu .menu-heading {
+  padding: 6px 10px 5px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
