@@ -813,6 +813,9 @@ export function ProseEditor({
     if (!askAbout) return;
     for (const span of el.querySelectorAll(".misspelled")) {
       if ((span.getAttribute("data-word") ?? span.textContent) !== askAbout) continue;
+      // Arrived from elsewhere in the manuscript, so it is very likely off
+      // screen: the menu would otherwise open against a word nobody can see.
+      bringIntoView(span);
       setMenu(placeSpellMenu(askAbout, span.getBoundingClientRect()));
       break;
     }

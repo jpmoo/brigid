@@ -100,13 +100,15 @@ export function SearchBar({
             }}
           />
 
-          <span className="search-count">
-            {query.trim().length === 0
-              ? ""
-              : matches.length === 0
-                ? "none"
-                : `${activeIndex + 1} of ${matches.length}`}
-          </span>
+          {/* Only once there is something to count. The width is held so the
+              tally does not jiggle between "1 of 9" and "10 of 120", but with
+              no query that reserved space is just a gap between the field and
+              the buttons. */}
+          {query.trim().length > 0 ? (
+            <span className="search-count">
+              {matches.length === 0 ? "none" : `${activeIndex + 1} of ${matches.length}`}
+            </span>
+          ) : null}
 
           {/* Nothing to do with the query: a pass through the misspellings is
               the other way of walking a manuscript, and this is where the

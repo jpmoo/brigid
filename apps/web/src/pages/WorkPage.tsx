@@ -867,7 +867,9 @@ export function WorkPage() {
         );
         if (!flagged) continue;
 
-        setSelectedId(item.block.id);
+        // The section on screen first; the editor then puts the word itself
+        // in view and opens its menu.
+        selectAndScroll(item.block.id);
         setEditingProse({
           id: item.block.id,
           selection: { anchor: 0, focus: 0 },
@@ -880,7 +882,7 @@ export function WorkPage() {
       // plainly than a menu that refuses to open.
       setEditingProse(null);
     },
-    [items, spelling],
+    [items, spelling, selectAndScroll],
   );
 
   async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
