@@ -38,7 +38,7 @@ import { SearchBar, findMatches } from "../components/SearchBar.js";
 import type { SearchMatch } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
-import { OutlinePanel } from "../components/OutlinePanel.js";
+import { OutlinePanel, kindOf } from "../components/OutlinePanel.js";
 import { ProseEditor } from "../components/ProseEditor.js";
 import type { ProseLayout } from "../components/ProseEditor.js";
 import { isCheckable, useSpelling, words } from "../spelling.js";
@@ -632,38 +632,6 @@ export function WorkPage() {
       />
     ) : null;
 
-  /** What the canvas needs to draw a block: the card, as the outline shows it. */
-  const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
-
-  /**
-   * Whether a block stands at a level in the book, rather than being front
-   * matter that happens to sit among them. A title page is not a chapter and
-   * has no length it is meant to reach.
-   */
-  const structural = useCallback(
-    (block: Block) =>
-      templates.find((t) => t.id === block.formatId)?.formatSettings?.structural ?? true,
-    [templates],
-  );
-
-  const canvasItems = useMemo(
-    () =>
-      entries.map((entry) => ({
-        block: entry.block,
-        levelName: levels[entry.depth]?.name ?? "Section",
-        words: canvasTotals.get(entry.block.id) ?? entry.block.wordCount,
-        childCount: entry.childCount,
-        breakName:
-          levels[entry.depth]?.breakTemplateId && !entry.isFirstChild
-            ? (templates.find((t) => t.id === levels[entry.depth]?.breakTemplateId)?.name ?? null)
-            : null,
-        // Only structural blocks: a title page has no length to fall short of,
-        // so it is never shaded short and never shaded met.
-        goal: structural(entry.block) ? (levels[entry.depth]?.wordGoal ?? null) : null,
-      })),
-    [entries, levels, templates, canvasTotals, structural],
-  );
-
 
   const items = useMemo(() => {
     if (!work) return [];
@@ -705,6 +673,50 @@ export function WorkPage() {
     }
     return map;
   }, [items]);
+
+  /** What the canvas needs to draw a block: the card, as the outline shows it. */
+  const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
+
+  /**
+   * Whether a block stands at a level in the book, rather than being front
+   * matter that happens to sit among them. A title page is not a chapter and
+   * has no length it is meant to reach.
+   */
+  const structural = useCallback(
+    (block: Block) =>
+      templates.find((t) => t.id === block.formatId)?.formatSettings?.structural ?? true,
+    [templates],
+  );
+
+  const canvasItems = useMemo(
+    () =>
+      entries.map((entry) => ({
+        block: entry.block,
+        /**
+         * What to call it. A non-structural block is not at a level in any
+         * meaningful sense — it takes no break and no chapter number — so
+         * naming it by depth would be a lie, and a title page was being
+         * announced as a chapter. It says what it actually is instead, the
+         * same way the outline does.
+         */
+        levelName: structural(entry.block)
+          ? (levels[entry.depth]?.name ?? "Section")
+          : kindOf(templates.find((t) => t.id === entry.block.formatId)?.name ?? "Section"),
+        words: canvasTotals.get(entry.block.id) ?? entry.block.wordCount,
+        childCount: entry.childCount,
+        /**
+         * The break this block actually takes, read from the resolved
+         * document rather than guessed at from its depth. Guessed at, a title
+         * page sitting at the top level was given the chapter break that its
+         * depth implies and that it does not in fact take.
+         */
+        breakName: breaks.get(entry.block.id)?.templateName ?? null,
+        // Only structural blocks: a title page has no length to fall short of,
+        // so it is never shaded short and never shaded met.
+        goal: structural(entry.block) ? (levels[entry.depth]?.wordGoal ?? null) : null,
+      })),
+    [entries, levels, templates, canvasTotals, structural, breaks],
+  );
 
   const totalWords = useMemo(
     () =>

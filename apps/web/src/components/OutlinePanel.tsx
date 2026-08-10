@@ -49,7 +49,7 @@ function literalText(body: TemplateBody | null | undefined): string {
  * Pride and Prejudice" — which is useful in the format library and far too long
  * here, where it sits beside "CHAPTER".
  */
-function kindOf(name: string): string {
+export function kindOf(name: string): string {
   return name.split(/\s+—\s+/)[0] ?? name;
 }
 
