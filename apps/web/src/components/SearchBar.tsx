@@ -49,6 +49,7 @@ export function SearchBar({
   onClose,
   onQuery,
   onStep,
+  stepping = true,
   onNextMisspelling,
 }: {
   open: boolean;
@@ -59,6 +60,15 @@ export function SearchBar({
   onClose: () => void;
   onQuery: (value: string) => void;
   onStep: (delta: 1 | -1) => void;
+  /**
+   * Whether results can be walked one at a time.
+   *
+   * False on the canvas, where there is no reading order to walk along: the
+   * cards holding the term light up where they sit and the count says how many
+   * sections hold it. A next and a previous would have to invent an order the
+   * view does not have.
+   */
+  stepping?: boolean;
   /**
    * Jump to the next word the checker doesn't know, wherever it is. Absent when
    * checking is switched off, in which case the control isn't offered.
@@ -93,7 +103,7 @@ export function SearchBar({
             onChange={(e) => onQuery(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Escape") onClose();
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && stepping) {
                 e.preventDefault();
                 onStep(e.shiftKey ? -1 : 1);
               }
@@ -106,7 +116,13 @@ export function SearchBar({
               the buttons. */}
           {query.trim().length > 0 ? (
             <span className="search-count">
-              {matches.length === 0 ? "none" : `${activeIndex + 1} of ${matches.length}`}
+              {matches.length === 0
+                ? "none"
+                : stepping
+                  ? `${activeIndex + 1} of ${matches.length}`
+                  : // A count of places rather than a position among them,
+                    // since there is nowhere to be within it.
+                    `${matches.length} ${matches.length === 1 ? "section" : "sections"}`}
             </span>
           ) : null}
 
@@ -124,24 +140,28 @@ export function SearchBar({
               <SpellCheck size={15} />
             </button>
           ) : null}
-          <button
-            className="btn ghost"
-            type="button"
-            title="Previous (Shift+Enter)"
-            disabled={matches.length === 0}
-            onClick={() => onStep(-1)}
-          >
-            <ChevronUp size={15} />
-          </button>
-          <button
-            className="btn ghost"
-            type="button"
-            title="Next (Enter)"
-            disabled={matches.length === 0}
-            onClick={() => onStep(1)}
-          >
-            <ChevronDown size={15} />
-          </button>
+          {stepping ? (
+            <>
+              <button
+                className="btn ghost"
+                type="button"
+                title="Previous (Shift+Enter)"
+                disabled={matches.length === 0}
+                onClick={() => onStep(-1)}
+              >
+                <ChevronUp size={15} />
+              </button>
+              <button
+                className="btn ghost"
+                type="button"
+                title="Next (Enter)"
+                disabled={matches.length === 0}
+                onClick={() => onStep(1)}
+              >
+                <ChevronDown size={15} />
+              </button>
+            </>
+          ) : null}
           <button className="btn ghost" type="button" title="Close" onClick={onClose}>
             <X size={15} />
           </button>

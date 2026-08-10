@@ -749,6 +749,15 @@ export function WorkPage() {
    * in view. Null when the active hit is somewhere else — or nowhere.
    */
   const activeHitInEditor = useMemo(() => {
+    /**
+     * Nothing is picked out on the canvas.
+     *
+     * There is no stepping there, so there is no "current" result to be at —
+     * a section opened from a lit-up card should show every hit in it at once,
+     * which is what the writer was promised by the card lighting up in the
+     * first place.
+     */
+    if (mode === "canvas") return null;
     if (!editingProse || !activeMatch || activeMatch.blockId !== editingProse.id) return null;
     let n = 0;
     for (const match of allMatches) {
@@ -756,7 +765,7 @@ export function WorkPage() {
       if (match.blockId === editingProse.id) n += 1;
     }
     return null;
-  }, [allMatches, activeMatch, editingProse]);
+  }, [allMatches, activeMatch, editingProse, mode]);
 
   useEffect(() => {
     setMatchIndex(0);
@@ -1359,6 +1368,7 @@ export function WorkPage() {
           }}
           onQuery={setQuery}
           onStep={stepMatch}
+          stepping={mode !== "canvas"}
           onNextMisspelling={
             spelling.enabled
               ? () => {
@@ -1618,6 +1628,7 @@ export function WorkPage() {
                 }}
                 onQuery={setQuery}
                 onStep={stepMatch}
+                stepping={mode !== "canvas"}
             /* Offered whenever checking is switched on, not only once the
                dictionary has arrived. It is fetched when checking is first
                wanted — which, before any section is opened, is never — so
