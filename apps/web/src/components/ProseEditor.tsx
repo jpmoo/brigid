@@ -691,6 +691,11 @@ export interface ProseEditorProps {
    * when the active hit is elsewhere in the manuscript, or there isn't one.
    */
   activeHit?: number | null | undefined;
+  /**
+   * Where to put the style buttons, when they belong somewhere other than
+   * above the prose. Null or absent leaves them in the editor's own column.
+   */
+  toolbarSlot?: HTMLElement | null | undefined;
   /** This block's bookmarks, so a marker does not vanish while it is edited. */
   bookmarks?: EditorBookmark[] | undefined;
   content: Record<string, unknown> | null;
@@ -716,6 +721,7 @@ export function ProseEditor({
   initialSelection,
   search,
   activeHit,
+  toolbarSlot,
   bookmarks,
   layout,
   askAbout,
@@ -1421,92 +1427,109 @@ export function ProseEditor({
     };
   }, []);
 
+  /**
+   * The style buttons, which do not always belong to the editor's own column.
+   *
+   * Given somewhere to go they are put there instead: the canvas opens a
+   * section in a modal that already has a bar across its top, and a second
+   * bar floating below the first is one bar too many. Portalled rather than
+   * rebuilt, so there is one set of buttons wired to one editor — a copy in
+   * the modal would be a copy to keep in step.
+   */
+  const toolbar = (
+        <div
+      className={`prose-toolbar${toolbarSlot ? " docked" : ""}`}
+      role="toolbar"
+      aria-label="Text style"
+    >
+      <button
+        type="button"
+        className={`be-mark${marks.strong ? " on" : ""}`}
+        aria-pressed={marks.strong}
+        title="Bold"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyMark("bold")}
+      >
+        <Bold size={13} />
+      </button>
+      <button
+        type="button"
+        className={`be-mark${marks.em ? " on" : ""}`}
+        aria-pressed={marks.em}
+        title="Italic"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyMark("italic")}
+      >
+        <Italic size={13} />
+      </button>
+      <button
+        type="button"
+        className={`be-mark${marks.underline ? " on" : ""}`}
+        aria-pressed={marks.underline}
+        title="Underline"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => applyMark("underline")}
+      >
+        <Underline size={13} />
+      </button>
+      <span className="be-gap" />
+      <button
+        type="button"
+        className={`be-mark${quoted ? " on" : ""}`}
+        aria-pressed={quoted}
+        title="Block quote"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={toggleBlockquote}
+      >
+        <Quote size={13} />
+      </button>
+      <span className="be-gap" />
+      <button
+        type="button"
+        className="be-mark"
+        title="Undo (⌘Z)"
+        aria-label="Undo"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => restore(-1)}
+      >
+        <Undo2 size={13} />
+      </button>
+      <button
+        type="button"
+        className="be-mark"
+        title="Redo (⇧⌘Z)"
+        aria-label="Redo"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => restore(1)}
+      >
+        <Redo2 size={13} />
+      </button>
+      <span className="be-gap" />
+      {/* Whether the checker is on, and whether it has arrived yet: a
+          dictionary is half a megabyte, so there is a moment on first use when
+          nothing is underlined and the reason isn't otherwise visible. */}
+      <span
+        className={`prose-spell${speller ? " on" : ""}`}
+        title={
+          speller
+            ? "Spelling is being checked"
+            : spellcheckWanted
+              ? "Fetching the dictionary…"
+              : "Spelling checking is off — turn it on in Settings and Tools"
+        }
+      >
+        <SpellCheck size={13} />
+      </span>
+      <span className="be-gap" />
+      <span className="prose-words" aria-live="polite">
+        {wordFmt.format(words)} {words === 1 ? "word" : "words"}
+      </span>
+    </div>
+  );
+
   return (
-    <div className="prose-editor">
-      <div className="prose-toolbar" role="toolbar" aria-label="Text style">
-        <button
-          type="button"
-          className={`be-mark${marks.strong ? " on" : ""}`}
-          aria-pressed={marks.strong}
-          title="Bold"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyMark("bold")}
-        >
-          <Bold size={13} />
-        </button>
-        <button
-          type="button"
-          className={`be-mark${marks.em ? " on" : ""}`}
-          aria-pressed={marks.em}
-          title="Italic"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyMark("italic")}
-        >
-          <Italic size={13} />
-        </button>
-        <button
-          type="button"
-          className={`be-mark${marks.underline ? " on" : ""}`}
-          aria-pressed={marks.underline}
-          title="Underline"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => applyMark("underline")}
-        >
-          <Underline size={13} />
-        </button>
-        <span className="be-gap" />
-        <button
-          type="button"
-          className={`be-mark${quoted ? " on" : ""}`}
-          aria-pressed={quoted}
-          title="Block quote"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={toggleBlockquote}
-        >
-          <Quote size={13} />
-        </button>
-        <span className="be-gap" />
-        <button
-          type="button"
-          className="be-mark"
-          title="Undo (⌘Z)"
-          aria-label="Undo"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => restore(-1)}
-        >
-          <Undo2 size={13} />
-        </button>
-        <button
-          type="button"
-          className="be-mark"
-          title="Redo (⇧⌘Z)"
-          aria-label="Redo"
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={() => restore(1)}
-        >
-          <Redo2 size={13} />
-        </button>
-        <span className="be-gap" />
-        {/* Whether the checker is on, and whether it has arrived yet: a
-            dictionary is half a megabyte, so there is a moment on first use when
-            nothing is underlined and the reason isn't otherwise visible. */}
-        <span
-          className={`prose-spell${speller ? " on" : ""}`}
-          title={
-            speller
-              ? "Spelling is being checked"
-              : spellcheckWanted
-                ? "Fetching the dictionary…"
-                : "Spelling checking is off — turn it on in Settings and Tools"
-          }
-        >
-          <SpellCheck size={13} />
-        </span>
-        <span className="be-gap" />
-        <span className="prose-words" aria-live="polite">
-          {wordFmt.format(words)} {words === 1 ? "word" : "words"}
-        </span>
-      </div>
+    <div className={`prose-editor${toolbarSlot ? " bare" : ""}`}>
+      {toolbarSlot ? createPortal(toolbar, toolbarSlot) : toolbar}
 
       <div
         className="prose-surface"

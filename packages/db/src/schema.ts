@@ -221,6 +221,9 @@ export const bookmarks = pgTable(
      */
     noteX: doublePrecision("note_x"),
     noteY: doublePrecision("note_y"),
+    /** How big it is drawn. Null means whatever the canvas draws one at. */
+    noteW: doublePrecision("note_w"),
+    noteH: doublePrecision("note_h"),
     sortKey: text("sort_key").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

@@ -147,6 +147,7 @@ export function CanvasView({
   focusId,
   bookmarks,
   onMoveNote,
+  onSizeNote,
   onAddNote,
   onOpenNote,
   onSelect,
@@ -179,6 +180,8 @@ export function CanvasView({
    */
   bookmarks: Bookmark[];
   onMoveNote: (bookmarkId: string, x: number, y: number) => void;
+  /** A note resized by a corner: where it now sits, and how big. */
+  onSizeNote: (bookmarkId: string, x: number, y: number, w: number, h: number) => void;
   /** A note dragged out from a card's side, dropped at an offset from it. */
   onAddNote: (blockId: string, x: number, y: number) => void;
   onOpenNote: (bookmarkId: string) => void;
@@ -245,6 +248,8 @@ export function CanvasView({
   /** What a note is drawn as, before anyone has moved it. */
   const NOTE_W = 180;
   const NOTE_H = 120;
+  const NOTE_MIN_W = 110;
+  const NOTE_MIN_H = 70;
 
   /**
    * The notes, placed and tethered.
@@ -285,8 +290,8 @@ export function CanvasView({
         note,
         x: host.x + (note.noteX ?? host.w + GAP),
         y: host.y + (note.noteY ?? nth * (NOTE_H + 16)),
-        w: NOTE_W,
-        h: NOTE_H,
+        w: note.noteW ?? NOTE_W,
+        h: note.noteH ?? NOTE_H,
         host,
         unplaced,
       });
@@ -311,16 +316,18 @@ export function CanvasView({
   /** A dotted line from each note to the card it is about. */
   const tethers = useMemo(
     () =>
-      notes.map((n) => {
-        const ends = facingSides(
+      notes.map((n) => ({
+        key: n.note.id,
+        // The same geometry the sequence arrows use: the two facing sides, and
+        // the same bend across the gap. A note is joined to its section by a
+        // different kind of line, not by a differently-shaped one — and it runs
+        // from the note to the section, because that is the direction the
+        // reader needs: this note is about that.
+        d: arrow(
           { x: n.x, y: n.y, w: n.w, h: n.h },
           { x: n.host.x, y: n.host.y, w: n.host.w, h: n.host.h },
-        );
-        return {
-          key: n.note.id,
-          d: `M ${ends.start.x} ${ends.start.y} L ${ends.end.x} ${ends.end.y}`,
-        };
-      }),
+        ),
+      })),
     [notes],
   );
 
@@ -533,6 +540,59 @@ export function CanvasView({
   };
 
   /**
+   * Resizing a note by a corner. The same arithmetic the cards use: a west or
+   * north corner moves the note as it sizes it, so the far corner stays put.
+   */
+  const growingNote = useRef<{
+    id: string;
+    corner: "nw" | "ne" | "sw" | "se";
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
+  const onNoteGripDown = (
+    event: React.PointerEvent,
+    n: { note: Bookmark; x: number; y: number; w: number; h: number; host: Placed },
+    corner: "nw" | "ne" | "sw" | "se",
+  ) => {
+    event.stopPropagation();
+    growingNote.current = {
+      id: n.note.id,
+      corner,
+      x: event.clientX,
+      y: event.clientY,
+      startX: n.x - n.host.x,
+      startY: n.y - n.host.y,
+      startW: n.w,
+      startH: n.h,
+    };
+    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+
+  const onNoteGripMove = (event: React.PointerEvent) => {
+    const held = growingNote.current;
+    if (!held) return;
+    const dx = (event.clientX - held.x) / zoom;
+    const dy = (event.clientY - held.y) / zoom;
+    const west = held.corner === "nw" || held.corner === "sw";
+    const north = held.corner === "nw" || held.corner === "ne";
+
+    const w = Math.max(NOTE_MIN_W, held.startW + (west ? -dx : dx));
+    const h = Math.max(NOTE_MIN_H, held.startH + (north ? -dy : dy));
+    onSizeNote(
+      held.id,
+      held.startX + (west ? held.startW - w : 0),
+      held.startY + (north ? held.startH - h : 0),
+      w,
+      h,
+    );
+  };
+
+  /**
    * Hanging a new note off a card.
    *
    * Dragged out from a tab on one of the four sides, and dropped wherever it
@@ -682,6 +742,7 @@ export function CanvasView({
     dragging.current = null;
     draggingNote.current = null;
     resizing.current = null;
+    growingNote.current = null;
     hanging.current = null;
     setHangingAt(null);
   };
@@ -795,6 +856,10 @@ export function CanvasView({
         onPointerMove={(e) => {
           if (resizing.current) {
             onGripPointerMove(e);
+            return;
+          }
+          if (growingNote.current) {
+            onNoteGripMove(e);
             return;
           }
           if (hanging.current) {
@@ -988,17 +1053,37 @@ export function CanvasView({
               than set into it, and it is small enough that anything drawn on
               top of it would hide it entirely. */}
           <svg className="canvas-links" width={bounds.w} height={bounds.h}>
+            <defs>
+              <marker
+                id="canvas-tether-arrow"
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+            </defs>
             {tethers.map((tether) => (
-              <path key={tether.key} d={tether.d} className="canvas-tether" />
+              <path
+                key={tether.key}
+                d={tether.d}
+                className="canvas-tether"
+                markerEnd="url(#canvas-tether-arrow)"
+              />
             ))}
           </svg>
 
           {hangingAt ? (
             <div
               className="canvas-note ghost"
-              style={{ left: hangingAt.x, top: hangingAt.y, width: 180, height: 120 }}
+              style={{ left: hangingAt.x, top: hangingAt.y, width: NOTE_W, height: NOTE_H }}
             >
-              <span className="cnote-name">New note</span>
+              <span className="cnote-paper">
+                <span className="cnote-name">New note</span>
+              </span>
             </div>
           ) : null}
 
@@ -1016,10 +1101,23 @@ export function CanvasView({
                 onOpenNote(n.note.id);
               }}
             >
-              <span className="cnote-name">{n.note.name}</span>
-              {n.note.description ? (
-                <span className="cnote-body">{n.note.description}</span>
-              ) : null}
+              {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+                <span
+                  key={corner}
+                  className={`cn-grip ${corner}`}
+                  onPointerDown={(e) => onNoteGripDown(e, n, corner)}
+                />
+              ))}
+              {/* The paper is a layer of its own because its turned corner is
+                  cut with a clip-path, and a clip-path takes the element's
+                  children with it — the corner ate the grip that sat in it, so
+                  dragging there moved the note instead of sizing it. */}
+              <span className="cnote-paper">
+                <span className="cnote-name">{n.note.name}</span>
+                {n.note.description ? (
+                  <span className="cnote-body">{n.note.description}</span>
+                ) : null}
+              </span>
             </div>
           ))}
         </div>

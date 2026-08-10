@@ -29,7 +29,7 @@ import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { CanvasView } from "../components/CanvasView.js";
-import { DocumentView, breakRefKey } from "../components/DocumentView.js";
+import { BOOK_MEASURE_CH, DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
 import { FormatFields } from "../components/FormatFields.js";
@@ -520,7 +520,7 @@ export function WorkPage() {
       const notes = [...pendingNotes.current.entries()];
       pendingNotes.current.clear();
       for (const [bid, at] of notes) {
-        void api.editBookmark(bid, { noteX: at.x, noteY: at.y }).catch(() => undefined);
+        void api.editBookmark(bid, at).catch(() => undefined);
       }
     };
     window.addEventListener("beforeunload", flush);
@@ -538,28 +538,53 @@ export function WorkPage() {
    * frame. Batched in a map keyed by note, so the last position of each wins
    * and a slow write cannot lose a later move.
    */
-  const pendingNotes = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const pendingNotes = useRef<
+    Map<string, { noteX: number; noteY: number; noteW?: number; noteH?: number }>
+  >(new Map());
   const noteSave = useRef<number | null>(null);
 
-  const moveNote = useCallback((bookmarkId: string, x: number, y: number) => {
-    setBookmarks((held) =>
-      held.map((b) => (b.id === bookmarkId ? { ...b, noteX: x, noteY: y } : b)),
-    );
-    pendingNotes.current.set(bookmarkId, { x, y });
+  const settleNote = useCallback(
+    (bookmarkId: string, patch: { noteX: number; noteY: number; noteW?: number; noteH?: number }) => {
+      setBookmarks((held) =>
+        held.map((b) => (b.id === bookmarkId ? { ...b, ...patch } : b)),
+      );
+      pendingNotes.current.set(bookmarkId, patch);
 
-    if (noteSave.current) window.clearTimeout(noteSave.current);
-    noteSave.current = window.setTimeout(() => {
-      const batch = [...pendingNotes.current.entries()];
-      pendingNotes.current.clear();
-      for (const [bid, at] of batch) {
-        void api.editBookmark(bid, { noteX: at.x, noteY: at.y }).catch(() => {
-          // Put it back, so a failed write is retried with the next move rather
-          // than quietly losing where the note was put.
-          pendingNotes.current.set(bid, at);
-        });
-      }
-    }, 400);
-  }, []);
+      if (noteSave.current) window.clearTimeout(noteSave.current);
+      noteSave.current = window.setTimeout(() => {
+        const batch = [...pendingNotes.current.entries()];
+        pendingNotes.current.clear();
+        for (const [bid, at] of batch) {
+          void api.editBookmark(bid, at).catch(() => {
+            // Put it back, so a failed write is retried with the next move
+            // rather than quietly losing where the note was put.
+            pendingNotes.current.set(bid, at);
+          });
+        }
+      }, 400);
+    },
+    [],
+  );
+
+  const moveNote = useCallback(
+    (bookmarkId: string, x: number, y: number) => settleNote(bookmarkId, { noteX: x, noteY: y }),
+    [settleNote],
+  );
+
+  const sizeNote = useCallback(
+    (bookmarkId: string, x: number, y: number, w: number, h: number) =>
+      settleNote(bookmarkId, { noteX: x, noteY: y, noteW: w, noteH: h }),
+    [settleNote],
+  );
+
+  /**
+   * Where the modal's style buttons go.
+   *
+   * State rather than a ref because the editor has to be re-rendered once the
+   * slot exists — a ref filled during the same render would be read on the
+   * pass that already decided the buttons had nowhere to go.
+   */
+  const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
 
   /**
    * The editor for whichever block is open, wherever it is being shown.
@@ -569,9 +594,10 @@ export function WorkPage() {
    * writing in the manuscript would quietly not exist when writing from the
    * canvas.
    */
-  const proseEditor = (layout: ProseLayout): ReactNode =>
+  const proseEditor = (layout: ProseLayout, slot?: HTMLElement | null): ReactNode =>
     editingProse ? (
       <ProseEditor
+        toolbarSlot={slot ?? null}
         layout={layout}
         spellcheckWanted={spelling.enabled}
         // A fresh editor per block. Reusing one across a switch would
@@ -1516,6 +1542,7 @@ export function WorkPage() {
               focusId={activeMatch?.blockId ?? null}
               bookmarks={bookmarks}
               onMoveNote={moveNote}
+              onSizeNote={sizeNote}
               onAddNote={(blockId, x, y) =>
                 void addBookmark(blockId, undefined, { x, y })
               }
@@ -1684,6 +1711,11 @@ export function WorkPage() {
               <span className="czen-name">
                 {blocks.find((b) => b.id === editingProse.id)?.label || <em>Untitled</em>}
               </span>
+              {/* The editor's own style buttons are portalled in here, so
+                  the modal has one bar rather than a second floating under
+                  the first. */}
+              <span className="czen-tools" ref={setToolbarSlot} />
+
               <span className="czen-words">
                 {wordFmt.format(
                   blocks.find((b) => b.id === editingProse.id)?.wordCount ?? 0,
@@ -1706,10 +1738,13 @@ export function WorkPage() {
               </button>
             </div>
 
-            {/* Book typography: the canvas is neither of the two views, and a
-                section read on its own reads best set comfortably. */}
-            <div className="canvas-zen-page doc-mode-book">
-              {proseEditor({ indentFirst: true })}
+            {/* The canvas is neither of the two views, and a section read on
+                its own reads best set to a comfortable measure — the same one
+                book view uses, asked for by name rather than guessed at. */}
+            <div className="canvas-zen-page">
+              <div className="canvas-zen-measure" style={{ maxWidth: `${BOOK_MEASURE_CH}ch` }}>
+                {proseEditor({ indentFirst: true }, toolbarSlot)}
+              </div>
             </div>
           </div>
         </div>

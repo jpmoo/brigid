@@ -83,6 +83,9 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
         // Where the note was dragged to on the canvas, from its card's corner.
         noteX: z.number().finite().nullable().optional(),
         noteY: z.number().finite().nullable().optional(),
+        // Nothing may be saved smaller than a thing you could grab.
+        noteW: z.number().finite().min(40).nullable().optional(),
+        noteH: z.number().finite().min(30).nullable().optional(),
       })
       .parse(req.body);
     const [row] = await db
@@ -94,6 +97,8 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
           : {}),
         ...(body.noteX !== undefined ? { noteX: body.noteX } : {}),
         ...(body.noteY !== undefined ? { noteY: body.noteY } : {}),
+        ...(body.noteW !== undefined ? { noteW: body.noteW } : {}),
+        ...(body.noteH !== undefined ? { noteH: body.noteH } : {}),
         updatedAt: new Date(),
       })
       .where(eq(bookmarks.id, id))

@@ -2854,6 +2854,13 @@ mark.hit.active {
   margin-top: calc(-1 * (var(--prose-bar) + var(--prose-bar-gap)));
 }
 
+/* With the style bar gone elsewhere there is nothing in the flow to cancel, so
+   the pull-up goes too — left in, it would hoist the prose by exactly the
+   height of a bar that is no longer above it. */
+.prose-editor.bare {
+  margin-top: 0;
+}
+
 /* The surface inherits the manuscript's type: what is being typed has to look
    like what will be read, or the line breaks lie. Only a faint ground and rule
    separate it, so the page doesn't turn into a form. */
@@ -5369,18 +5376,28 @@ mark.hit.active {
 /* Searching a canvas: the cards holding the term light where they sit, since
    there is no reading order to scroll along. The stepped-to one is louder than
    the rest, the way the active hit is in the manuscript. */
+/* Loud on purpose. A hit has to be findable at the zoom where a whole
+   manuscript fits on screen, which is one where a card is a few millimetres
+   wide and a hairline border is nothing at all — so the ring is thick, solid,
+   and carries a glow that reads before the card it is around does. */
 .canvas-node.hit {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 3px var(--accent),
+    0 0 16px 4px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
+/* The one a search settled on: brighter still, and lifted off the surface. */
 .canvas-node.hit-active {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+  box-shadow:
+    0 0 0 5px var(--accent),
+    0 0 28px 8px color-mix(in srgb, var(--accent) 65%, transparent);
 }
 
 .cn-hit {
-  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  background: color-mix(in srgb, var(--accent) 60%, transparent);
+  font-weight: 600;
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
@@ -5429,6 +5446,31 @@ mark.hit.active {
   text-overflow: ellipsis;
 }
 
+/* The editor's style buttons, sitting in the bar rather than floating over the
+   prose. Stripped of the pane treatment — the frosted panel, the shadow, the
+   border — because the bar it now sits in is already all of those. */
+.czen-tools {
+  display: flex;
+  align-items: center;
+}
+
+.czen-tools .prose-toolbar.docked {
+  position: static;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  background: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  /* The floating bar scales itself against the sheet's zoom; in the title bar
+     there is no zoom to undo. */
+  transform: none;
+  zoom: normal;
+}
+
 .czen-words {
   margin-left: auto;
   font-size: 11px;
@@ -5444,6 +5486,11 @@ mark.hit.active {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 32px clamp(20px, 6vw, 64px) 40vh;
+}
+
+/* Centred, so a wide sheet does not put the prose against its left edge. */
+.canvas-zen-measure {
+  margin: 0 auto;
 }
 
 /* Room to grab, without a handle so large it covers the card it belongs to.
@@ -5506,25 +5553,31 @@ mark.hit.active {
    the page: square-ish, tinted, with one corner turned. Shaped differently from
    a card on purpose — a note is not part of the book's structure and shouldn't
    read as another section sitting among the sections. */
+/* The note itself is only a frame: it positions the paper and carries the
+   resize grips, which must not be inside the clip-path below. */
 .canvas-note {
   position: absolute;
+  cursor: grab;
+  filter: drop-shadow(1px 2px 5px rgba(0, 0, 0, 0.22));
+}
+
+.cnote-paper {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
   padding: 10px 11px;
-  border: none;
   border-radius: 2px;
   background: var(--note-paper, #fdf3bf);
   color: #3b3524;
-  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.18);
-  cursor: grab;
   overflow: hidden;
   /* The turned corner, cut from the sheet rather than drawn on it. */
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
 }
 
 /* The underside of the turned corner. */
-.canvas-note::after {
+.cnote-paper::after {
   content: "";
   position: absolute;
   right: 0;
@@ -5538,12 +5591,22 @@ mark.hit.active {
   );
 }
 
+/* Shown on the note, since the grips are on the frame and not on the paper. */
+.canvas-note:hover .cn-grip::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
 /* The one following the pointer while a note is being pulled out. Faint, and
    deaf to the pointer, so it cannot swallow the drop it is previewing. */
 .canvas-note.ghost {
   opacity: 0.55;
   pointer-events: none;
-  box-shadow: none;
+  filter: none;
 }
 
 .canvas-note.selected {

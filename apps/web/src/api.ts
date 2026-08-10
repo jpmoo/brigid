@@ -231,6 +231,9 @@ export interface Bookmark {
   /** Where it sits on the canvas, from its card's corner. Null until placed. */
   noteX: number | null;
   noteY: number | null;
+  /** How big it is drawn. Null means whatever the canvas draws one at. */
+  noteW: number | null;
+  noteH: number | null;
   sortKey: string;
   createdAt: string;
   updatedAt: string;
@@ -403,6 +406,8 @@ export const api = {
       description?: string | null;
       noteX?: number | null;
       noteY?: number | null;
+      noteW?: number | null;
+      noteH?: number | null;
     },
   ) =>
     request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {
