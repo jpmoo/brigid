@@ -5278,6 +5278,13 @@ mark.hit.active {
   overflow: hidden;
   cursor: grab;
   touch-action: none;
+
+  /* A drag here moves things; it never selects them. Without this, dragging a
+     card across its neighbours highlights their titles as though the canvas
+     were a page of text, and the browser then treats the next press as a
+     click on a selection. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .canvas-surface:active {

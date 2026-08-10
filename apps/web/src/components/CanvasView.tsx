@@ -24,7 +24,7 @@ const DEFAULT_W = 260;
 const DEFAULT_H = 120;
 /** Room inside a region for its children, and between siblings. */
 const PADDING = 28;
-const GAP = 24;
+const GAP = 44;
 /** The band along the top of a region that carries its own name. */
 const HEADER = 34;
 
@@ -213,8 +213,8 @@ function layout(
       );
 
       if (!own) {
-        unsaved.push({ blockId: item.block.id, x: guess.x - originX, y: guess.y - originY, w, h });
         // The row only knew the guessed size; a grown region needs more room.
+        // Where it ends up is recorded after the rows have been mirrored.
         rowX = Math.max(rowX, guess.x + w + GAP);
         rowH = Math.max(rowH, h);
       }
@@ -239,6 +239,73 @@ function layout(
   };
 
   place(null, 0, 0, 0);
+
+  /**
+   * Every other row runs the other way.
+   *
+   * Packed all left-to-right, the last node of a row has to reach back across
+   * the whole width to the first node of the next — so it leaves by the same
+   * edge its own arrow arrived at, and the two lines lie on top of each other.
+   * Reversing alternate rows makes the sequence a boustrophedon: within a row a
+   * node is entered on one side and left on the other, and at a wrap the link
+   * simply drops to the row below.
+   *
+   * Done afterwards rather than during, because a row cannot be mirrored until
+   * every node in it has its final size — and a region has no size until its
+   * children have theirs. Moving a node carries its subtree, since children
+   * were laid out against their parent's corner.
+   */
+  const kids = new Map<string | null, Placed[]>();
+  for (const p of placed) kids.set(p.parentId, [...(kids.get(p.parentId) ?? []), p]);
+
+  const shift = (node: Placed, dx: number) => {
+    node.x += dx;
+    for (const child of kids.get(node.id) ?? []) shift(child, dx);
+  };
+
+  for (const [, group] of kids) {
+    // Only what was laid out here: anything the writer placed stays put.
+    const fresh = group.filter((p) => !p.isSelfCard && !saved.has(p.id));
+    if (fresh.length < 2) continue;
+
+    const rows = new Map<number, Placed[]>();
+    for (const p of fresh) rows.set(p.y, [...(rows.get(p.y) ?? []), p]);
+
+    const order = [...rows.keys()].sort((a, b) => a - b);
+    for (const [index, y] of order.entries()) {
+      if (index % 2 === 0) continue;
+      const row = (rows.get(y) ?? []).slice().sort((a, b) => a.x - b.x);
+      if (row.length < 2) continue;
+
+      // Mirrored about the row's own extent, so it occupies the same space.
+      const left = row[0]!.x;
+      const right = row[row.length - 1]!.x + row[row.length - 1]!.w;
+
+      // Worked out against the row as it stands, then applied: shifting as we
+      // go would measure each node against positions already moved.
+      const moves = row.map((node) => ({ node, dx: left + right - node.w - 2 * node.x }));
+      for (const { node, dx } of moves) shift(node, dx);
+    }
+  }
+
+  /**
+   * What to write back, taken from the final positions.
+   *
+   * Collected here rather than as each node was placed, because the rows are
+   * mirrored afterwards — anything gathered earlier would record where a node
+   * was before it moved, and the next load would undo the arrangement it had
+   * just been given.
+   */
+  const origin = new Map<string | null, { x: number; y: number }>([[null, { x: 0, y: 0 }]]);
+  for (const p of placed) {
+    origin.set(p.id, { x: p.x + PADDING, y: p.y + HEADER + PADDING / 2 });
+  }
+  for (const p of placed) {
+    if (p.isSelfCard || saved.has(p.id)) continue;
+    const from = origin.get(p.parentId) ?? { x: 0, y: 0 };
+    unsaved.push({ blockId: p.id, x: p.x - from.x, y: p.y - from.y, w: p.w, h: p.h });
+  }
+
 
   /**
    * Outermost first.
@@ -433,7 +500,7 @@ export function CanvasView({
         const py = event.clientY - box.top;
 
         setZoom((current) => {
-          const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, current * (1 - event.deltaY / 400)));
+          const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, current * (1 - event.deltaY / 160)));
           // Hold the point under the cursor still: its canvas coordinate must
           // read the same before and after.
           setPan((p) => ({
@@ -548,7 +615,7 @@ export function CanvasView({
           className="btn ghost"
           type="button"
           title="Zoom out"
-          onClick={() => applyZoom(zoom / 1.25)}
+          onClick={() => applyZoom(zoom / 1.4)}
         >
           <Minus size={15} />
         </button>
@@ -576,7 +643,7 @@ export function CanvasView({
           className="btn ghost"
           type="button"
           title="Zoom in"
-          onClick={() => applyZoom(zoom * 1.25)}
+          onClick={() => applyZoom(zoom * 1.4)}
         >
           <Plus size={15} />
         </button>
