@@ -5399,3 +5399,13 @@ mark.hit.active {
   color: var(--text-muted);
   overflow: hidden;
 }
+
+/* The canvas fills the pane and manages its own scrolling.
+   The pane is built for a document: it scrolls vertically and keeps a deep
+   bottom padding so the last line can be brought up the screen. Neither is
+   wanted here, and the padding was showing as a band along the bottom that the
+   surface never reached. */
+.document-pane.canvas-mode {
+  padding: 0;
+  overflow: hidden;
+}

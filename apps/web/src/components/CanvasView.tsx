@@ -128,6 +128,16 @@ function layout(
   };
 
   place(null, 0, 0, 0);
+
+  /**
+   * Outermost first.
+   *
+   * Laying out is depth-last — a region cannot know its size until its children
+   * have theirs — so `placed` comes back with children before their parents.
+   * Painted in that order the region is drawn on top of everything it contains,
+   * which is precisely the report that chapters had nothing in them.
+   */
+  placed.sort((a, b) => a.depth - b.depth);
   return { placed, unsaved };
 }
 

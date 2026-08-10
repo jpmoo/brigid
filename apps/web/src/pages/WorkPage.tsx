@@ -1319,7 +1319,10 @@ export function WorkPage() {
           </div>
         </aside>
 
-        <main className="document-pane" ref={attachPane}>
+        <main
+          className={`document-pane${mode === "canvas" ? " canvas-mode" : ""}`}
+          ref={attachPane}
+        >
           {mode === "canvas" ? (
             <CanvasView
               items={canvasItems}
