@@ -9,6 +9,7 @@ import Fastify, { type FastifyError, type FastifyInstance } from "fastify";
 import { ZodError } from "zod";
 import { authRoutes } from "./auth/routes.js";
 import { blocksRoutes } from "./blocks/routes.js";
+import { canvasRoutes } from "./canvas/routes.js";
 import { bookmarksRoutes } from "./bookmarks/routes.js";
 import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
@@ -72,6 +73,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(worksRoutes);
       await scope.register(blocksRoutes);
       await scope.register(bookmarksRoutes);
+      await scope.register(canvasRoutes);
       await scope.register(templatesRoutes);
       await scope.register(importRoutes);
       await scope.register(spellingRoutes);

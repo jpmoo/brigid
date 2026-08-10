@@ -1,5 +1,6 @@
 import {
   boolean,
+  doublePrecision,
   primaryKey,
   index,
   integer,
@@ -210,6 +211,14 @@ export const bookmarks = pgTable(
     paragraphText: text("paragraph_text"),
     /** What the writer wanted to remember about the place. Shown on hover. */
     description: text("description"),
+    /**
+     * Where a note hangs on the canvas: which side of its node, and how far
+     * along that side so several on one edge keep their order. Null on every
+     * bookmark not made on the canvas — it is the same row either way, and
+     * appears in the book view stacked by when it was made.
+     */
+    noteSide: text("note_side").$type<"top" | "right" | "bottom" | "left">(),
+    noteOffset: doublePrecision("note_offset"),
     sortKey: text("sort_key").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -489,4 +498,36 @@ export const chatMessages = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ byTime: index("chat_messages_work_time_idx").on(t.workId, t.createdAt) }),
+);
+
+/**
+ * Where a block sits on the canvas.
+ *
+ * Decoration, not structure. The outline still decides order and nesting; this
+ * only records where a block was put and how big it was drawn, which is what
+ * lets the arrows be derived from the outline and redraw the moment anything is
+ * reordered. A block with no row here has never been placed, and is laid out
+ * from its position in the outline the first time the canvas is opened.
+ *
+ * Coordinates are relative to the parent region, so moving a chapter carries
+ * its scenes without touching a row for each one.
+ */
+export const canvasNodes = pgTable(
+  "canvas_nodes",
+  {
+    blockId: uuid("block_id")
+      .primaryKey()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    x: doublePrecision("x").notNull(),
+    y: doublePrecision("y").notNull(),
+    /** What the writer dragged it to. A region grows past this to hold its
+     *  children, so it is a floor rather than the final size. */
+    w: doublePrecision("w").notNull(),
+    h: doublePrecision("h").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byWork: index("canvas_nodes_work_idx").on(t.workId) }),
 );

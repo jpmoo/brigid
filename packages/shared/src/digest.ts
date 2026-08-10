@@ -455,3 +455,16 @@ export function mergeTitled(byKey: Map<string, RosterEntry>): void {
   }
 }
 
+
+/** Where a block sits on the canvas, relative to the region containing it. */
+export interface CanvasNode {
+  blockId: string;
+  x: number;
+  y: number;
+  /** What the writer dragged it to. Regions grow past this to hold children. */
+  w: number;
+  h: number;
+}
+
+/** Which edge of a node a canvas note hangs from. */
+export type NoteSide = "top" | "right" | "bottom" | "left";
