@@ -743,7 +743,7 @@ export function CanvasView({
         }}
         // The dots are drawn in page pixels, so they have to move and scale
         // with the surface rather than sitting still behind it.
-        style={{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${24 * zoom}px ${24 * zoom}px` }}
+        style={{ backgroundPosition: `${pan.x}px ${pan.y}px`, backgroundSize: `${36 * zoom}px ${36 * zoom}px` }}
       >
         <div
           className="canvas-world"
@@ -805,9 +805,20 @@ export function CanvasView({
                 p.id === selectedId ? "selected" : "",
                 isRegion ? "region" : "",
                 p.isSelfCard ? "self" : "",
-                // Counted over the whole of it, as the outline counts it, so
-                // the shading and the number agree.
-                p.item.goal ? (p.item.words >= p.item.goal ? "met" : "short") : "",
+                /**
+                 * Shaded on the region, and only there.
+                 *
+                 * The goal belongs to the level — the chapter — and the region
+                 * is the chapter. The card holding its opening is part of the
+                 * same thing, so shading it too would say the same thing twice
+                 * and imply the opening had a target of its own. A section is
+                 * shaded only when its own level carries a goal.
+                 */
+                !p.isSelfCard && p.item.goal
+                  ? p.item.words >= p.item.goal
+                    ? "met"
+                    : "short"
+                  : "",
               ]
                 .filter(Boolean)
                 .join(" ")}

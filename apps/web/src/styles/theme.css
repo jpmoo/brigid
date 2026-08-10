@@ -5291,10 +5291,13 @@ mark.hit.active {
   cursor: grabbing;
 }
 
+/* Smaller dots, further apart. The grid is there to give the eye a sense of
+   distance while dragging, not to be looked at — at the old weight it read as
+   texture and competed with the cards. */
 .canvas-surface.ruled {
   background-image: radial-gradient(
     circle at 1px 1px,
-    color-mix(in srgb, var(--text) 18%, transparent) 1px,
+    color-mix(in srgb, var(--text) 22%, transparent) 0.5px,
     transparent 0
   );
 }
