@@ -7,8 +7,9 @@ goddess of poetry.
 Brigid keeps your manuscript as a structured outline rather than one long file, so
 you can move a chapter without cutting and pasting twenty pages. It handles the
 things a novel needs and a word processor doesn't: parts and chapters and scenes
-that know what they are, formatting decided once and applied everywhere,
-compiling to a submission manuscript, and — if you want it — a local AI that
+that know what they are, formatting decided once and applied everywhere, a
+canvas that lays the whole shape of the book out in front of you, compiling to a
+submission manuscript, and — if you want it — a local AI that
 reads the book and tells you what shape it has, maps your characters to archetypes, and lets you chat about your work.
 
 Nothing leaves your machine or server until you're ready to compile into a Word document or a PDF. There is no account with anyone, no subscription,
@@ -112,6 +113,66 @@ Then make a manuscript and start writing.
 
 **From another computer on your network**, use the address the installer printed
 rather than `localhost`. If it doesn't load, see *When something's wrong*.
+
+---
+
+## Three ways of looking at it
+
+The outline down the left is always the same manuscript. What changes is how the
+middle shows it, and you switch with the three buttons above it.
+
+**Book** sets your writing the way a novel is set: a comfortable measure,
+generous leading, nothing on the page but the words. This is the one to write
+in.
+
+**Manuscript** sets it exactly as your submission templates specify — double
+spaced, the right indents, the right font — so what you see is what will come
+out of the compiler. Useful when you are close to sending it somewhere.
+
+Clicking into a section in either one starts writing there. The style bar
+carries bold, italic, and the rest; spelling is checked as you go, and the search
+box walks every match in the whole manuscript rather than just the section you
+are in. **Zen** (the expand button) drops the header and floats the outline, so
+there is nothing left but the page.
+
+### Canvas
+
+**Canvas** shows the *shape* of the book rather than its text: every part,
+chapter, and scene as a card on an endless surface, nested inside the thing that
+contains it, with arrows for the order they are read in.
+
+Anything with something inside it is drawn as a container rather than a card,
+and its own writing — a chapter's opening, before its first scene — gets a card
+of its own at the top of it. So a chapter is a rectangle holding its opening and
+then its scenes, with the sequence running through all of them.
+
+The arrows are worked out from the outline every time it is drawn, so reordering
+a chapter redraws them immediately — there is no stored connection that could
+quietly disagree with the book. Dragging never re-parents: a scene dropped
+inside another chapter's rectangle has been moved on screen, not moved in the
+book. Structure stays the outline's business, so an accidental drag can't
+rewrite it.
+
+- **Getting around.** Drag the background to pan, or scroll with two fingers.
+  Pinch or Ctrl-scroll to zoom, or type a percentage. The dot grid can be turned
+  off.
+- **Arranging.** Drag a card to move it, drag a corner to resize it. Chapters
+  grow and shrink around their scenes as you go. Everything is remembered, and
+  **Reset** (hold to confirm) throws the arrangement away and lays it out fresh.
+- **Notes.** Drag from a tab on any side of a card to hang a note off it, and
+  drop it wherever you like — a dotted arrow keeps it pointed at the section it
+  belongs to. Notes are bookmarks — the same list at the top of the outline — so
+  one made here appears there, and one dropped on a line while writing appears
+  here beside the section holding it.
+- **Colour.** Cards shade against their level's word goal, the same reading the
+  outline gives — short of it, or past it. The goal belongs to the chapter, so
+  it is the chapter that shades and not the card holding its opening.
+- **Searching.** There is no reading order to scroll along, so search works
+  differently here: every card holding the term lights up where it sits and the
+  count is of sections rather than occurrences. Open one and you see all of its
+  matches at once.
+- **Writing.** Double-click a card to open that section in a room of its own —
+  zen without the outline, the same editor with all the same features.
 
 ---
 
