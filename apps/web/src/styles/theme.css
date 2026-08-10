@@ -5409,3 +5409,21 @@ mark.hit.active {
   padding: 0;
   overflow: hidden;
 }
+
+/* A region's own prose, first inside it. An ordinary card — it is ordinary
+   prose — but not draggable on its own, since it belongs to the region. */
+.canvas-node.self {
+  cursor: default;
+  border-style: solid;
+}
+
+/* A region now carries only its name, so it needs no room for text and should
+   not compete with the cards inside it. */
+.canvas-node.region {
+  display: block;
+  padding: 8px 12px;
+}
+
+.canvas-node.region > .cn-meta {
+  margin-top: 2px;
+}

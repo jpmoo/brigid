@@ -59,14 +59,41 @@ interface Placed {
   depth: number;
   parentId: string | null;
   item: CanvasBlock;
+  /** A region's own prose, drawn as the first card inside it. */
+  isSelfCard: boolean;
+}
+
+/**
+ * How wide a region tries to get before wrapping its children onto a new row.
+ * Chosen so a chapter of a few scenes lands roughly square, which is the shape
+ * that wastes least on an endless surface and reads best at a distance.
+ */
+const ROW_WIDTH = 900;
+
+/**
+ * A card standing for a block's own prose, inside the region it heads.
+ *
+ * A block that contains others is drawn as a region: a container named by the
+ * break that starts it. But it usually has prose of its own — the opening of
+ * the chapter, before its first scene — and that prose has nowhere to go on a
+ * container. So it is given an ordinary card, first among the region's
+ * children, and the region keeps nothing but a title. Nothing overlaps, and the
+ * sequence arrow runs through it into the scenes that follow.
+ *
+ * It is not separately placeable: it belongs to the region and moves with it,
+ * which is also why it needs no row of its own in the database.
+ */
+function selfCardId(blockId: string): string {
+  return `${blockId}::self`;
 }
 
 /**
  * Where everything goes.
  *
  * Saved placements win; anything never placed is laid out from its position in
- * the outline, which is the only sensible first guess — a book opened on the
- * canvas for the first time should look like the book, not like a heap.
+ * the outline, wrapped into rows rather than run down a column — a book is
+ * wider than it is tall on a canvas, and a single column of forty chapters is
+ * unreadable at any zoom that shows more than three.
  *
  * Regions are then grown to contain their children, which is why this runs
  * bottom-up: a chapter cannot know its size until its scenes have theirs.
@@ -84,7 +111,6 @@ function layout(
   const unsaved: CanvasNode[] = [];
   const placed: Placed[] = [];
 
-  /** Lay out one generation, returning the space it needed. */
   const place = (
     parentId: string | null,
     originX: number,
@@ -94,37 +120,94 @@ function layout(
     const children = byParent.get(parentId) ?? [];
     if (children.length === 0) return { w: 0, h: 0 };
 
-    let flowY = originY;
+    // Where the next unplaced thing goes, wrapping when the row is full.
+    let rowX = originX;
+    let rowY = originY;
+    let rowH = 0;
     let widest = 0;
+    let deepest = originY;
+
+    const advance = (w: number, h: number): { x: number; y: number } => {
+      if (rowX > originX && rowX + w > originX + ROW_WIDTH) {
+        rowX = originX;
+        rowY += rowH + GAP;
+        rowH = 0;
+      }
+      const at = { x: rowX, y: rowY };
+      rowX += w + GAP;
+      rowH = Math.max(rowH, h);
+      return at;
+    };
 
     for (const item of children) {
+      const isRegion = item.childCount > 0;
       const own = saved.get(item.block.id);
-      // Relative to the parent, so moving a region carries everything in it.
-      const x = originX + (own?.x ?? 0);
-      const y = own ? originY + own.y : flowY;
 
-      // Children first: a region's size depends on what is inside it.
-      const inside = place(item.block.id, x + PADDING, y + HEADER + PADDING / 2, depth + 1);
+      /**
+       * A region's size is decided by what is inside it, so its children are
+       * laid out first — against a provisional origin, then moved once the
+       * region's own corner is known. Cheaper than laying out twice.
+       */
+      const guess = own
+        ? { x: originX + own.x, y: originY + own.y }
+        : advance(DEFAULT_W, DEFAULT_H);
 
-      const w = Math.max(own?.w ?? DEFAULT_W, inside.w + PADDING * 2);
+      let inside = { w: 0, h: 0 };
+      if (isRegion) {
+        // The block's own prose, first inside the region it heads.
+        const selfW = DEFAULT_W;
+        const selfH = DEFAULT_H;
+        placed.push({
+          id: selfCardId(item.block.id),
+          x: guess.x + PADDING,
+          y: guess.y + HEADER + PADDING / 2,
+          w: selfW,
+          h: selfH,
+          depth: depth + 1,
+          parentId: item.block.id,
+          item,
+          isSelfCard: true,
+        });
+
+        inside = place(
+          item.block.id,
+          guess.x + PADDING,
+          guess.y + HEADER + PADDING / 2 + selfH + GAP,
+          depth + 1,
+        );
+        inside = { w: Math.max(inside.w, selfW), h: inside.h + selfH + GAP };
+      }
+
+      const w = Math.max(own?.w ?? DEFAULT_W, isRegion ? inside.w + PADDING * 2 : 0);
       const h = Math.max(
         own?.h ?? DEFAULT_H,
-        inside.h > 0 ? inside.h + HEADER + PADDING * 1.5 : 0,
+        isRegion ? inside.h + HEADER + PADDING * 1.5 : 0,
       );
 
       if (!own) {
-        // Written back so the arrangement is the writer's from now on, and does
-        // not shuffle the next time a sibling is added.
-        unsaved.push({ blockId: item.block.id, x: x - originX, y: y - originY, w, h });
+        unsaved.push({ blockId: item.block.id, x: guess.x - originX, y: guess.y - originY, w, h });
+        // The row only knew the guessed size; a grown region needs more room.
+        rowX = Math.max(rowX, guess.x + w + GAP);
+        rowH = Math.max(rowH, h);
       }
 
-      placed.push({ id: item.block.id, x, y, w, h, depth, parentId, item });
+      placed.push({
+        id: item.block.id,
+        x: guess.x,
+        y: guess.y,
+        w,
+        h,
+        depth,
+        parentId,
+        item,
+        isSelfCard: false,
+      });
 
-      widest = Math.max(widest, x - originX + w);
-      flowY = Math.max(flowY, y + h + GAP);
+      widest = Math.max(widest, guess.x - originX + w);
+      deepest = Math.max(deepest, guess.y + h);
     }
 
-    return { w: widest, h: flowY - originY };
+    return { w: widest, h: deepest - originY };
   };
 
   place(null, 0, 0, 0);
@@ -263,7 +346,14 @@ export function CanvasView({
 
     for (const [, group] of siblings) {
       // In outline order, which is the order `items` arrives in.
-      const order = group.slice().sort((a, b) => items.findIndex((i) => i.block.id === a.id) - items.findIndex((i) => i.block.id === b.id));
+      /**
+       * In outline order, with a region's own prose first among its children —
+       * the chapter's opening comes before its first scene, so the sequence
+       * runs through the card standing for it.
+       */
+      const rank = (p: Placed) =>
+        p.isSelfCard ? -1 : items.findIndex((i) => i.block.id === p.id);
+      const order = group.slice().sort((a, b) => rank(a) - rank(b));
       for (let i = 0; i < order.length - 1; i += 1) {
         const from = order[i]!;
         const to = order[i + 1]!;
@@ -476,13 +566,16 @@ export function CanvasView({
             ))}
           </svg>
 
-          {placed.map((p) => (
+          {placed.map((p) => {
+            const isRegion = !p.isSelfCard && p.item.childCount > 0;
+            return (
             <div
               key={p.id}
               className={[
                 "canvas-node",
                 p.id === selectedId ? "selected" : "",
-                p.item.childCount > 0 ? "region" : "",
+                isRegion ? "region" : "",
+                p.isSelfCard ? "self" : "",
                 // Counted over the whole of it, as the outline counts it, so
                 // the shading and the number agree.
                 p.item.goal ? (p.item.words >= p.item.goal ? "met" : "short") : "",
@@ -490,10 +583,13 @@ export function CanvasView({
                 .filter(Boolean)
                 .join(" ")}
               style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
-              onPointerDown={(e) => onNodePointerDown(e, p)}
+              // A self card belongs to its region and moves with it, so it is
+              // not draggable in its own right.
+              onPointerDown={(e) => (p.isSelfCard ? undefined : onNodePointerDown(e, p))}
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                onOpen(p.id);
+                // The self card stands for its region's block, so it opens it.
+                onOpen(p.isSelfCard ? p.parentId ?? p.id : p.id);
               }}
             >
               {/* The same things the outline card shows, in the same order —
@@ -501,22 +597,32 @@ export function CanvasView({
                   object is a cost with nothing on the other side. */}
               <div className="cn-head">
                 <span className="cn-label">{p.item.block.label || <em>Untitled</em>}</span>
-                <span className="cn-level">{p.item.levelName}</span>
+                <span className="cn-level">
+                  {/* The region is named by the break that starts it; the card
+                      inside it is that block's own prose. */}
+                  {p.isSelfCard ? "opening" : (p.item.breakName ?? p.item.levelName)}
+                </span>
               </div>
 
               <div className="cn-meta">
-                <span className="cn-words">{wordFmt.format(p.item.words)}</span>
+                <span className="cn-words">
+                  {wordFmt.format(p.isSelfCard ? p.item.block.wordCount : p.item.words)}
+                </span>
                 {p.item.childCount > 0 && p.item.block.wordCount !== p.item.words ? (
                   <span className="cn-own">{wordFmt.format(p.item.block.wordCount)} here</span>
                 ) : null}
                 {p.item.breakName ? <span className="cn-break">{p.item.breakName}</span> : null}
               </div>
 
-              {p.item.block.contentText.trim() ? (
+              {/* A region is a container: its own prose lives in the card
+                  standing for it, first among its children, so nothing is
+                  drawn here for anything to overlap. */}
+              {!isRegion && p.item.block.contentText.trim() ? (
                 <p className="cn-preview">{p.item.block.contentText.trim().slice(0, 220)}</p>
               ) : null}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
