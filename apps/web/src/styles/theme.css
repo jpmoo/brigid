@@ -2398,6 +2398,18 @@ input::placeholder {
   border-radius: 3px;
 }
 
+/* Except the one being written in, which already wears the editor's own accent
+   rule and tint. A ring around that is a second border saying what the first
+   one said — and it wraps the floating style bar too, which belongs to no
+   section at all. The surface deepens instead. */
+.doc-block.drop-target:has(.prose-editor) {
+  box-shadow: none;
+}
+
+.doc-block.drop-target .prose-surface {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
 .doc-block {
   position: relative;
   /* Nearly flush: a jump should put the section's first line at the top of the
@@ -2945,6 +2957,14 @@ mark.hit.active {
 }
 
 /* Under the word, not through it — a strikethrough reads as deleted. */
+/* A search hit inside a word the checker doesn't know carries both, so the
+   squiggle runs under the whole word rather than stopping where the highlight
+   starts. */
+mark.hit.misspelled {
+  text-decoration: underline wavy var(--misspelled);
+  text-decoration-skip-ink: none;
+}
+
 .misspelled {
   text-decoration: underline wavy var(--misspelled);
   /* Thin on purpose. The thickness also sets the wave's amplitude, so a heavier

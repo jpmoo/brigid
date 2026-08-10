@@ -217,7 +217,17 @@ export function paragraphUnder(
   block: HTMLElement,
   clientY: number,
 ): { index: number; text: string } | undefined {
-  const paragraphs = [...block.querySelectorAll("p")];
+  /**
+   * The block's own prose, and only that.
+   *
+   * `p.prose` rather than `p`: a format can put paragraphs of its own above the
+   * writing — a chapter's heading line, a title page's every line — and those
+   * are `p.tpl-para`. Counting them made this index disagree with the index the
+   * markers are drawn at, which counts prose alone. A bookmark dropped on the
+   * first line of a chapter was recorded as the second paragraph, drawn beside
+   * the second, and jumped to at the second.
+   */
+  const paragraphs = [...block.querySelectorAll("p.prose")];
   if (paragraphs.length === 0) return undefined;
 
   let at = 0;

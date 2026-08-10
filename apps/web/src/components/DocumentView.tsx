@@ -65,37 +65,62 @@ function typographyStyle(t: Typography | null, mode: ViewMode): CSSProperties {
 }
 
 /**
- * Split a paragraph on the search term, tagging each hit with its ordinal
- * within the block so the active one can be picked out from the rest.
+ * Marking up a run of prose: what the search found, and what the checker
+ * doesn't know. Both are drawn in the reading view, over prose nobody is
+ * editing; the editor draws its own.
  */
-/**
- * The words a checker doesn't know, marked in prose nobody is editing.
- *
- * Only the parts of a line that aren't already a search hit: a hit is its own
- * mark, and two overlaid would say less than either. The checker's answers are
- * remembered per word, because this runs over the whole manuscript rather than
- * the block being written in.
- */
-function misspellings(text: string, speller: Speller | null, key: string): ReactNode {
-  if (!speller || !text) return text;
-
-  const parts: ReactNode[] = [];
-  let from = 0;
-  for (const { word, at } of words(text)) {
-    if (speller.correct(word)) continue;
-    if (at > from) parts.push(text.slice(from, at));
-    parts.push(
-      <span className="misspelled" key={`${key}-${at}`}>
-        {word}
-      </span>,
-    );
-    from = at + word.length;
-  }
-  if (parts.length === 0) return text;
-  if (from < text.length) parts.push(text.slice(from));
-  return parts;
+interface Span {
+  start: number;
+  end: number;
 }
 
+/** Where the checker doesn't know the word, over the whole run. */
+function misspelledSpans(text: string, speller: Speller | null): Span[] {
+  if (!speller || !text) return [];
+  const out: Span[] = [];
+  for (const { word, at } of words(text)) {
+    if (!speller.correct(word)) out.push({ start: at, end: at + word.length });
+  }
+  return out;
+}
+
+/**
+ * Where the search matches, over the whole run.
+ *
+ * Searched folded, shown unfolded: the reader keeps the typeset punctuation
+ * while the match is found however it was typed. The fold carries a note of
+ * where each character came from, because one of the substitutions — the
+ * ellipsis, one character standing for three — moves every offset after it.
+ */
+function hitSpans(text: string, needle: string): Span[] {
+  if (!needle) return [];
+  const folded = foldForSearchMapped(text);
+  const out: Span[] = [];
+  let searched = 0;
+  for (;;) {
+    const found = folded.text.indexOf(needle, searched);
+    if (found === -1) break;
+    out.push({
+      start: folded.at[found] ?? text.length,
+      end: folded.at[found + needle.length] ?? text.length,
+    });
+    searched = found + needle.length;
+  }
+  return out;
+}
+
+/**
+ * A run of prose with the search marked and the unknown words underlined.
+ *
+ * Both are worked out over the whole run and then drawn together, rather than
+ * the text being cut at each hit and the pieces checked separately. Cut first,
+ * searching for "so" handed the checker "mething" — a fragment of a word it
+ * had every reason to reject, and a squiggle appeared under the back half of a
+ * perfectly good "something" for as long as the search ran.
+ *
+ * The two can overlap in any way, since a hit pays no attention to where words
+ * begin and end, so a stretch that is both carries both.
+ */
 function highlight(
   text: string,
   needle: string,
@@ -103,47 +128,52 @@ function highlight(
   activeIndex: number | null,
   speller: Speller | null = null,
 ) {
-  if (!needle) return misspellings(text, speller, "s");
-  const parts: ReactNode[] = [];
+  const hits = hitSpans(text, needle);
+  const bad = misspelledSpans(text, speller);
+  // One ordinal per match, taken before anything is drawn: a match split by a
+  // misspelling's edge is still one match, and the count has to agree with the
+  // search's own tally of the manuscript.
+  const ordinals = hits.map(() => counter.n++);
+  if (hits.length === 0 && bad.length === 0) return text;
 
-  // Searched folded, shown unfolded: the reader keeps the typeset punctuation
-  // while the match is found however it was typed. The fold carries a note of
-  // where each character came from, because one of the substitutions — the
-  // ellipsis, one character standing for three — moves every offset after it.
-  const folded = foldForSearchMapped(text);
-  let searched = 0;
-  let shown = 0;
-
-  for (;;) {
-    const found = folded.text.indexOf(needle, searched);
-    if (found === -1) break;
-
-    const start = folded.at[found] ?? text.length;
-    const end = folded.at[found + needle.length] ?? text.length;
-    if (start > shown) parts.push(misspellings(text.slice(shown, start), speller, `s${shown}`));
-
-    const ordinal = counter.n;
-    counter.n += 1;
-    // Make the active hit focusable so browsers scroll inline elements reliably.
-    // Inline <mark> does not have consistent scrollIntoView rects across engines,
-    // but document.querySelector() → .focus() works everywhere the text is actually rendered.
-    const isActive = ordinal === activeIndex;
-    parts.push(
-      <mark
-        className={isActive ? "hit active" : "hit"}
-        tabIndex={isActive ? -1 : undefined}
-        key={`${start}-${ordinal}`}
-      >
-        {text.slice(start, end)}
-      </mark>,
-    );
-
-    searched = found + needle.length;
-    shown = end;
+  const cuts = new Set<number>([0, text.length]);
+  for (const span of [...hits, ...bad]) {
+    cuts.add(span.start);
+    cuts.add(span.end);
   }
+  const points = [...cuts].sort((a, b) => a - b);
 
-  if (parts.length === 0) return misspellings(text, speller, "s");
-  if (shown < text.length) parts.push(misspellings(text.slice(shown), speller, `s${shown}`));
+  const parts: ReactNode[] = [];
+  for (let i = 0; i < points.length - 1; i += 1) {
+    const from = points[i]!;
+    const to = points[i + 1]!;
+    if (to <= from) continue;
+    const piece = text.slice(from, to);
+
+    const hit = hits.findIndex((h) => h.start <= from && to <= h.end);
+    const misspelled = bad.some((m) => m.start <= from && to <= m.end);
+
+    if (hit >= 0) {
+      const active = ordinals[hit] === activeIndex;
+      parts.push(
+        <mark
+          className={`hit${active ? " active" : ""}${misspelled ? " misspelled" : ""}`}
+          tabIndex={active ? -1 : undefined}
+          key={`h${from}`}
+        >
+          {piece}
+        </mark>,
+      );
+    } else if (misspelled) {
+      parts.push(
+        <span className="misspelled" key={`m${from}`}>
+          {piece}
+        </span>,
+      );
+    } else {
+      parts.push(piece);
+    }
+  }
   return parts;
 }
 

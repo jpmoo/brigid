@@ -1167,7 +1167,9 @@ export function WorkPage() {
     const block = paneRef.current?.querySelector(`[data-block-id="${bookmark.blockId}"]`);
     if (!block) return false;
 
-    const paragraphs = [...block.querySelectorAll("p")];
+    // Prose only, as `paragraphUnder` counts it — a format's own lines are
+    // `p.tpl-para` and are not paragraphs a bookmark can name.
+    const paragraphs = [...block.querySelectorAll("p.prose")];
     if (paragraphs.length === 0) return false;
 
     const wanted = (bookmark.paragraphText ?? "").trim();
