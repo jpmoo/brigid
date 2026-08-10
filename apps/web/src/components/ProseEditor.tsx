@@ -213,6 +213,34 @@ function decorate(
  * Undefined when the block has no paragraphs to speak of, which leaves the
  * bookmark pointing at the block as bookmarks always have.
  */
+/**
+ * The box of a paragraph's first line, rather than of the whole paragraph.
+ *
+ * A one-character range at the start of the text, measured — the only way to
+ * ask the browser where a line sits, since lines are not elements and have no
+ * boxes of their own to read.
+ *
+ * The bookmark markers are skipped: they sit in the margin beside the line, out
+ * of the flow, and their box would be measured as readily as the prose's.
+ */
+export function firstLineBox(el: Element): DOMRect | null {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode: (node) =>
+      node.parentElement?.closest(".doc-bookmarks")
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT,
+  });
+
+  const text = walker.nextNode();
+  if (!text || !(text.textContent ?? "").length) return null;
+
+  const range = document.createRange();
+  range.setStart(text, 0);
+  range.setEnd(text, 1);
+  const box = range.getBoundingClientRect();
+  return box.height > 0 ? box : null;
+}
+
 export function paragraphUnder(
   block: HTMLElement,
   clientY: number,

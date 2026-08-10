@@ -39,7 +39,7 @@ import type { SearchMatch } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel, kindOf } from "../components/OutlinePanel.js";
-import { ProseEditor } from "../components/ProseEditor.js";
+import { ProseEditor, firstLineBox } from "../components/ProseEditor.js";
 import type { ProseLayout } from "../components/ProseEditor.js";
 import { isCheckable, useSpelling, words } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -1181,7 +1181,23 @@ export function WorkPage() {
     }
 
     if (!target) return false;
-    target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+    /**
+     * The marked line put in the middle, rather than the paragraph.
+     *
+     * Centring the paragraph is right only while it fits: a paragraph taller
+     * than the pane has its middle in the middle, so a bookmark on a long one
+     * landed halfway down it with the line it marks scrolled off the top. The
+     * marker sits against the paragraph's first line, so that is what is
+     * centred — which needs no cases, and puts the marked line in the same
+     * place whether the paragraph is one line or a hundred.
+     */
+    const pane = paneRef.current;
+    if (!pane) return false;
+    const line = firstLineBox(target) ?? target.getBoundingClientRect();
+    const paneBox = pane.getBoundingClientRect();
+    const delta = line.top - paneBox.top - Math.max(0, paneBox.height - line.height) / 2;
+    if (Math.abs(delta) > 2) pane.scrollBy({ top: delta, behavior: "smooth" });
     return true;
   }
 
