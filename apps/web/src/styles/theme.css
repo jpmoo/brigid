@@ -5339,7 +5339,10 @@ mark.hit.active {
   background: var(--surface);
   box-shadow: var(--shadow-soft, 0 1px 2px rgba(0, 0, 0, 0.06));
   cursor: grab;
-  overflow: hidden;
+  /* Not hidden: the resize grips and note tabs hang on the border and would be
+     clipped away to nothing. The one thing that actually overruns is the
+     preview text, which is clipped where it sits instead. */
+  overflow: visible;
 }
 
 /* A region is a container first: its own text matters less than the fact that
@@ -5383,6 +5386,122 @@ mark.hit.active {
   padding: 0 1px;
 }
 
+/* Writing a section from the canvas: a room of its own rather than a card
+   swollen to the size of a page. Zen without the outline — nothing but the
+   section and the usual controls. */
+.canvas-zen {
+  padding: 0;
+  background: color-mix(in srgb, var(--bg) 82%, rgba(0, 0, 0, 0.5));
+  backdrop-filter: blur(3px);
+  place-items: stretch;
+}
+
+.canvas-zen-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 24px auto;
+  width: min(860px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lift);
+  overflow: hidden;
+}
+
+/* Quiet, and pinned: the controls should be findable without being what the
+   eye lands on when the section opens. */
+.canvas-zen-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 90%, var(--bg));
+}
+
+.czen-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.czen-words {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Only the page scrolls, so the bar stays put however long the section runs. */
+.canvas-zen-page {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 32px clamp(20px, 6vw, 64px) 40vh;
+}
+
+/* Room to grab, without a handle so large it covers the card it belongs to.
+   Only cards carry these: a region is the size of what it holds, so there is
+   nothing about it to set by hand. */
+.cn-grip {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  z-index: 2;
+}
+
+.cn-grip.nw { top: -3px; left: -3px; cursor: nwse-resize; }
+.cn-grip.ne { top: -3px; right: -3px; cursor: nesw-resize; }
+.cn-grip.sw { bottom: -3px; left: -3px; cursor: nesw-resize; }
+.cn-grip.se { bottom: -3px; right: -3px; cursor: nwse-resize; }
+
+/* Shown once the pointer is on the card, so a canvas at rest is cards rather
+   than cards plus eight dots each. */
+.canvas-node:hover .cn-grip::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+  opacity: 0.65;
+}
+
+/* The four note handles, one per side, dragged outward to hang a note. Marked
+   apart from the resize grips because they make something rather than change
+   something. */
+.cn-tab {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 120ms ease;
+  cursor: copy;
+  z-index: 2;
+}
+
+.canvas-node:hover .cn-tab {
+  opacity: 0.75;
+}
+
+.cn-tab:hover {
+  opacity: 1;
+  color: var(--accent);
+}
+
+.cn-tab.top { top: -8px; left: calc(50% - 8px); }
+.cn-tab.bottom { bottom: -8px; left: calc(50% - 8px); }
+.cn-tab.left { left: -8px; top: calc(50% - 8px); }
+.cn-tab.right { right: -8px; top: calc(50% - 8px); }
+
 /* A note is a bookmark, and looks like the thing a writer would have stuck to
    the page: square-ish, tinted, with one corner turned. Shaped differently from
    a card on purpose — a note is not part of the book's structure and shouldn't
@@ -5417,6 +5536,14 @@ mark.hit.active {
     color-mix(in srgb, var(--note-paper, #fdf3bf) 70%, #000) 0%,
     color-mix(in srgb, var(--note-paper, #fdf3bf) 92%, #000) 100%
   );
+}
+
+/* The one following the pointer while a note is being pulled out. Faint, and
+   deaf to the pointer, so it cannot swallow the drop it is previewing. */
+.canvas-note.ghost {
+  opacity: 0.55;
+  pointer-events: none;
+  box-shadow: none;
 }
 
 .canvas-note.selected {
@@ -5486,7 +5613,9 @@ mark.hit.active {
   background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
+/* Clipped here rather than on the card, so the handles on the border survive. */
 .cn-preview {
+  min-height: 0;
   margin: 0;
   font-size: 11.5px;
   line-height: 1.45;

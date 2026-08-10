@@ -1,6 +1,6 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Grid3x3, Minus, Plus, RotateCcw } from "lucide-react";
+import { Grid3x3, Minus, Plus, RotateCcw, StickyNote } from "lucide-react";
 import { foldForSearch, foldForSearchMapped } from "@brigid/shared";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block, Bookmark } from "../api.js";
@@ -147,6 +147,7 @@ export function CanvasView({
   focusId,
   bookmarks,
   onMoveNote,
+  onAddNote,
   onOpenNote,
   onSelect,
   onOpen,
@@ -178,6 +179,8 @@ export function CanvasView({
    */
   bookmarks: Bookmark[];
   onMoveNote: (bookmarkId: string, x: number, y: number) => void;
+  /** A note dragged out from a card's side, dropped at an offset from it. */
+  onAddNote: (blockId: string, x: number, y: number) => void;
   onOpenNote: (bookmarkId: string) => void;
   onSelect: (blockId: string) => void;
   /** Double-click: the section opens for editing. */
@@ -530,6 +533,126 @@ export function CanvasView({
   };
 
   /**
+   * Hanging a new note off a card.
+   *
+   * Dragged out from a tab on one of the four sides, and dropped wherever it
+   * lands — the side says which way it was pulled, not where the note must
+   * live. A ghost follows the pointer so the drag reads as making something
+   * rather than as a click that will produce a note somewhere off screen.
+   */
+  const hanging = useRef<{ blockId: string; host: Placed } | null>(null);
+  const [hangingAt, setHangingAt] = useState<{ x: number; y: number } | null>(null);
+
+  const canvasPoint = (event: React.PointerEvent): { x: number; y: number } | null => {
+    const box = surface.current?.getBoundingClientRect();
+    if (!box) return null;
+    return {
+      x: (event.clientX - box.left - pan.x) / zoom,
+      y: (event.clientY - box.top - pan.y) / zoom,
+    };
+  };
+
+  const onHangPointerDown = (event: React.PointerEvent, p: Placed) => {
+    event.stopPropagation();
+    hanging.current = { blockId: p.isSelfCard ? (p.parentId ?? p.id) : p.id, host: p };
+    setHangingAt(canvasPoint(event));
+    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+
+  const onHangPointerMove = (event: React.PointerEvent) => {
+    if (!hanging.current) return;
+    setHangingAt(canvasPoint(event));
+  };
+
+  const onHangPointerUp = (event: React.PointerEvent) => {
+    const held = hanging.current;
+    const at = canvasPoint(event);
+    hanging.current = null;
+    setHangingAt(null);
+    if (!held || !at) return;
+    // Dropped where the pointer let go, kept from its card's corner — so the
+    // note travels with the section rather than with the canvas.
+    onAddNote(held.blockId, at.x - held.host.x, at.y - held.host.y);
+  };
+
+  /**
+   * Resizing a card by a corner.
+   *
+   * Only cards. A region is the size of what it holds and has no size of its
+   * own to set — dragging its corner would be a request the next redraw would
+   * quietly refuse.
+   *
+   * Dragging a west or north corner moves the card as well as sizing it, so the
+   * opposite corner stays put: a card grabbed by its top-left should grow up
+   * and to the left, not slide down.
+   */
+  const resizing = useRef<{
+    id: string;
+    blockId: string;
+    self: boolean;
+    corner: "nw" | "ne" | "sw" | "se";
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+    startW: number;
+    startH: number;
+  } | null>(null);
+
+  const MIN_W = 120;
+  const MIN_H = 70;
+
+  const onGripPointerDown = (
+    event: React.PointerEvent,
+    p: Placed,
+    corner: "nw" | "ne" | "sw" | "se",
+  ) => {
+    event.stopPropagation();
+    const blockId = p.isSelfCard ? (p.parentId ?? p.id) : p.id;
+    const own = saved.get(blockId);
+    if (!own) return;
+    resizing.current = {
+      id: p.id,
+      blockId,
+      self: p.isSelfCard,
+      corner,
+      x: event.clientX,
+      y: event.clientY,
+      startX: (p.isSelfCard ? own.selfX : own.x) ?? 0,
+      startY: (p.isSelfCard ? own.selfY : own.y) ?? 0,
+      startW: p.w,
+      startH: p.h,
+    };
+    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+
+  const onGripPointerMove = (event: React.PointerEvent) => {
+    const held = resizing.current;
+    if (!held) return;
+    const own = saved.get(held.blockId);
+    if (!own) return;
+
+    const dx = (event.clientX - held.x) / zoom;
+    const dy = (event.clientY - held.y) / zoom;
+    const west = held.corner === "nw" || held.corner === "sw";
+    const north = held.corner === "nw" || held.corner === "ne";
+
+    // A west or north drag takes width off the near edge, so the far edge is
+    // what stays still; clamped first, or the corner would keep travelling
+    // after the card had stopped shrinking.
+    const w = Math.max(MIN_W, held.startW + (west ? -dx : dx));
+    const h = Math.max(MIN_H, held.startH + (north ? -dy : dy));
+    const x = held.startX + (west ? held.startW - w : 0);
+    const y = held.startY + (north ? held.startH - h : 0);
+
+    onPlace([
+      held.self
+        ? { ...own, selfX: x, selfY: y, selfW: w, selfH: h }
+        : { ...own, x, y, w, h },
+    ]);
+  };
+
+  /**
    * Dragging a note. Never re-tethers: a note dropped over another section is a
    * note that has been moved, not one that now belongs to that section. Which
    * section a note is about is the bookmark's business, the same way which
@@ -558,6 +681,9 @@ export function CanvasView({
   const endNodeDrag = () => {
     dragging.current = null;
     draggingNote.current = null;
+    resizing.current = null;
+    hanging.current = null;
+    setHangingAt(null);
   };
 
   return (
@@ -667,6 +793,14 @@ export function CanvasView({
           (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
         }}
         onPointerMove={(e) => {
+          if (resizing.current) {
+            onGripPointerMove(e);
+            return;
+          }
+          if (hanging.current) {
+            onHangPointerMove(e);
+            return;
+          }
           if (dragging.current) {
             onNodePointerMove(e);
             return;
@@ -679,7 +813,8 @@ export function CanvasView({
           if (!held) return;
           setPan({ x: held.panX + (e.clientX - held.x), y: held.panY + (e.clientY - held.y) });
         }}
-        onPointerUp={() => {
+        onPointerUp={(e) => {
+          if (hanging.current) onHangPointerUp(e);
           panning.current = null;
           endNodeDrag();
         }}
@@ -810,6 +945,31 @@ export function CanvasView({
                 {p.item.breakName ? <span className="cn-break">{p.item.breakName}</span> : null}
               </div>
 
+              {/* Grips and tabs on cards only. A region is the size of what it
+                  holds, so there is nothing about it to set by hand, and its
+                  notes hang off the card standing for its prose. */}
+              {!isRegion ? (
+                <>
+                  {(["nw", "ne", "sw", "se"] as const).map((corner) => (
+                    <span
+                      key={corner}
+                      className={`cn-grip ${corner}`}
+                      onPointerDown={(e) => onGripPointerDown(e, p, corner)}
+                    />
+                  ))}
+                  {(["top", "right", "bottom", "left"] as const).map((side) => (
+                    <span
+                      key={side}
+                      className={`cn-tab ${side}`}
+                      title="Drag out to add a note"
+                      onPointerDown={(e) => onHangPointerDown(e, p)}
+                    >
+                      <StickyNote size={12} />
+                    </span>
+                  ))}
+                </>
+              ) : null}
+
               {/* A region is a container: its own prose lives in the card
                   standing for it, first among its children, so nothing is
                   drawn here for anything to overlap. */}
@@ -832,6 +992,15 @@ export function CanvasView({
               <path key={tether.key} d={tether.d} className="canvas-tether" />
             ))}
           </svg>
+
+          {hangingAt ? (
+            <div
+              className="canvas-note ghost"
+              style={{ left: hangingAt.x, top: hangingAt.y, width: 180, height: 120 }}
+            >
+              <span className="cnote-name">New note</span>
+            </div>
+          ) : null}
 
           {notes.map((n) => (
             <div

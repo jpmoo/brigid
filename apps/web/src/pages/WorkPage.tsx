@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -40,6 +40,7 @@ import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
 import { ProseEditor } from "../components/ProseEditor.js";
+import type { ProseLayout } from "../components/ProseEditor.js";
 import { isCheckable, useSpelling, words } from "../spelling.js";
 import { useAuth } from "../auth/AuthContext.js";
 import { PHONE, useMediaQuery } from "../useMediaQuery.js";
@@ -559,6 +560,51 @@ export function WorkPage() {
       }
     }, 400);
   }, []);
+
+  /**
+   * The editor for whichever block is open, wherever it is being shown.
+   *
+   * One definition, called by the document view inline and by the canvas in
+   * a modal. Written out twice they would drift, and a feature added to
+   * writing in the manuscript would quietly not exist when writing from the
+   * canvas.
+   */
+  const proseEditor = (layout: ProseLayout): ReactNode =>
+    editingProse ? (
+      <ProseEditor
+        layout={layout}
+        spellcheckWanted={spelling.enabled}
+        // A fresh editor per block. Reusing one across a switch would
+        // leave the outgoing block's debounced save holding the
+        // incoming block's text.
+        key={editingProse.id}
+        blockId={editingProse.id}
+        initialSelection={editingProse.selection}
+        askAbout={editingProse.askAbout}
+        search={query.trim() || undefined}
+        activeHit={activeHitInEditor}
+        // The block keeps its markers while it is being edited.
+        bookmarks={bookmarks.filter((b) => b.blockId === editingProse.id)}
+        onNoMoreHere={() => continueSpellingAfter(editingProse.id)}
+        content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
+        fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
+        speller={spelling.speller}
+        smartPunctuation={smartPunctuationFor(editingProse.id)}
+        onSave={(doc) => {
+          void saveProse(editingProse.id, doc);
+          // Writing is what the clock is for, so writing starts it.
+          setSession((current) => {
+            if (!current || current.since !== null) return current;
+            const going = resumeSession(current);
+            writeSession(going);
+            return going;
+          });
+        }}
+        onDone={() => setEditingProse(null)}
+        onAddWord={(word) => void spelling.addWord(word)}
+        onIgnoreWord={spelling.ignoreWord}
+      />
+    ) : null;
 
   /** What the canvas needs to draw a block: the card, as the outline shows it. */
   const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
@@ -1137,11 +1183,23 @@ export function WorkPage() {
     [items, spelling],
   );
 
-  async function addBookmark(blockId: string, paragraph?: { index: number; text: string }) {
+  async function addBookmark(
+    blockId: string,
+    paragraph?: { index: number; text: string },
+    /** Where it was dropped on the canvas, from its card's corner. */
+    at?: { x: number; y: number },
+  ) {
     try {
       const { bookmark } = await api.createBookmark(id, blockId, {
         ...(paragraph ? { paragraphIndex: paragraph.index, paragraphText: paragraph.text } : {}),
       });
+      // Placed straight away, so it appears where it was let go rather than
+      // stacked beside its card and then jumping when the write lands.
+      if (at) {
+        bookmark.noteX = at.x;
+        bookmark.noteY = at.y;
+        void api.editBookmark(bookmark.id, { noteX: at.x, noteY: at.y }).catch(() => undefined);
+      }
       setBookmarks((prev) => [...prev, bookmark]);
       setActiveBookmark(bookmark.id);
       // Straight into naming it. A bookmark dropped and left with its fallback
@@ -1448,6 +1506,9 @@ export function WorkPage() {
               focusId={activeMatch?.blockId ?? null}
               bookmarks={bookmarks}
               onMoveNote={moveNote}
+              onAddNote={(blockId, x, y) =>
+                void addBookmark(blockId, undefined, { x, y })
+              }
               onOpenNote={(bookmarkId) => {
                 const note = bookmarks.find((b) => b.id === bookmarkId);
                 if (note) void renameBookmark(note);
@@ -1498,43 +1559,7 @@ export function WorkPage() {
               setSelectedId(blockId);
               setEditingProse({ id: blockId, selection, ...(askAbout ? { askAbout } : {}) });
             }}
-            editor={(layout) =>
-              editingProse ? (
-                <ProseEditor
-                  layout={layout}
-                  spellcheckWanted={spelling.enabled}
-                  // A fresh editor per block. Reusing one across a switch would
-                  // leave the outgoing block's debounced save holding the
-                  // incoming block's text.
-                  key={editingProse.id}
-                  blockId={editingProse.id}
-                  initialSelection={editingProse.selection}
-                  askAbout={editingProse.askAbout}
-                  search={query.trim() || undefined}
-                  activeHit={activeHitInEditor}
-                  // The block keeps its markers while it is being edited.
-                  bookmarks={bookmarks.filter((b) => b.blockId === editingProse.id)}
-                  onNoMoreHere={() => continueSpellingAfter(editingProse.id)}
-                  content={blocks.find((b) => b.id === editingProse.id)?.content ?? null}
-                  fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
-                  speller={spelling.speller}
-                  smartPunctuation={smartPunctuationFor(editingProse.id)}
-                  onSave={(doc) => {
-                    void saveProse(editingProse.id, doc);
-                    // Writing is what the clock is for, so writing starts it.
-                    setSession((current) => {
-                      if (!current || current.since !== null) return current;
-                      const going = resumeSession(current);
-                      writeSession(going);
-                      return going;
-                    });
-                  }}
-                  onDone={() => setEditingProse(null)}
-                  onAddWord={(word) => void spelling.addWord(word)}
-                  onIgnoreWord={spelling.ignoreWord}
-                />
-              ) : null
-            }
+            editor={proseEditor}
           />
           )}
           {session ? (
@@ -1623,6 +1648,61 @@ export function WorkPage() {
           ) : null}
         </main>
       </div>
+
+      {/**
+        * Writing from the canvas.
+        *
+        * A canvas shows the shape of the book, not its text, so a section
+        * opened here gets a room of its own rather than expanding a card into
+        * something the size of a page and pushing its neighbours about. It is
+        * zen without the outline: nothing but the section, its length, and the
+        * usual controls — the same editor the manuscript uses, so everything
+        * that works there works here.
+        */}
+      {mode === "canvas" && editingProse ? (
+        <div
+          className="modal-backdrop canvas-zen"
+          onPointerDown={(e) => {
+            // Only a press on the backdrop itself closes; one that began inside
+            // and ended out here is the end of a selection drag, not a dismissal.
+            if (e.target === e.currentTarget) setEditingProse(null);
+          }}
+        >
+          <div className="canvas-zen-sheet" role="dialog" aria-modal="true">
+            <div className="canvas-zen-bar">
+              <span className="czen-name">
+                {blocks.find((b) => b.id === editingProse.id)?.label || <em>Untitled</em>}
+              </span>
+              <span className="czen-words">
+                {wordFmt.format(
+                  blocks.find((b) => b.id === editingProse.id)?.wordCount ?? 0,
+                )}{" "}
+                words
+              </span>
+              <TextSize
+                scaleIndex={scaleIndex}
+                setScaleIndex={setScaleIndex}
+                onResize={rememberPosition}
+              />
+              <ThemeToggle />
+              <button
+                className="btn ghost"
+                type="button"
+                title="Close (Esc)"
+                onClick={() => setEditingProse(null)}
+              >
+                <X size={15} />
+              </button>
+            </div>
+
+            {/* Book typography: the canvas is neither of the two views, and a
+                section read on its own reads best set comfortably. */}
+            <div className="canvas-zen-page doc-mode-book">
+              {proseEditor({ indentFirst: true })}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {adding ? (
         <AddBlockModal
