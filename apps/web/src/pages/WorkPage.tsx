@@ -467,6 +467,17 @@ export function WorkPage() {
    * one request per frame.
    */
   const placeSave = useRef<number | null>(null);
+  /**
+   * Everything moved since the last write, gathered rather than replaced.
+   *
+   * A drag is a stream of these, so they are debounced — but debouncing the
+   * *batch* threw work away: move a chapter and then a scene inside the same
+   * few hundred milliseconds and only the scene reached the server, while the
+   * chapter sat correct on screen until the page was next loaded. Merged by
+   * block, so the last word on each is kept and none is dropped.
+   */
+  const pendingPlaces = useRef<Map<string, CanvasNode>>(new Map());
+
   const placeNodes = useCallback(
     (moved: CanvasNode[]) => {
       if (moved.length === 0) return;
@@ -476,13 +487,40 @@ export function WorkPage() {
         return [...by.values()];
       });
 
+      for (const n of moved) pendingPlaces.current.set(n.blockId, n);
+
       if (placeSave.current) window.clearTimeout(placeSave.current);
       placeSave.current = window.setTimeout(() => {
-        if (id) void api.saveCanvas(id, moved).catch(() => undefined);
+        const batch = [...pendingPlaces.current.values()];
+        pendingPlaces.current.clear();
+        if (id && batch.length > 0) {
+          void api.saveCanvas(id, batch).catch(() => {
+            // Put them back, so a failed write is retried with the next move
+            // rather than quietly losing an arrangement.
+            for (const n of batch) pendingPlaces.current.set(n.blockId, n);
+          });
+        }
       }, 400);
     },
     [id],
   );
+
+  /**
+   * A drag left in flight when the view changes, or the tab closes, would
+   * otherwise never be written: the timer dies with the component.
+   */
+  useEffect(() => {
+    const flush = () => {
+      const batch = [...pendingPlaces.current.values()];
+      pendingPlaces.current.clear();
+      if (id && batch.length > 0) void api.saveCanvas(id, batch).catch(() => undefined);
+    };
+    window.addEventListener("beforeunload", flush);
+    return () => {
+      window.removeEventListener("beforeunload", flush);
+      flush();
+    };
+  }, [id]);
 
   /** What the canvas needs to draw a block: the card, as the outline shows it. */
   const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
