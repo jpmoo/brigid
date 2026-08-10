@@ -11,6 +11,7 @@ import type {
   ImportedParagraph,
   BlockOptions,
   PlacedDigest,
+  CanvasNode,
   IdentityProposal,
   RosterEntry,
   StructureAnalysis,
@@ -132,7 +133,7 @@ export interface RestoreRequest {
 export interface Preferences {
   /** A multiplier, not an index — the ladder of sizes can change. */
   textScale?: number;
-  viewMode?: "book" | "manuscript";
+  viewMode?: "book" | "manuscript" | "canvas";
 }
 
 /** Everything the AI panel needs to draw itself. */
@@ -558,6 +559,13 @@ export const api = {
   /** Stop the reading, set it going again, or throw it away and start over. */
   controlDigest: (workId: string, action: "stop" | "resume" | "restart") =>
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
+  /** Where blocks sit on the canvas. Positions only; structure is the outline's. */
+  getCanvas: (workId: string) => request<{ nodes: CanvasNode[] }>(`/works/${workId}/canvas`),
+  saveCanvas: (workId: string, nodes: CanvasNode[]) =>
+    request<{ ok: true; saved: number }>(`/works/${workId}/canvas`, {
+      method: "PUT",
+      body: JSON.stringify({ nodes }),
+    }),
   /** The conversation so far, oldest first. */
   getChatHistory: (workId: string) =>
     request<{ messages: { role: "user" | "assistant"; content: string }[] }>(

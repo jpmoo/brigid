@@ -21,7 +21,14 @@ import type { Block } from "../api.js";
  * Book is comfortable and book-like; Manuscript sets the page exactly as the
  * templates specify. Both are editable — the mode is presentation only.
  */
-export type ViewMode = "book" | "manuscript";
+/**
+ * How the manuscript is being looked at.
+ *
+ * The first two are the same document set differently. The canvas is a
+ * different shape entirely — nested regions on an endless surface — but the
+ * same book underneath, which is why it is a mode rather than a page.
+ */
+export type ViewMode = "book" | "manuscript" | "canvas";
 
 /** Fixed: long enough not to feel cramped, short enough to read comfortably. */
 export const BOOK_MEASURE_CH = 85;

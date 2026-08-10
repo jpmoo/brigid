@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   BookOpen,
+  LayoutGrid,
   Check,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -15,11 +16,19 @@ import {
   Settings,
   X
 } from "lucide-react";
-import { buildOutline, currentBlockAt, deriveDocument, foldForSearch, smartenText } from "@brigid/shared";
-import type { BlockOptions, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
+import {
+  buildOutline,
+  currentBlockAt,
+  deriveDocument,
+  foldForSearch,
+  smartenText,
+  subtreeWordCounts,
+} from "@brigid/shared";
+import type { BlockOptions, CanvasNode, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
+import { CanvasView } from "../components/CanvasView.js";
 import { DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
@@ -137,11 +146,18 @@ export function WorkPage() {
       if (current) writeSession(pauseSession(current));
     };
   }, []);
-  const [mode, setMode] = useState<ViewMode>(() =>
-    // "reading" was the earlier name for this mode; map it forward so an
-    // existing browser doesn't come back to a mode that no longer exists.
-    localStorage.getItem(MODE_KEY) === "manuscript" ? "manuscript" : "book",
-  );
+  /**
+   * The browser's own copy, read before anything is fetched so the manuscript
+   * opens in the right shape rather than flicking into it. "reading" was an
+   * earlier name for the manuscript mode; map it forward so an existing browser
+   * doesn't come back to a mode that no longer exists.
+   */
+  const [mode, setMode] = useState<ViewMode>(() => {
+    const held = localStorage.getItem(MODE_KEY);
+    if (held === "manuscript" || held === "reading") return "manuscript";
+    if (held === "canvas") return "canvas";
+    return "book";
+  });
   const [editingBreak, setEditingBreak] = useState<Block | null>(null);
   const [editingFormat, setEditingFormat] = useState<Block | null>(null);
   const [editingOptions, setEditingOptions] = useState<Block | null>(null);
@@ -285,10 +301,6 @@ export function WorkPage() {
     void load();
   }, [load]);
 
-  useEffect(() => {
-    localStorage.setItem(MODE_KEY, mode);
-  }, [mode]);
-
   // Written both places: the browser so the next first paint is right, the
   // server so it is right on every other machine too. Held back until the
   // server's own answer has arrived, or the default would overwrite it in the
@@ -356,11 +368,35 @@ export function WorkPage() {
         if (preferences.textScale !== undefined) {
           setScaleIndex(stepForScale(preferences.textScale));
         }
+        /**
+         * Only when this browser has no opinion of its own. Someone who just
+         * switched to the canvas here should not be moved back because another
+         * machine last saved something else.
+         */
+        if (preferences.viewMode && !localStorage.getItem(MODE_KEY)) {
+          setMode(preferences.viewMode);
+        }
       } finally {
         scaleLoaded.current = true;
+        modeLoaded.current = true;
       }
     })();
   }, []);
+
+  /**
+   * Kept in both places, for the two different jobs. The browser's copy is what
+   * makes the next visit open in the right shape immediately; the server's is
+   * what carries the choice to another machine.
+   */
+  const modeLoaded = useRef(false);
+  useEffect(() => {
+    localStorage.setItem(MODE_KEY, mode);
+    if (!modeLoaded.current) return;
+    void api.savePreferences({ viewMode: mode }).catch(() => {
+      // The browser's copy still holds; a failed save is not worth interrupting
+      // the writing for.
+    });
+  }, [mode]);
 
   useEffect(() => {
     if (!scaleLoaded.current) return;
@@ -400,6 +436,74 @@ export function WorkPage() {
 
   const templateMap = useMemo(() => new Map(templates.map((t) => [t.id, t])), [templates]);
   const entries = useMemo(() => buildOutline(blocks), [blocks]);
+
+  /**
+   * Where blocks sit on the canvas. Positions only — the outline still decides
+   * order and nesting, which is what lets the arrows be derived rather than
+   * stored, and redraw the moment anything is reordered.
+   */
+  const [canvasNodes, setCanvasNodes] = useState<CanvasNode[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    let alive = true;
+    void api
+      .getCanvas(id)
+      .then(({ nodes }) => {
+        if (alive) setCanvasNodes(nodes);
+      })
+      .catch(() => {
+        // An unplaced canvas lays itself out; a failed read is not worth an
+        // error over a view the writer may never open.
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  /**
+   * Moving something. Held locally at once so the drag is smooth, and written
+   * back — a drag is a stream of these, so the save is debounced rather than
+   * one request per frame.
+   */
+  const placeSave = useRef<number | null>(null);
+  const placeNodes = useCallback(
+    (moved: CanvasNode[]) => {
+      if (moved.length === 0) return;
+      setCanvasNodes((held) => {
+        const by = new Map(held.map((n) => [n.blockId, n]));
+        for (const n of moved) by.set(n.blockId, n);
+        return [...by.values()];
+      });
+
+      if (placeSave.current) window.clearTimeout(placeSave.current);
+      placeSave.current = window.setTimeout(() => {
+        if (id) void api.saveCanvas(id, moved).catch(() => undefined);
+      }, 400);
+    },
+    [id],
+  );
+
+  /** What the canvas needs to draw a block: the card, as the outline shows it. */
+  const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
+
+  const canvasItems = useMemo(
+    () =>
+      entries.map((entry) => ({
+        block: entry.block,
+        levelName: levels[entry.depth]?.name ?? "Section",
+        words: canvasTotals.get(entry.block.id) ?? entry.block.wordCount,
+        childCount: entry.childCount,
+        breakName:
+          levels[entry.depth]?.breakTemplateId && !entry.isFirstChild
+            ? (templates.find((t) => t.id === levels[entry.depth]?.breakTemplateId)?.name ?? null)
+            : null,
+        // Only structural blocks: a title page has no length to fall short of.
+        goal: levels[entry.depth]?.wordGoal ?? null,
+      })),
+    [entries, levels, templates, canvasTotals],
+  );
+
 
   const items = useMemo(() => {
     if (!work) return [];
@@ -1058,6 +1162,14 @@ export function WorkPage() {
           >
             <FileText size={13} /> Manuscript
           </button>
+          <button
+            type="button"
+            aria-pressed={mode === "canvas"}
+            onClick={() => setMode("canvas")}
+            title="Canvas — the shape of the book, as nested regions"
+          >
+            <LayoutGrid size={13} /> Canvas
+          </button>
         </div>
 
         <TextSize scaleIndex={scaleIndex} setScaleIndex={setScaleIndex} onResize={rememberPosition} />
@@ -1208,6 +1320,18 @@ export function WorkPage() {
         </aside>
 
         <main className="document-pane" ref={attachPane}>
+          {mode === "canvas" ? (
+            <CanvasView
+              items={canvasItems}
+              nodes={canvasNodes}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onOpen={(blockId) =>
+                setEditingProse({ id: blockId, selection: { anchor: 0, focus: 0 } })
+              }
+              onPlace={placeNodes}
+            />
+          ) : (
           <DocumentView
             items={items}
             registerRef={registerRef}
@@ -1279,6 +1403,7 @@ export function WorkPage() {
               ) : null
             }
           />
+          )}
           {session ? (
             <SessionPill
               session={session}
