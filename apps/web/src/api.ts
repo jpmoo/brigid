@@ -561,6 +561,9 @@ export const api = {
     post<{ progress: DigestProgress }>(`/works/${workId}/digest/${action}`),
   /** Where blocks sit on the canvas. Positions only; structure is the outline's. */
   getCanvas: (workId: string) => request<{ nodes: CanvasNode[] }>(`/works/${workId}/canvas`),
+  /** Forget every placement. The canvas lays itself out again from the outline. */
+  resetCanvas: (workId: string) =>
+    request<{ ok: true }>(`/works/${workId}/canvas`, { method: "DELETE" }),
   saveCanvas: (workId: string, nodes: CanvasNode[]) =>
     request<{ ok: true; saved: number }>(`/works/${workId}/canvas`, {
       method: "PUT",

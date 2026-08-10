@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Grid3x3, Minus, Plus } from "lucide-react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Grid3x3, Minus, Plus, RotateCcw } from "lucide-react";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block } from "../api.js";
 
@@ -186,10 +186,22 @@ function layout(
 
         // The rest flow below wherever the opening ended up, so a moved card
         // pushes its scenes rather than sitting on them.
-        inside = place(item.block.id, inner.x, selfAt.y + selfH + GAP, depth + 1);
+        const below = place(item.block.id, inner.x, selfAt.y + selfH + GAP, depth + 1);
+
+        /**
+         * Measured from the region's inner corner, not from where the children
+         * happened to start.
+         *
+         * `place` reports the height of what it laid out, relative to the origin
+         * it was given — and that origin was already below the opening. Taking
+         * the larger of the two counted the opening or the scenes but never
+         * both, so a region ended up shorter than its contents and the last
+         * scene hung out of the bottom.
+         */
+        const openingBottom = selfAt.y - inner.y + selfH;
         inside = {
-          w: Math.max(inside.w, selfAt.x - inner.x + selfW),
-          h: Math.max(inside.h, selfAt.y - inner.y + selfH) + GAP,
+          w: Math.max(below.w, selfAt.x - inner.x + selfW),
+          h: below.h > 0 ? openingBottom + GAP + below.h : openingBottom,
         };
       }
 
@@ -319,6 +331,7 @@ export function CanvasView({
   onSelect,
   onOpen,
   onPlace,
+  onReset,
 }: {
   items: CanvasBlock[];
   nodes: CanvasNode[];
@@ -327,11 +340,14 @@ export function CanvasView({
   /** Double-click: the section opens for editing. */
   onOpen: (blockId: string) => void;
   onPlace: (nodes: CanvasNode[]) => void;
+  /** Throw the arrangement away and let it be drawn again. */
+  onReset: () => void;
 }) {
   const surface = useRef<HTMLDivElement | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 60, y: 60 });
   const [grid, setGrid] = useState(true);
+  const [resetting, setResetting] = useState(false);
   /** What the percentage field says while it is being typed into. */
   const [zoomText, setZoomText] = useState("100");
 
@@ -355,7 +371,7 @@ export function CanvasView({
    * with nothing to keep in step.
    */
   const links = useMemo(() => {
-    const out: { key: string; d: string }[] = [];
+    const out: { key: string; d: string; depth: number }[] = [];
     const siblings = new Map<string | null, Placed[]>();
     for (const p of placed) siblings.set(p.parentId, [...(siblings.get(p.parentId) ?? []), p]);
 
@@ -372,11 +388,19 @@ export function CanvasView({
       for (let i = 0; i < order.length - 1; i += 1) {
         const from = order[i]!;
         const to = order[i + 1]!;
-        out.push({ key: `${from.id}-${to.id}`, d: arrow(from, to) });
+        // Kept with the depth they join, so each set can be drawn after the
+        // region it lives inside and before the cards it joins.
+        out.push({ key: `${from.id}-${to.id}`, d: arrow(from, to), depth: from.depth });
       }
     }
     return out;
   }, [placed, items]);
+
+  /** Every depth in play, outermost first — the order things are painted in. */
+  const depths = useMemo(
+    () => [...new Set(placed.map((p) => p.depth))].sort((a, b) => a - b),
+    [placed],
+  );
 
   const bounds = useMemo(() => {
     let w = 800;
@@ -557,6 +581,16 @@ export function CanvasView({
         </button>
 
         <button
+          className="btn ghost"
+          type="button"
+          title="Lay the canvas out again"
+          aria-label="Lay the canvas out again"
+          onClick={() => setResetting(true)}
+        >
+          <RotateCcw size={15} />
+        </button>
+
+        <button
           className={`btn ghost${grid ? " on" : ""}`}
           type="button"
           title={grid ? "Hide the grid" : "Show the grid"}
@@ -566,6 +600,41 @@ export function CanvasView({
           <Grid3x3 size={15} />
         </button>
       </div>
+
+      {resetting ? (
+        <div className="modal-backdrop" onClick={() => setResetting(false)} role="presentation">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2 className="card-title">Lay the canvas out again?</h2>
+            <p className="card-subtitle">
+              Every position and size you have set here is forgotten, and the canvas is
+              drawn from the outline as it would be the first time you opened it.
+            </p>
+            <p className="tpl-note">
+              Your manuscript is not touched. The arrangement is the only thing this view
+              stores, so this undoes nothing but the arranging.
+            </p>
+            <div className="modal-actions">
+              <button
+                className="btn secondary"
+                type="button"
+                onClick={() => setResetting(false)}
+              >
+                Keep this arrangement
+              </button>
+              <button
+                className="btn danger"
+                type="button"
+                onClick={() => {
+                  onReset();
+                  setResetting(false);
+                }}
+              >
+                Lay it out again
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       <div
         className={`canvas-surface${grid ? " ruled" : ""}`}
@@ -600,26 +669,49 @@ export function CanvasView({
             height: bounds.h,
           }}
         >
-          <svg className="canvas-links" width={bounds.w} height={bounds.h} aria-hidden="true">
-            <defs>
-              <marker
-                id="canvas-arrow"
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="6"
-                markerHeight="6"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 0 L 10 5 L 0 10 z" />
-              </marker>
-            </defs>
-            {links.map((l) => (
-              <path key={l.key} d={l.d} className="canvas-link" markerEnd="url(#canvas-arrow)" />
-            ))}
-          </svg>
+          {/* Drawn depth by depth: the arrows for a generation, then the cards
+              of that generation on top of them.
 
-          {placed.map((p) => {
+              A single layer underneath everything looked right for chapters and
+              lost every arrow inside a region — the region is painted after
+              them, and painted over them. Interleaving puts each set above its
+              own container and below the cards it joins. */}
+          {depths.map((depth) => (
+            <Fragment key={depth}>
+              <svg
+                className="canvas-links"
+                width={bounds.w}
+                height={bounds.h}
+                aria-hidden="true"
+              >
+                <defs>
+                  <marker
+                    id={`canvas-arrow-${depth}`}
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto-start-reverse"
+                  >
+                    <path d="M 0 0 L 10 5 L 0 10 z" />
+                  </marker>
+                </defs>
+                {links
+                  .filter((l) => l.depth === depth)
+                  .map((l) => (
+                    <path
+                      key={l.key}
+                      d={l.d}
+                      className="canvas-link"
+                      markerEnd={`url(#canvas-arrow-${depth})`}
+                    />
+                  ))}
+              </svg>
+
+              {placed
+                .filter((p) => p.depth === depth)
+                .map((p) => {
             const isRegion = !p.isSelfCard && p.item.childCount > 0;
             return (
             <div
@@ -672,8 +764,10 @@ export function CanvasView({
                 <p className="cn-preview">{p.item.block.contentText.trim().slice(0, 220)}</p>
               ) : null}
             </div>
-            );
-          })}
+                  );
+                })}
+            </Fragment>
+          ))}
         </div>
       </div>
     </div>

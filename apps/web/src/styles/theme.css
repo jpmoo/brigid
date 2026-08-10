@@ -5313,7 +5313,8 @@ mark.hit.active {
   stroke-width: 1.5;
 }
 
-#canvas-arrow path {
+/* One marker per depth, since each generation of arrows is its own layer. */
+.canvas-links marker path {
   fill: color-mix(in srgb, var(--text) 40%, transparent);
 }
 
@@ -5334,7 +5335,7 @@ mark.hit.active {
 /* A region is a container first: its own text matters less than the fact that
    things live inside it, so it recedes and lets its children carry the weight. */
 .canvas-node.region {
-  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  background: color-mix(in srgb, var(--surface) 55%, transparent);
   border-style: dashed;
 }
 

@@ -1371,6 +1371,12 @@ export function WorkPage() {
                 setEditingProse({ id: blockId, selection: { anchor: 0, focus: 0 } })
               }
               onPlace={placeNodes}
+              onReset={() => {
+                if (!id) return;
+                pendingPlaces.current.clear();
+                setCanvasNodes([]);
+                void api.resetCanvas(id).catch(() => undefined);
+              }}
             />
           ) : (
           <DocumentView

@@ -68,6 +68,22 @@ export async function canvasRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
+   * Forget every placement and let it be laid out again.
+   *
+   * Nothing of the manuscript is touched — there is nothing of the manuscript
+   * here to touch. The arrangement is the only thing stored, so throwing it
+   * away means the canvas draws itself from the outline again, which is what it
+   * does the first time it is opened.
+   */
+  app.delete("/works/:workId/canvas", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    await workOr404(workId);
+    await db.delete(canvasNodes).where(eq(canvasNodes.workId, workId));
+    return { ok: true as const };
+  });
+
+  /**
    * Save placements, several at a time.
    *
    * A batch, because one drag moves more than one thing: dropping a scene grows
