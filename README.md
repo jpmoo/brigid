@@ -22,7 +22,8 @@ model runs on hardware you control too.
 <img width="40%" alt="SCR-20260803-gvwa" src="https://github.com/user-attachments/assets/6cd13000-affe-4126-9b92-8bce5781cff5" /></p>
 
 <p align="center">
-  <a href="https://www.buymeacoffee.com/jpmoo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="41" width="174"></a>
+  <a href="https://www.buymeacoffee.com/jpmoo" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="41" width="174">&nbpsp;<img width="1582" height="1031" alt="image" src="https://github.com/user-attachments/assets/ca13d626-414b-4214-9b3f-555e16d82640" />
+</a>
 </p>
 
 
