@@ -5363,6 +5363,89 @@ mark.hit.active {
   background: color-mix(in srgb, #2e7d32 10%, var(--surface));
 }
 
+/* Searching a canvas: the cards holding the term light where they sit, since
+   there is no reading order to scroll along. The stepped-to one is louder than
+   the rest, the way the active hit is in the manuscript. */
+.canvas-node.hit {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border-strong));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.canvas-node.hit-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+.cn-hit {
+  background: color-mix(in srgb, var(--accent) 30%, transparent);
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* A note is a bookmark, and looks like the thing a writer would have stuck to
+   the page: square-ish, tinted, with one corner turned. Shaped differently from
+   a card on purpose — a note is not part of the book's structure and shouldn't
+   read as another section sitting among the sections. */
+.canvas-note {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 11px;
+  border: none;
+  border-radius: 2px;
+  background: var(--note-paper, #fdf3bf);
+  color: #3b3524;
+  box-shadow: 1px 2px 6px rgba(0, 0, 0, 0.18);
+  cursor: grab;
+  overflow: hidden;
+  /* The turned corner, cut from the sheet rather than drawn on it. */
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+
+/* The underside of the turned corner. */
+.canvas-note::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  background: linear-gradient(
+    315deg,
+    color-mix(in srgb, var(--note-paper, #fdf3bf) 70%, #000) 0%,
+    color-mix(in srgb, var(--note-paper, #fdf3bf) 92%, #000) 100%
+  );
+}
+
+.canvas-note.selected {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.cnote-name {
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.cnote-body {
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0.82;
+  overflow: hidden;
+}
+
+/* Dotted, so a note reads as attached to a section rather than following it in
+   sequence — the solid arrows are the order of the book, and a note has none. */
+.canvas-tether {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 45%, transparent);
+  stroke-width: 1.25;
+  stroke-dasharray: 3 4;
+}
+
 .cn-head {
   display: flex;
   align-items: baseline;

@@ -35,6 +35,7 @@ import { BookmarkStrip } from "../components/BookmarkStrip.js";
 import { FormatFields } from "../components/FormatFields.js";
 import { useDialogs } from "../components/Dialogs.js";
 import { SearchBar, findMatches } from "../components/SearchBar.js";
+import type { SearchMatch } from "../components/SearchBar.js";
 import { ThemeToggle } from "../components/ThemeToggle.js";
 import { useSavedFlash } from "../useSavedFlash.js";
 import { OutlinePanel } from "../components/OutlinePanel.js";
@@ -514,6 +515,12 @@ export function WorkPage() {
       const batch = [...pendingPlaces.current.values()];
       pendingPlaces.current.clear();
       if (id && batch.length > 0) void api.saveCanvas(id, batch).catch(() => undefined);
+
+      const notes = [...pendingNotes.current.entries()];
+      pendingNotes.current.clear();
+      for (const [bid, at] of notes) {
+        void api.editBookmark(bid, { noteX: at.x, noteY: at.y }).catch(() => undefined);
+      }
     };
     window.addEventListener("beforeunload", flush);
     return () => {
@@ -521,6 +528,37 @@ export function WorkPage() {
       flush();
     };
   }, [id]);
+
+  /**
+   * A note moved on the canvas.
+   *
+   * Held on screen at once and written a moment later, the same as a block: a
+   * drag is a stream of positions, and a request for each would be a request a
+   * frame. Batched in a map keyed by note, so the last position of each wins
+   * and a slow write cannot lose a later move.
+   */
+  const pendingNotes = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const noteSave = useRef<number | null>(null);
+
+  const moveNote = useCallback((bookmarkId: string, x: number, y: number) => {
+    setBookmarks((held) =>
+      held.map((b) => (b.id === bookmarkId ? { ...b, noteX: x, noteY: y } : b)),
+    );
+    pendingNotes.current.set(bookmarkId, { x, y });
+
+    if (noteSave.current) window.clearTimeout(noteSave.current);
+    noteSave.current = window.setTimeout(() => {
+      const batch = [...pendingNotes.current.entries()];
+      pendingNotes.current.clear();
+      for (const [bid, at] of batch) {
+        void api.editBookmark(bid, { noteX: at.x, noteY: at.y }).catch(() => {
+          // Put it back, so a failed write is retried with the next move rather
+          // than quietly losing where the note was put.
+          pendingNotes.current.set(bid, at);
+        });
+      }
+    }, 400);
+  }, []);
 
   /** What the canvas needs to draw a block: the card, as the outline shows it. */
   const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
@@ -626,8 +664,35 @@ export function WorkPage() {
         .filter((b): b is { id: string; contentText: string } => b !== null),
     [items],
   );
-  const matches = useMemo(() => findMatches(searchable, query), [searchable, query]);
+  const allMatches = useMemo(() => findMatches(searchable, query), [searchable, query]);
+
+  /**
+   * One entry per card rather than per occurrence, on the canvas.
+   *
+   * A canvas has no reading order to scroll along, so a result there is a
+   * card: five hits in one chapter's opening is one place to be taken, not
+   * five. Stepping and the tally both run off this list, so "3 of 6" means the
+   * third of six cards.
+   */
+  const canvasMatches = useMemo(() => {
+    const seen = new Set<string>();
+    const out: SearchMatch[] = [];
+    for (const m of allMatches) {
+      if (seen.has(m.blockId)) continue;
+      seen.add(m.blockId);
+      out.push({ blockId: m.blockId, indexInBlock: 0 });
+    }
+    return out;
+  }, [allMatches]);
+
+  const matches = mode === "canvas" ? canvasMatches : allMatches;
   const activeMatch = matches[matchIndex] ?? null;
+
+  /** Which cards hold the term, for lighting them where they sit. */
+  const canvasHits = useMemo(
+    () => new Set(canvasMatches.map((m) => m.blockId)),
+    [canvasMatches],
+  );
 
   /**
    * Which hit inside the block being edited is the current one.
@@ -640,12 +705,12 @@ export function WorkPage() {
   const activeHitInEditor = useMemo(() => {
     if (!editingProse || !activeMatch || activeMatch.blockId !== editingProse.id) return null;
     let n = 0;
-    for (const match of matches) {
+    for (const match of allMatches) {
       if (match === activeMatch) return n;
       if (match.blockId === editingProse.id) n += 1;
     }
     return null;
-  }, [matches, activeMatch, editingProse]);
+  }, [allMatches, activeMatch, editingProse]);
 
   useEffect(() => {
     setMatchIndex(0);
@@ -1378,6 +1443,15 @@ export function WorkPage() {
               items={canvasItems}
               nodes={canvasNodes}
               selectedId={selectedId}
+              query={query}
+              hits={canvasHits}
+              focusId={activeMatch?.blockId ?? null}
+              bookmarks={bookmarks}
+              onMoveNote={moveNote}
+              onOpenNote={(bookmarkId) => {
+                const note = bookmarks.find((b) => b.id === bookmarkId);
+                if (note) void renameBookmark(note);
+              }}
               onSelect={setSelectedId}
               onOpen={(blockId) =>
                 setEditingProse({ id: blockId, selection: { anchor: 0, focus: 0 } })

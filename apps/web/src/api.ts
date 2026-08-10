@@ -228,6 +228,9 @@ export interface Bookmark {
   /** Which paragraph in the block. Null means the block as a whole. */
   paragraphIndex: number | null;
   paragraphText: string | null;
+  /** Where it sits on the canvas, from its card's corner. Null until placed. */
+  noteX: number | null;
+  noteY: number | null;
   sortKey: string;
   createdAt: string;
   updatedAt: string;
@@ -393,7 +396,15 @@ export const api = {
   ) =>
     post<{ bookmark: Bookmark }>(`/works/${workId}/bookmarks`, { blockId, ...extra }),
   /** Both fields are optional: send only what changed. */
-  editBookmark: (id: string, patch: { name?: string; description?: string | null }) =>
+  editBookmark: (
+    id: string,
+    patch: {
+      name?: string;
+      description?: string | null;
+      noteX?: number | null;
+      noteY?: number | null;
+    },
+  ) =>
     request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {
       method: "PATCH",
       body: JSON.stringify(patch),

@@ -80,6 +80,9 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
       .object({
         name: z.string().min(1).max(200).optional(),
         description: z.string().max(2000).nullable().optional(),
+        // Where the note was dragged to on the canvas, from its card's corner.
+        noteX: z.number().finite().nullable().optional(),
+        noteY: z.number().finite().nullable().optional(),
       })
       .parse(req.body);
     const [row] = await db
@@ -89,6 +92,8 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
         ...(body.description !== undefined
           ? { description: body.description?.trim() || null }
           : {}),
+        ...(body.noteX !== undefined ? { noteX: body.noteX } : {}),
+        ...(body.noteY !== undefined ? { noteY: body.noteY } : {}),
         updatedAt: new Date(),
       })
       .where(eq(bookmarks.id, id))

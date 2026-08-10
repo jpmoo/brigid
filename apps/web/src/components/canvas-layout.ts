@@ -39,15 +39,47 @@ export interface CanvasBlock {
 /** A laid-out rectangle in canvas coordinates, absolute rather than relative. */
 export interface Placed {
   id: string;
+  /** The rectangle drawn on screen. */
   x: number;
   y: number;
   w: number;
   h: number;
+  /**
+   * The corner this node's saved position is measured from its parent, and —
+   * for a region — the corner its own children are measured from.
+   *
+   * The same as `x`/`y` for a card. A region's rectangle is the bounding box of
+   * what it holds, so dragging a scene up and to the left extends the region up
+   * and to the left with it; but the corner every position inside is stored
+   * against must not move, or every child's saved offset would change to mean
+   * the same place and the layout would walk on each redraw.
+   */
+  anchorX: number;
+  anchorY: number;
   depth: number;
   parentId: string | null;
   item: CanvasBlock;
   /** A region's own prose, drawn as the first card inside it. */
   isSelfCard: boolean;
+}
+
+/** Extents relative to whatever corner they were measured from. */
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+function union(a: Box | null, b: Box | null): Box | null {
+  if (!a) return b;
+  if (!b) return a;
+  return {
+    left: Math.min(a.left, b.left),
+    top: Math.min(a.top, b.top),
+    right: Math.max(a.right, b.right),
+    bottom: Math.max(a.bottom, b.bottom),
+  };
 }
 
 /**
@@ -137,9 +169,9 @@ export function layout(
     originY: number,
     depth: number,
     flowFrom = originY,
-  ): { w: number; h: number } => {
+  ): Box | null => {
     const children = byParent.get(parentId) ?? [];
-    if (children.length === 0) return { w: 0, h: 0 };
+    if (children.length === 0) return null;
 
     // Where the next unplaced thing goes, wrapping when the row is full.
     const across = perRow(children.filter((c) => !saved.has(c.block.id)).length);
@@ -147,8 +179,7 @@ export function layout(
     let rowY = flowFrom;
     let rowH = 0;
     let inRow = 0;
-    let widest = 0;
-    let deepest = originY;
+    let box: Box | null = null;
 
     const advance = (w: number, h: number): { x: number; y: number } => {
       if (inRow >= across) {
@@ -177,7 +208,7 @@ export function layout(
         ? { x: originX + own.x, y: originY + own.y }
         : advance(DEFAULT_W, DEFAULT_H);
 
-      let inside = { w: 0, h: 0 };
+      let rect = { x: guess.x, y: guess.y, w: own?.w ?? DEFAULT_W, h: own?.h ?? DEFAULT_H };
       if (isRegion) {
         /**
          * The block's own prose, inside the region it heads. A block only has
@@ -203,6 +234,8 @@ export function layout(
           y: selfAt.y,
           w: selfW,
           h: selfH,
+          anchorX: selfAt.x,
+          anchorY: selfAt.y,
           depth: depth + 1,
           parentId: item.block.id,
           item,
@@ -222,51 +255,60 @@ export function layout(
         );
 
         /**
-         * The opening and the scenes are measured from the same corner, so the
-         * region is as tall and as wide as whichever reaches further.
+         * A region is the bounding box of everything it holds, with a margin
+         * all round and its title bar above.
+         *
+         * A box rather than a width and a height, so it follows a child in
+         * whichever direction that child was dragged. Sized from the far edges
+         * alone it only ever grew right and down: a scene dragged up or left
+         * simply walked out through the border and the chapter sat there
+         * unchanged.
+         *
+         * `anchor` stays where it was through all of this. The rectangle may
+         * move; the corner positions inside are stored against may not.
          */
-        inside = {
-          w: Math.max(below.w, selfAt.x - inner.x + selfW),
-          h: Math.max(below.h, selfAt.y - inner.y + selfH),
+        const held = union(below, {
+          left: selfAt.x - inner.x,
+          top: selfAt.y - inner.y,
+          right: selfAt.x - inner.x + selfW,
+          bottom: selfAt.y - inner.y + selfH,
+        })!;
+
+        rect = {
+          x: inner.x + held.left - PADDING,
+          y: inner.y + held.top - PADDING - HEADER,
+          w: held.right - held.left + PADDING * 2,
+          h: held.bottom - held.top + PADDING * 2 + HEADER,
         };
       }
-
-      /**
-       * A region is exactly as big as what it holds, rather than the larger of
-       * that and whatever it was last time. Kept as a maximum it could only
-       * ever grow: dragging a scene rightwards widened its chapter, and
-       * dragging it back left left the chapter stretched around empty space.
-       *
-       * There is nothing lost by not remembering — a region's size was never
-       * the writer's to choose. Only cards carry one.
-       */
-      const w = isRegion ? inside.w + PADDING * 2 : (own?.w ?? DEFAULT_W);
-      const h = isRegion ? inside.h + HEADER + PADDING * 2 : (own?.h ?? DEFAULT_H);
 
       if (!own) {
         // The row only knew the guessed size; a grown region needs more room.
         // Where it ends up is recorded after the rows have been mirrored.
-        rowX = Math.max(rowX, guess.x + w + GAP);
-        rowH = Math.max(rowH, h);
+        rowX = Math.max(rowX, rect.x + rect.w + GAP);
+        rowH = Math.max(rowH, rect.h);
       }
 
       placed.push({
         id: item.block.id,
-        x: guess.x,
-        y: guess.y,
-        w,
-        h,
+        ...rect,
+        anchorX: guess.x,
+        anchorY: guess.y,
         depth,
         parentId,
         item,
         isSelfCard: false,
       });
 
-      widest = Math.max(widest, guess.x - originX + w);
-      deepest = Math.max(deepest, guess.y + h);
+      box = union(box, {
+        left: rect.x - originX,
+        top: rect.y - originY,
+        right: rect.x - originX + rect.w,
+        bottom: rect.y - originY + rect.h,
+      });
     }
 
-    return { w: widest, h: deepest - originY };
+    return box;
   };
 
   place(null, 0, 0, 0);
@@ -291,6 +333,7 @@ export function layout(
 
   const shift = (node: Placed, dx: number) => {
     node.x += dx;
+    node.anchorX += dx;
     for (const child of kids.get(node.id) ?? []) shift(child, dx);
   };
 
@@ -300,7 +343,7 @@ export function layout(
     if (fresh.length < 2) continue;
 
     const rows = new Map<number, Placed[]>();
-    for (const p of fresh) rows.set(p.y, [...(rows.get(p.y) ?? []), p]);
+    for (const p of fresh) rows.set(p.anchorY, [...(rows.get(p.anchorY) ?? []), p]);
 
     const order = [...rows.keys()].sort((a, b) => a - b);
     for (const [index, y] of order.entries()) {
@@ -329,12 +372,18 @@ export function layout(
    */
   const origin = new Map<string | null, { x: number; y: number }>([[null, { x: 0, y: 0 }]]);
   for (const p of placed) {
-    origin.set(p.id, innerCorner(p.x, p.y));
+    origin.set(p.id, innerCorner(p.anchorX, p.anchorY));
   }
   for (const p of placed) {
     if (p.isSelfCard || saved.has(p.id)) continue;
     const from = origin.get(p.parentId) ?? { x: 0, y: 0 };
-    unsaved.push({ blockId: p.id, x: p.x - from.x, y: p.y - from.y, w: p.w, h: p.h });
+    unsaved.push({
+      blockId: p.id,
+      x: p.anchorX - from.x,
+      y: p.anchorY - from.y,
+      w: p.w,
+      h: p.h,
+    });
   }
 
 

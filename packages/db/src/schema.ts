@@ -212,13 +212,15 @@ export const bookmarks = pgTable(
     /** What the writer wanted to remember about the place. Shown on hover. */
     description: text("description"),
     /**
-     * Where a note hangs on the canvas: which side of its node, and how far
-     * along that side so several on one edge keep their order. Null on every
-     * bookmark not made on the canvas — it is the same row either way, and
-     * appears in the book view stacked by when it was made.
+     * Where the note sits on the canvas, from the corner of the card it belongs
+     * to — so dragging the section carries its notes without a write for each.
+     *
+     * Null until it has been placed: the canvas lays an unplaced note out
+     * beside its card and writes back where it put it. It is the same row
+     * either way, and appears in the book view stacked by when it was made.
      */
-    noteSide: text("note_side").$type<"top" | "right" | "bottom" | "left">(),
-    noteOffset: doublePrecision("note_offset"),
+    noteX: doublePrecision("note_x"),
+    noteY: doublePrecision("note_y"),
     sortKey: text("sort_key").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

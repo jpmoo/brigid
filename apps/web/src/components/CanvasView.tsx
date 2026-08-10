@@ -1,9 +1,11 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Grid3x3, Minus, Plus, RotateCcw } from "lucide-react";
+import { foldForSearch, foldForSearchMapped } from "@brigid/shared";
 import type { CanvasNode } from "@brigid/shared";
-import type { Block } from "../api.js";
+import type { Block, Bookmark } from "../api.js";
 import { HoldToConfirm } from "./HoldToConfirm.js";
-import { GAP, PADDING, layout, selfCardId } from "./canvas-layout.js";
+import { GAP, layout, selfCardId } from "./canvas-layout.js";
 import type { CanvasBlock, Placed } from "./canvas-layout.js";
 
 const ZOOM_MIN = 0.1;
@@ -99,10 +101,53 @@ function arrow(from: Rect, to: Rect): string {
   return `M ${start.x} ${start.y} C ${lead.x} ${lead.y}, ${trail.x} ${trail.y}, ${end.x} ${end.y}`;
 }
 
+/**
+ * A card's preview with the searched term marked.
+ *
+ * Matched on the folded text — the same fold the search itself uses, so a
+ * straight apostrophe typed into the box marks the typeset one on the card —
+ * and mapped back, so what is wrapped is the real characters rather than the
+ * folded stand-ins.
+ */
+function marked(text: string, query: string): ReactNode {
+  const needle = foldForSearch(query.trim());
+  if (needle.length === 0) return text;
+
+  const folded = foldForSearchMapped(text);
+  const out: ReactNode[] = [];
+  let from = 0;
+  let cut = 0;
+
+  for (;;) {
+    const at = folded.text.indexOf(needle, from);
+    if (at === -1) break;
+    const start = folded.at[at] ?? text.length;
+    const end = folded.at[at + needle.length] ?? text.length;
+    if (start > cut) out.push(text.slice(cut, start));
+    out.push(
+      <mark key={start} className="cn-hit">
+        {text.slice(start, end)}
+      </mark>,
+    );
+    cut = end;
+    from = at + needle.length;
+  }
+
+  if (out.length === 0) return text;
+  if (cut < text.length) out.push(text.slice(cut));
+  return out;
+}
+
 export function CanvasView({
   items,
   nodes,
   selectedId,
+  query,
+  hits,
+  focusId,
+  bookmarks,
+  onMoveNote,
+  onOpenNote,
   onSelect,
   onOpen,
   onPlace,
@@ -111,6 +156,29 @@ export function CanvasView({
   items: CanvasBlock[];
   nodes: CanvasNode[];
   selectedId: string | null;
+  /**
+   * What is being searched for, and which cards hold it.
+   *
+   * A canvas has no reading order to scroll along, so searching it means
+   * something different from searching the manuscript: the cards holding the
+   * term light up where they are, and stepping through the results brings each
+   * one to the middle in turn. The count is of cards, not occurrences.
+   */
+  query: string;
+  hits: Set<string>;
+  /** The card the writer has stepped to, brought into view. */
+  focusId: string | null;
+  /**
+   * The manuscript's bookmarks, drawn here as notes.
+   *
+   * The same rows the book view lists — a note on the canvas is not a second
+   * kind of thing. What the canvas adds is somewhere for it to sit and a line
+   * back to the section it belongs to, so it can be put near what it is about
+   * without being part of the sequence.
+   */
+  bookmarks: Bookmark[];
+  onMoveNote: (bookmarkId: string, x: number, y: number) => void;
+  onOpenNote: (bookmarkId: string) => void;
   onSelect: (blockId: string) => void;
   /** Double-click: the section opens for editing. */
   onOpen: (blockId: string) => void;
@@ -170,6 +238,88 @@ export function CanvasView({
     }
     return out;
   }, [placed, items]);
+
+  /** What a note is drawn as, before anyone has moved it. */
+  const NOTE_W = 180;
+  const NOTE_H = 120;
+
+  /**
+   * The notes, placed and tethered.
+   *
+   * A note belongs to a section but sits wherever the writer put it, so its
+   * position is kept from that section's corner: dragging the section carries
+   * its notes along without a write for each one, and reordering the outline
+   * moves them with the card they are about.
+   *
+   * Unplaced ones are stacked off the card's right-hand edge, stepped down so
+   * several on one section do not land on top of each other.
+   */
+  const notes = useMemo(() => {
+    const perBlock = new Map<string, number>();
+    const out: {
+      note: Bookmark;
+      x: number;
+      y: number;
+      w: number;
+      h: number;
+      /** The card it is about, for the line back to it. */
+      host: Placed;
+      unplaced: boolean;
+    }[] = [];
+
+    for (const note of bookmarks) {
+      // A region's prose lives in the card standing for it, so a note on a
+      // chapter hangs off its opening rather than off the whole rectangle.
+      const host =
+        byId.get(selfCardId(note.blockId)) ?? byId.get(note.blockId);
+      if (!host) continue;
+
+      const nth = perBlock.get(note.blockId) ?? 0;
+      perBlock.set(note.blockId, nth + 1);
+      const unplaced = note.noteX === null || note.noteY === null;
+
+      out.push({
+        note,
+        x: host.x + (note.noteX ?? host.w + GAP),
+        y: host.y + (note.noteY ?? nth * (NOTE_H + 16)),
+        w: NOTE_W,
+        h: NOTE_H,
+        host,
+        unplaced,
+      });
+    }
+    return out;
+  }, [bookmarks, byId]);
+
+  /**
+   * Where the notes went, written back once — the same bargain the blocks get.
+   * A note laid out but never recorded would be laid out again next time, and
+   * would move the moment another note was added to the same section.
+   */
+  const settleNotes = useRef(onMoveNote);
+  settleNotes.current = onMoveNote;
+  useEffect(() => {
+    for (const n of notes) {
+      if (!n.unplaced) continue;
+      settleNotes.current(n.note.id, n.x - n.host.x, n.y - n.host.y);
+    }
+  }, [notes]);
+
+  /** A dotted line from each note to the card it is about. */
+  const tethers = useMemo(
+    () =>
+      notes.map((n) => {
+        const ends = facingSides(
+          { x: n.x, y: n.y, w: n.w, h: n.h },
+          { x: n.host.x, y: n.host.y, w: n.host.w, h: n.host.h },
+        );
+        return {
+          key: n.note.id,
+          d: `M ${ends.start.x} ${ends.start.y} L ${ends.end.x} ${ends.end.y}`,
+        };
+      }),
+    [notes],
+  );
 
   /** Every depth in play, outermost first — the order things are painted in. */
   const depths = useMemo(
@@ -272,6 +422,39 @@ export function CanvasView({
     setZoom(next);
   };
 
+  /**
+   * Bring the stepped-to card into the middle.
+   *
+   * Panning rather than scrolling, since there is nothing to scroll: the pan
+   * is chosen so the card's centre lands on the surface's centre. Zoom is left
+   * where the writer put it unless it is too small to read the card at, in
+   * which case it is lifted just far enough — stepping through results should
+   * not quietly undo the zoom you chose.
+   */
+  const READABLE = 0.55;
+
+  useEffect(() => {
+    if (!focusId) return;
+    const box = surface.current?.getBoundingClientRect();
+    // A region's prose sits in the card standing for it, so that is what is
+    // brought into view — centring the whole chapter would leave the writer
+    // looking at a rectangle and hunting inside it for the word.
+    const card =
+      placed.find((p) => p.isSelfCard && p.parentId === focusId) ??
+      placed.find((p) => !p.isSelfCard && p.id === focusId);
+    if (!box || !card) return;
+
+    const next = Math.max(zoom, READABLE);
+    setZoom(next);
+    setPan({
+      x: box.width / 2 - (card.x + card.w / 2) * next,
+      y: box.height / 2 - (card.y + card.h / 2) * next,
+    });
+    // Only when the writer steps to a different card. Following `placed` would
+    // yank the view back to the result every time a card was dragged.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId]);
+
   /** Dragging a node. Position only — never a change of parent. */
   const dragging = useRef<{
     id: string;
@@ -314,23 +497,20 @@ export function CanvasView({
 
     if (held.self) {
       /**
-       * Inside its region, never out of it — but as far as the region's own
-       * border, not just to the margin its siblings are laid out on. Held at
-       * the margin it could not be pushed into a corner at all, which is the
-       * one place a writer is likely to want to put an opening.
+       * Not held in at all. The region is the bounding box of what it holds and
+       * follows its contents in every direction, so an opening dragged past a
+       * border takes the border with it — there is nothing to clamp it to.
        *
-       * The region grows rightwards and downwards on its own, so there is no
-       * far edge to hold it against.
+       * Skipped until the region has a row of its own, which the first
+       * writeback gives it: there would be nothing to measure the offset
+       * against, and guessing would jump the region across the canvas.
        */
+      if (!own) return;
       onPlace([
         {
-          blockId: held.blockId,
-          x: own?.x ?? region.x,
-          y: own?.y ?? region.y,
-          w: own?.w ?? region.w,
-          h: own?.h ?? region.h,
-          selfX: Math.max(-PADDING, held.startX + dx),
-          selfY: Math.max(-PADDING, held.startY + dy),
+          ...own,
+          selfX: held.startX + dx,
+          selfY: held.startY + dy,
           selfW: p.w,
           selfH: p.h,
         },
@@ -349,8 +529,35 @@ export function CanvasView({
     ]);
   };
 
+  /**
+   * Dragging a note. Never re-tethers: a note dropped over another section is a
+   * note that has been moved, not one that now belongs to that section. Which
+   * section a note is about is the bookmark's business, the same way which
+   * chapter a scene is in stays the outline's.
+   */
+  const draggingNote = useRef<{ id: string; x: number; y: number; startX: number; startY: number } | null>(
+    null,
+  );
+
+  const onNotePointerDown = (event: React.PointerEvent, id: string, offX: number, offY: number) => {
+    event.stopPropagation();
+    draggingNote.current = { id, x: event.clientX, y: event.clientY, startX: offX, startY: offY };
+    (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
+  };
+
+  const onNotePointerMove = (event: React.PointerEvent) => {
+    const held = draggingNote.current;
+    if (!held) return;
+    onMoveNote(
+      held.id,
+      held.startX + (event.clientX - held.x) / zoom,
+      held.startY + (event.clientY - held.y) / zoom,
+    );
+  };
+
   const endNodeDrag = () => {
     dragging.current = null;
+    draggingNote.current = null;
   };
 
   return (
@@ -464,6 +671,10 @@ export function CanvasView({
             onNodePointerMove(e);
             return;
           }
+          if (draggingNote.current) {
+            onNotePointerMove(e);
+            return;
+          }
           const held = panning.current;
           if (!held) return;
           setPan({ x: held.panX + (e.clientX - held.x), y: held.panY + (e.clientY - held.y) });
@@ -528,14 +739,30 @@ export function CanvasView({
                 .filter((p) => p.depth === depth)
                 .map((p) => {
             const isRegion = !p.isSelfCard && p.item.childCount > 0;
+            /**
+             * Whose prose this card shows, for lighting it up on a search.
+             *
+             * A region is a container — its own prose lives in the card
+             * standing for it — so a region never lights. Lighting a
+             * chapter-sized rectangle would say the term is somewhere in the
+             * chapter, which is not what was found.
+             */
+            const holds = isRegion ? null : (p.isSelfCard ? p.parentId : p.id);
             return (
             <div
               key={p.id}
               className={[
                 "canvas-node",
-                p.id === selectedId ? "selected" : "",
+                /**
+                 * A region's own block is shown by the card standing for it, so
+                 * that is what lights — selecting a chapter's opening should
+                 * mark the opening, not draw a border round the whole chapter.
+                 */
+                holds && holds === selectedId ? "selected" : "",
                 isRegion ? "region" : "",
                 p.isSelfCard ? "self" : "",
+                holds && hits.has(holds) ? "hit" : "",
+                holds && holds === focusId ? "hit-active" : "",
                 /**
                  * Shaded on the region, and only there.
                  *
@@ -587,12 +814,44 @@ export function CanvasView({
                   standing for it, first among its children, so nothing is
                   drawn here for anything to overlap. */}
               {!isRegion && p.item.block.contentText.trim() ? (
-                <p className="cn-preview">{p.item.block.contentText.trim().slice(0, 220)}</p>
+                <p className="cn-preview">
+                  {marked(p.item.block.contentText.trim().slice(0, 220), query)}
+                </p>
               ) : null}
             </div>
                   );
                 })}
             </Fragment>
+          ))}
+
+          {/* Notes last, over everything. A note is stuck to the canvas rather
+              than set into it, and it is small enough that anything drawn on
+              top of it would hide it entirely. */}
+          <svg className="canvas-links" width={bounds.w} height={bounds.h}>
+            {tethers.map((tether) => (
+              <path key={tether.key} d={tether.d} className="canvas-tether" />
+            ))}
+          </svg>
+
+          {notes.map((n) => (
+            <div
+              key={n.note.id}
+              className={`canvas-note${n.note.id === selectedId ? " selected" : ""}`}
+              style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
+              title={n.note.description ?? undefined}
+              onPointerDown={(e) =>
+                onNotePointerDown(e, n.note.id, n.x - n.host.x, n.y - n.host.y)
+              }
+              onDoubleClick={(e) => {
+                e.stopPropagation();
+                onOpenNote(n.note.id);
+              }}
+            >
+              <span className="cnote-name">{n.note.name}</span>
+              {n.note.description ? (
+                <span className="cnote-body">{n.note.description}</span>
+              ) : null}
+            </div>
           ))}
         </div>
       </div>

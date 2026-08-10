@@ -208,6 +208,64 @@ test("a region shrinks back when a scene is dragged in again", () => {
   assert.equal(at(back).w, before, "and dragging back in returned it");
 });
 
+/**
+ * A region followed a child right and down but not up or left, because it was
+ * sized from its far edges alone. A scene dragged up simply walked out through
+ * the border and the chapter sat there unchanged.
+ */
+test("a region follows a child in whichever direction it is dragged", () => {
+  const items = manuscript(3, 4);
+  const settled = saveMap(layout(items, new Map()).unsaved);
+  const at = (s: Map<string, CanvasNode>) => byId(layout(items, s).placed).get("ch1")!;
+  const start = at(settled);
+
+  const drags: [string, Partial<CanvasNode>, (r: Placed) => boolean, string][] = [
+    ["right", { x: 1400 }, (r) => r.x + r.w > start.x + start.w, "its right edge moved out"],
+    ["down", { y: 1400 }, (r) => r.y + r.h > start.y + start.h, "its bottom edge moved down"],
+    ["left", { x: -1400 }, (r) => r.x < start.x, "its left edge moved out"],
+    ["up", { y: -1400 }, (r) => r.y < start.y, "its top edge moved up"],
+  ];
+
+  for (const [way, patch, grew, what] of drags) {
+    const next = new Map(settled);
+    next.set("ch1-s2", { ...settled.get("ch1-s2")!, ...patch });
+    assert.ok(grew(at(next)), `dragged ${way}: ${what}`);
+  }
+});
+
+/**
+ * And having followed it, the region still holds it — which is the whole point
+ * of following. The check runs on the redraw after, because a region that grows
+ * by moving its own corner is exactly how the offsets inside come to mean
+ * something different from one draw to the next.
+ */
+test("a child dragged out in any direction is still inside afterwards", () => {
+  const items = manuscript(3, 4);
+  const settled = saveMap(layout(items, new Map()).unsaved);
+
+  for (const [dx, dy] of [[900, 0], [0, 900], [-900, 0], [0, -900], [-700, -700]]) {
+    const next = new Map(settled);
+    const was = settled.get("ch1-s2")!;
+    next.set("ch1-s2", { ...was, x: was.x + dx, y: was.y + dy });
+
+    const drawn = layout(items, next);
+    const again = layout(items, saveMap([...next.values(), ...drawn.unsaved]));
+
+    for (const draw of [drawn, again]) {
+      const region = byId(draw.placed).get("ch1")!;
+      for (const child of draw.placed.filter((p) => p.parentId === "ch1")) {
+        assert.ok(
+          child.x >= region.x &&
+            child.y >= region.y &&
+            child.x + child.w <= region.x + region.w &&
+            child.y + child.h <= region.y + region.h,
+          `${child.id} left ch1 after a drag of ${dx},${dy}`,
+        );
+      }
+    }
+  }
+});
+
 /** Where the writer put something is the one thing a redraw may not touch. */
 test("a moved card stays where it was put", () => {
   const items = manuscript(4, 4);
