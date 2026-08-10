@@ -65,11 +65,21 @@ interface Placed {
 }
 
 /**
- * How wide a region tries to get before wrapping its children onto a new row.
- * Chosen so a chapter of a few scenes lands roughly square, which is the shape
- * that wastes least on an endless surface and reads best at a distance.
+ * How many things go in a row, for a generation of that many.
+ *
+ * The square root, so a generation lands in a roughly square block: nine
+ * chapters make three rows of three, forty make six rows or so. That is the
+ * shape that wastes least on an endless surface and reads best zoomed out.
+ *
+ * Counted rather than measured against a width, which is what the first
+ * attempt did and why chapters still stacked in a column — a chapter region is
+ * wider than any sensible row target, being itself a wrapped grid of scenes, so
+ * every one of them overflowed the row immediately and took a line of its own.
+ * Items that *are* the width cannot be packed by width.
  */
-const ROW_WIDTH = 900;
+function perRow(count: number): number {
+  return Math.max(1, Math.ceil(Math.sqrt(count)));
+}
 
 /**
  * A card standing for a block's own prose, inside the region it heads.
@@ -122,21 +132,25 @@ function layout(
     if (children.length === 0) return { w: 0, h: 0 };
 
     // Where the next unplaced thing goes, wrapping when the row is full.
+    const across = perRow(children.filter((c) => !saved.has(c.block.id)).length);
     let rowX = originX;
     let rowY = originY;
     let rowH = 0;
+    let inRow = 0;
     let widest = 0;
     let deepest = originY;
 
     const advance = (w: number, h: number): { x: number; y: number } => {
-      if (rowX > originX && rowX + w > originX + ROW_WIDTH) {
+      if (inRow >= across) {
         rowX = originX;
         rowY += rowH + GAP;
         rowH = 0;
+        inRow = 0;
       }
       const at = { x: rowX, y: rowY };
       rowX += w + GAP;
       rowH = Math.max(rowH, h);
+      inRow += 1;
       return at;
     };
 
