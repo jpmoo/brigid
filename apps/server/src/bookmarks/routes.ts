@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { generateKeyBetween } from "fractional-indexing";
 import { z } from "zod";
@@ -86,8 +86,33 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
         // Nothing may be saved smaller than a thing you could grab.
         noteW: z.number().finite().min(40).nullable().optional(),
         noteH: z.number().finite().min(30).nullable().optional(),
+        /**
+         * Moved to another place in the manuscript, by dragging its marker
+         * onto a different paragraph — possibly in a different section, since
+         * both views show more than one at a time.
+         */
+        blockId: z.string().uuid().optional(),
+        paragraphIndex: z.number().int().min(0).nullable().optional(),
+        paragraphText: z.string().max(400).nullable().optional(),
       })
       .parse(req.body);
+
+    /**
+     * A bookmark may only be moved within its own manuscript. The block id
+     * arrives from the browser, and one belonging to another work would
+     * otherwise be stored quite happily — leaving a bookmark pointing into a
+     * book it is not part of.
+     */
+    if (body.blockId) {
+      const [current] = await db.select().from(bookmarks).where(eq(bookmarks.id, id)).limit(1);
+      if (!current) throw notFound("bookmark");
+      const [target] = await db
+        .select({ id: blocks.id })
+        .from(blocks)
+        .where(and(eq(blocks.id, body.blockId), eq(blocks.workId, current.workId)))
+        .limit(1);
+      if (!target) throw notFound("block");
+    }
     const [row] = await db
       .update(bookmarks)
       .set({
@@ -99,6 +124,9 @@ export async function bookmarksRoutes(app: FastifyInstance): Promise<void> {
         ...(body.noteY !== undefined ? { noteY: body.noteY } : {}),
         ...(body.noteW !== undefined ? { noteW: body.noteW } : {}),
         ...(body.noteH !== undefined ? { noteH: body.noteH } : {}),
+        ...(body.blockId !== undefined ? { blockId: body.blockId } : {}),
+        ...(body.paragraphIndex !== undefined ? { paragraphIndex: body.paragraphIndex } : {}),
+        ...(body.paragraphText !== undefined ? { paragraphText: body.paragraphText } : {}),
         updatedAt: new Date(),
       })
       .where(eq(bookmarks.id, id))

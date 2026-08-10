@@ -408,6 +408,9 @@ export const api = {
       noteY?: number | null;
       noteW?: number | null;
       noteH?: number | null;
+      blockId?: string;
+      paragraphIndex?: number | null;
+      paragraphText?: string | null;
     },
   ) =>
     request<{ bookmark: Bookmark }>(`/bookmarks/${id}`, {

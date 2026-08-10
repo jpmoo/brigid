@@ -587,6 +587,50 @@ export function WorkPage() {
   const [toolbarSlot, setToolbarSlot] = useState<HTMLElement | null>(null);
 
   /**
+   * A marker dragged onto another paragraph.
+   *
+   * Written straight through rather than debounced: a drop is a deliberate and
+   * infrequent act, with nothing to coalesce the way a drag across the canvas
+   * has.
+   */
+  const moveBookmark = useCallback(
+    (bookmarkId: string, blockId: string, paragraph?: { index: number; text: string }) => {
+      setBookmarks((held) =>
+        held.map((b) =>
+          b.id === bookmarkId
+            ? {
+                ...b,
+                blockId,
+                paragraphIndex: paragraph?.index ?? null,
+                paragraphText: paragraph?.text ?? null,
+              }
+            : b,
+        ),
+      );
+      void api
+        .editBookmark(bookmarkId, {
+          blockId,
+          paragraphIndex: paragraph?.index ?? null,
+          paragraphText: paragraph?.text ?? null,
+        })
+        .catch(() => setError("could not move the bookmark"));
+    },
+    [],
+  );
+
+  /** A marker double-clicked, wherever it was drawn. */
+  const openBookmark = useCallback(
+    (bookmarkId: string) => {
+      const note = bookmarks.find((b) => b.id === bookmarkId);
+      if (note) void renameBookmark(note);
+    },
+    // renameBookmark is redeclared each render and would defeat the memo; the
+    // bookmark it acts on is looked up here, which is the part that changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bookmarks],
+  );
+
+  /**
    * The editor for whichever block is open, wherever it is being shown.
    *
    * One definition, called by the document view inline and by the canvas in
@@ -607,6 +651,10 @@ export function WorkPage() {
         blockId={editingProse.id}
         initialSelection={editingProse.selection}
         askAbout={editingProse.askAbout}
+        onOpenBookmark={openBookmark}
+        onMoveBookmark={(bookmarkId, paragraph) =>
+          moveBookmark(bookmarkId, editingProse.id, paragraph)
+        }
         search={query.trim() || undefined}
         activeHit={activeHitInEditor}
         // The block keeps its markers while it is being edited.
@@ -1558,10 +1606,7 @@ export function WorkPage() {
               onAddNote={(blockId, x, y) =>
                 void addBookmark(blockId, undefined, { x, y })
               }
-              onOpenNote={(bookmarkId) => {
-                const note = bookmarks.find((b) => b.id === bookmarkId);
-                if (note) void renameBookmark(note);
-              }}
+              onOpenNote={openBookmark}
               onSelect={setSelectedId}
               onOpen={(blockId) =>
                 setEditingProse({ id: blockId, selection: { anchor: 0, focus: 0 } })
@@ -1600,6 +1645,8 @@ export function WorkPage() {
               )
             }
             onDropBookmark={(blockId, paragraph) => void addBookmark(blockId, paragraph)}
+            onOpenBookmark={openBookmark}
+            onMoveBookmark={moveBookmark}
             search={foldForSearch(query.trim())}
             activeMatch={activeMatch}
             speller={spelling.speller}

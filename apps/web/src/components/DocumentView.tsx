@@ -10,7 +10,7 @@ import {
   smartenText,
 } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
-import { offsetOfPoint, offsetOfPosition } from "./ProseEditor.js";
+import { offsetOfPoint, offsetOfPosition, paragraphUnder } from "./ProseEditor.js";
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
 import type { ProseLayout } from "./ProseEditor.js";
@@ -162,6 +162,8 @@ function Nodes({
   editing = false,
   editor,
   onEditProse,
+  onOpenBookmark,
+  onCarry,
   bookmarks = [],
 }: {
   nodes: ResolvedNode[];
@@ -182,6 +184,9 @@ function Nodes({
   editing?: boolean;
   editor?: (layout: ProseLayout) => ReactNode;
   onEditProse?: (selection: { anchor: number; focus: number }, askAbout?: string) => void;
+  onOpenBookmark?: ((bookmarkId: string) => void) | undefined;
+  /** Picked up, or put down. The block is the caller's to supply. */
+  onCarry?: ((bookmarkId: string | null) => void) | undefined;
 }) {
   const indent =
     mode === "manuscript" && typography?.firstLineIndentIn !== undefined
@@ -402,7 +407,18 @@ function Nodes({
                           <span
                             className="doc-bookmark"
                             key={b.id}
+                            draggable
+                            onDragEnd={() => onCarry?.(null)}
+                            onDragStart={(e) => {
+                              onCarry?.(b.id);
+                              e.dataTransfer.setData(BOOKMARK_DRAG_TYPE, b.id);
+                              e.dataTransfer.effectAllowed = "move";
+                            }}
                             title={b.description ? `${b.name}\n\n${b.description}` : b.name}
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              onOpenBookmark?.(b.id);
+                            }}
                           >
                             <BookmarkIcon size={13} fill="currentColor" />
                           </span>
@@ -552,6 +568,14 @@ export interface DocumentViewProps {
     { id: string; name: string; description: string | null; paragraphIndex: number | null }[]
   >;
   onDropBookmark: (blockId: string, paragraph?: { index: number; text: string }) => void;
+  /** Double-clicking a marker: the bookmark opens for editing. */
+  onOpenBookmark: (bookmarkId: string) => void;
+  /** A marker dragged onto another paragraph, possibly in another section. */
+  onMoveBookmark: (
+    bookmarkId: string,
+    blockId: string,
+    paragraph?: { index: number; text: string },
+  ) => void;
   /** Lowercased needle, or empty when not searching. */
   search: string;
   activeMatch: { blockId: string; indexInBlock: number } | null;
@@ -578,36 +602,6 @@ export interface DocumentViewProps {
   editor: (layout: ProseLayout) => ReactNode;
 }
 
-/**
- * Which paragraph the marker was dropped on.
- *
- * By vertical position rather than by `elementFromPoint`, because the pointer
- * may well be over a text node, a `<em>`, or the gap between lines — the
- * question is which paragraph's band of the page the cursor is in, and that is
- * answered by comparing against each one's box.
- *
- * Undefined when the block has no paragraphs to speak of, which leaves the
- * bookmark pointing at the block as bookmarks always have.
- */
-export function paragraphUnder(
-  block: HTMLElement,
-  clientY: number,
-): { index: number; text: string } | undefined {
-  const paragraphs = [...block.querySelectorAll("p")];
-  if (paragraphs.length === 0) return undefined;
-
-  let at = 0;
-  for (const [i, p] of paragraphs.entries()) {
-    const box = p.getBoundingClientRect();
-    // The last paragraph whose top is above the cursor: dropping in the gap
-    // below a paragraph means that paragraph, not the next one.
-    if (box.top <= clientY) at = i;
-  }
-
-  const text = (paragraphs[at]?.textContent ?? "").trim().slice(0, 400);
-  return text ? { index: at, text } : undefined;
-}
-
 export function DocumentView({
   items,
   registerRef,
@@ -619,6 +613,8 @@ export function DocumentView({
   baseTypography,
   bookmarksByBlock,
   onDropBookmark,
+  onOpenBookmark,
+  onMoveBookmark,
   search,
   activeMatch,
   speller,
@@ -627,6 +623,41 @@ export function DocumentView({
   editor,
 }: DocumentViewProps) {
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+
+  /**
+   * Which bookmark is in the air, and which section it belongs to.
+   *
+   * Held here rather than read from the drag itself: `dataTransfer` is
+   * deliberately unreadable during a dragover, so a section cannot ask what is
+   * being carried at the moment it has to decide whether to accept it. Set when
+   * a marker is picked up, cleared when it lands.
+   */
+  const [carrying, setCarrying] = useState<{ id: string; blockId: string } | null>(null);
+
+  /**
+   * A bookmark moves between the paragraphs of its own section and no further.
+   * It marks a place in a particular piece of writing; carried into another
+   * section it would be marking a place it had never been, so the drop is
+   * refused rather than quietly re-homed.
+   */
+  const acceptsDrop = (blockId: string) => !carrying || carrying.blockId === blockId;
+
+  /**
+   * Which section a bookmark currently belongs to, looked up rather than
+   * remembered.
+   *
+   * `carrying` is only ever an affordance — it decides the cursor during a
+   * dragover, and it is not always set, because a marker picked up inside the
+   * editor is markup the editor drew and never passes through here. The drop
+   * itself has to be decided on something that is true whatever the drag came
+   * from, so it is decided on this.
+   */
+  const ownerOf = (bookmarkId: string): string | undefined => {
+    for (const [blockId, list] of bookmarksByBlock) {
+      if (list.some((b) => b.id === bookmarkId)) return blockId;
+    }
+    return undefined;
+  };
 
   // Book holds a fixed 85-character measure — long enough not to feel cramped,
   // short enough to read. Manuscript fills the viewport, since fidelity to the
@@ -697,8 +728,18 @@ export function DocumentView({
             style={typographyStyle(item.typography, mode)}
             onDragOver={(e) => {
               if (!e.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
+              if (!acceptsDrop(item.block.id)) {
+                // Not prevented, so the drop is simply never offered here —
+                // which is what makes the pointer say no rather than the drop
+                // being taken and then discarded.
+                e.dataTransfer.dropEffect = "none";
+                return;
+              }
               e.preventDefault();
-              e.dataTransfer.dropEffect = "copy";
+              // The payload is unreadable until the drop, so the effect is
+              // "move" throughout: a marker being carried is the common case,
+              // and a new one arriving from the strip reads fine as either.
+              e.dataTransfer.dropEffect = "move";
               setDropTarget(item.block.id);
             }}
             onDragLeave={() => setDropTarget((c) => (c === item.block.id ? null : c))}
@@ -706,7 +747,20 @@ export function DocumentView({
               if (!e.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
               e.preventDefault();
               setDropTarget(null);
-              onDropBookmark(item.block.id, paragraphUnder(e.currentTarget, e.clientY));
+              setCarrying(null);
+              // The strip sends "new"; a marker already in the manuscript sends
+              // its own id and is moved rather than duplicated.
+              const carried = e.dataTransfer.getData(BOOKMARK_DRAG_TYPE);
+              const at = paragraphUnder(e.currentTarget, e.clientY);
+              if (!carried || carried === "new") {
+                onDropBookmark(item.block.id, at);
+                return;
+              }
+              // Its own section only. A bookmark marks a place in a particular
+              // piece of writing; carried into another it would be marking a
+              // place it had never been.
+              if (ownerOf(carried) !== item.block.id) return;
+              onMoveBookmark(carried, item.block.id, at);
             }}
           >
             {(bookmarksByBlock.get(item.block.id) ?? []).some((b) => b.paragraphIndex === null) ? (
@@ -723,7 +777,22 @@ export function DocumentView({
                   <span
                     className="doc-bookmark"
                     key={b.id}
+                    draggable
+                    onDragEnd={() => setCarrying(null)}
+                    onDragStart={(e) => {
+                      // Its own id rather than "new": the drop moves this one
+                      // instead of making another.
+                      setCarrying({ id: b.id, blockId: item.block.id });
+                      e.dataTransfer.setData(BOOKMARK_DRAG_TYPE, b.id);
+                      e.dataTransfer.effectAllowed = "move";
+                    }}
                     title={b.description ? `${b.name}\n\n${b.description}` : b.name}
+                    onDoubleClick={(e) => {
+                      // Or the double-click would also land in the prose behind
+                      // it and open the section for editing.
+                      e.stopPropagation();
+                      onOpenBookmark(b.id);
+                    }}
                   >
                     <BookmarkIcon size={13} fill="currentColor" />
                   </span>
@@ -750,6 +819,10 @@ export function DocumentView({
                 onEditProse(item.block.id, selection, askAbout)
               }
               indentFirst={item.firstLineIndent}
+              onOpenBookmark={onOpenBookmark}
+              onCarry={(bookmarkId) =>
+                setCarrying(bookmarkId ? { id: bookmarkId, blockId: item.block.id } : null)
+              }
               mode={mode}
               typography={item.typography}
               search={search}

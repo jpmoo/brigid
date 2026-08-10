@@ -12,6 +12,7 @@ import {
   proseToText,
 } from "@brigid/shared";
 import type { ProseDoc, ProseText } from "@brigid/shared";
+import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
 
@@ -201,6 +202,36 @@ function decorate(
  * — the indent vanished and the text shifted under the caret that had just been
  * placed by the click.
  */
+/**
+ * Which paragraph the marker was dropped on.
+ *
+ * By vertical position rather than by `elementFromPoint`, because the pointer
+ * may well be over a text node, a `<em>`, or the gap between lines — the
+ * question is which paragraph's band of the page the cursor is in, and that is
+ * answered by comparing against each one's box.
+ *
+ * Undefined when the block has no paragraphs to speak of, which leaves the
+ * bookmark pointing at the block as bookmarks always have.
+ */
+export function paragraphUnder(
+  block: HTMLElement,
+  clientY: number,
+): { index: number; text: string } | undefined {
+  const paragraphs = [...block.querySelectorAll("p")];
+  if (paragraphs.length === 0) return undefined;
+
+  let at = 0;
+  for (const [i, p] of paragraphs.entries()) {
+    const box = p.getBoundingClientRect();
+    // The last paragraph whose top is above the cursor: dropping in the gap
+    // below a paragraph means that paragraph, not the next one.
+    if (box.top <= clientY) at = i;
+  }
+
+  const text = (paragraphs[at]?.textContent ?? "").trim().slice(0, 400);
+  return text ? { index: at, text } : undefined;
+}
+
 export interface ProseLayout {
   /** A CSS length, or undefined when the mode sets no indent. */
   indent?: string | undefined;
@@ -234,7 +265,8 @@ function bookmarkMarkup(here: EditorBookmark[]): string {
     .map((b) => {
       const title = escapeHtml(b.description ? `${b.name}\n\n${b.description}` : b.name);
       return (
-        `<span class="doc-bookmark" title="${title}">` +
+        `<span class="doc-bookmark" data-bookmark="${escapeHtml(b.id)}" ` +
+        `draggable="true" title="${title}">` +
         `<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" ` +
         `stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true">` +
         `<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg></span>`
@@ -691,6 +723,12 @@ export interface ProseEditorProps {
    * when the active hit is elsewhere in the manuscript, or there isn't one.
    */
   activeHit?: number | null | undefined;
+  /** Double-clicking a marker: the bookmark opens for editing. */
+  onOpenBookmark?: ((bookmarkId: string) => void) | undefined;
+  /** A marker dragged onto another paragraph of the section being written. */
+  onMoveBookmark?:
+    | ((bookmarkId: string, paragraph?: { index: number; text: string }) => void)
+    | undefined;
   /**
    * Where to put the style buttons, when they belong somewhere other than
    * above the prose. Null or absent leaves them in the editor's own column.
@@ -722,6 +760,8 @@ export function ProseEditor({
   search,
   activeHit,
   toolbarSlot,
+  onOpenBookmark,
+  onMoveBookmark,
   bookmarks,
   layout,
   askAbout,
@@ -1539,6 +1579,58 @@ export function ProseEditor({
         role="textbox"
         aria-multiline="true"
         aria-label="Prose"
+        /**
+         * A marker is markup this editor built rather than a React element, so
+         * the double-click is caught here and matched against what it landed
+         * on. The marker carries its bookmark's id for exactly this.
+         */
+        /**
+         * A marker carried to another paragraph of the section being written.
+         *
+         * Both halves have to be taken over. The drag starts on markup inside
+         * a contenteditable, which the browser would otherwise treat as text
+         * being cut and pasted — so the marker would be lifted out of the
+         * prose and dropped back in as a copy of its own HTML.
+         */
+        onDragStart={(event) => {
+          const marker = (event.target as HTMLElement).closest?.(".doc-bookmark");
+          const id = marker?.getAttribute("data-bookmark");
+          if (!id) {
+            // Dragging prose out of the editor is not something to support:
+            // there is no drop target for it and it only risks losing text.
+            event.preventDefault();
+            return;
+          }
+          event.dataTransfer.setData(BOOKMARK_DRAG_TYPE, id);
+          event.dataTransfer.effectAllowed = "move";
+        }}
+        onDragOver={(event) => {
+          if (!event.dataTransfer.types.includes(BOOKMARK_DRAG_TYPE)) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={(event) => {
+          const carried = event.dataTransfer.getData(BOOKMARK_DRAG_TYPE);
+          if (!carried || carried === "new" || !onMoveBookmark) return;
+          // Ours now: without this the browser inserts the dragged markup at
+          // the caret, which is a marker duplicated into the prose.
+          event.preventDefault();
+          // The editor is drawn inside the block, whose own drop handler would
+          // otherwise run straight after this one and move it a second time.
+          event.stopPropagation();
+          const el = ref.current;
+          if (!el) return;
+          onMoveBookmark(carried, paragraphUnder(el, event.clientY));
+        }}
+        onDoubleClick={(event) => {
+          const marker = (event.target as HTMLElement).closest?.(".doc-bookmark");
+          const id = marker?.getAttribute("data-bookmark");
+          if (!id || !onOpenBookmark) return;
+          // The word under a double-click would otherwise be selected as well.
+          event.preventDefault();
+          window.getSelection()?.removeAllRanges();
+          onOpenBookmark(id);
+        }}
         // The browser's own checker would underline the same words in a second
         // colour, from a dictionary this app can't add to.
         spellCheck={false}
