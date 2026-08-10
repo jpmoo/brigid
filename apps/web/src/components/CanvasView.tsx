@@ -3,7 +3,7 @@ import { Grid3x3, Minus, Plus, RotateCcw } from "lucide-react";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block } from "../api.js";
 import { HoldToConfirm } from "./HoldToConfirm.js";
-import { GAP, layout, selfCardId } from "./canvas-layout.js";
+import { GAP, PADDING, layout, selfCardId } from "./canvas-layout.js";
 import type { CanvasBlock, Placed } from "./canvas-layout.js";
 
 const ZOOM_MIN = 0.1;
@@ -223,6 +223,40 @@ export function CanvasView({
     [],
   );
 
+  /**
+   * Keep a pinch on the canvas rather than the page.
+   *
+   * A trackpad pinch arrives as a wheel event with `ctrlKey` set, and the
+   * browser's own page zoom is the default action. React attaches its wheel
+   * listener passively at the document root, where `preventDefault` is ignored
+   * — so the handler below ran, the canvas zoomed, and the whole page zoomed
+   * underneath it at the same time.
+   *
+   * Bound here instead, on the surface itself and explicitly not passive, which
+   * is the only way to get the refusal to count. Safari sends `gesture*` events
+   * for the same pinch and needs turning down separately.
+   */
+  useEffect(() => {
+    const el = surface.current;
+    if (!el) return;
+
+    // Every wheel over the canvas, not only a pinch: a two-finger scroll is
+    // this view's pan, so letting the default through as well would drag an
+    // ancestor about underneath it.
+    const stop = (event: Event) => event.preventDefault();
+
+    el.addEventListener("wheel", stop, { passive: false });
+    for (const name of ["gesturestart", "gesturechange", "gestureend"]) {
+      el.addEventListener(name, stop as EventListener, { passive: false });
+    }
+    return () => {
+      el.removeEventListener("wheel", stop);
+      for (const name of ["gesturestart", "gesturechange", "gestureend"]) {
+        el.removeEventListener(name, stop as EventListener);
+      }
+    };
+  }, []);
+
   const applyZoom = (value: number) => {
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
     const box = surface.current?.getBoundingClientRect();
@@ -280,9 +314,13 @@ export function CanvasView({
 
     if (held.self) {
       /**
-       * Inside its region, never out of it. Negative would put the opening
-       * above the region's own title bar; the region grows to the right and
-       * downwards on its own, so there is no far edge to hold it against.
+       * Inside its region, never out of it — but as far as the region's own
+       * border, not just to the margin its siblings are laid out on. Held at
+       * the margin it could not be pushed into a corner at all, which is the
+       * one place a writer is likely to want to put an opening.
+       *
+       * The region grows rightwards and downwards on its own, so there is no
+       * far edge to hold it against.
        */
       onPlace([
         {
@@ -291,8 +329,8 @@ export function CanvasView({
           y: own?.y ?? region.y,
           w: own?.w ?? region.w,
           h: own?.h ?? region.h,
-          selfX: Math.max(0, held.startX + dx),
-          selfY: Math.max(0, held.startY + dy),
+          selfX: Math.max(-PADDING, held.startX + dx),
+          selfY: Math.max(-PADDING, held.startY + dy),
           selfW: p.w,
           selfH: p.h,
         },

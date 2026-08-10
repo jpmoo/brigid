@@ -525,6 +525,17 @@ export function WorkPage() {
   /** What the canvas needs to draw a block: the card, as the outline shows it. */
   const canvasTotals = useMemo(() => subtreeWordCounts(entries), [entries]);
 
+  /**
+   * Whether a block stands at a level in the book, rather than being front
+   * matter that happens to sit among them. A title page is not a chapter and
+   * has no length it is meant to reach.
+   */
+  const structural = useCallback(
+    (block: Block) =>
+      templates.find((t) => t.id === block.formatId)?.formatSettings?.structural ?? true,
+    [templates],
+  );
+
   const canvasItems = useMemo(
     () =>
       entries.map((entry) => ({
@@ -536,10 +547,11 @@ export function WorkPage() {
           levels[entry.depth]?.breakTemplateId && !entry.isFirstChild
             ? (templates.find((t) => t.id === levels[entry.depth]?.breakTemplateId)?.name ?? null)
             : null,
-        // Only structural blocks: a title page has no length to fall short of.
-        goal: levels[entry.depth]?.wordGoal ?? null,
+        // Only structural blocks: a title page has no length to fall short of,
+        // so it is never shaded short and never shaded met.
+        goal: structural(entry.block) ? (levels[entry.depth]?.wordGoal ?? null) : null,
       })),
-    [entries, levels, templates, canvasTotals],
+    [entries, levels, templates, canvasTotals, structural],
   );
 
 
@@ -1480,6 +1492,14 @@ export function WorkPage() {
                   title="Manuscript — set exactly as your templates specify"
                 >
                   <FileText size={13} /> Manuscript
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={mode === "canvas"}
+                  onClick={() => setMode("canvas")}
+                  title="Canvas — the shape of the book, as nested regions"
+                >
+                  <LayoutGrid size={13} /> Canvas
                 </button>
               </div>
 

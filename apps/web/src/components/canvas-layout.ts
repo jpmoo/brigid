@@ -14,7 +14,7 @@ import type { Block } from "../api.js";
 const DEFAULT_W = 260;
 const DEFAULT_H = 120;
 /** Room inside a region for its children, and between siblings. */
-const PADDING = 28;
+export const PADDING = 28;
 export const GAP = 44;
 /** The band along the top of a region that carries its own name. */
 const HEADER = 34;
@@ -82,6 +82,18 @@ function perRow(count: number): number {
  */
 export function selfCardId(blockId: string): string {
   return `${blockId}::self`;
+}
+
+/**
+ * The corner a region measures its contents from.
+ *
+ * Inset from the region's own rectangle by its title bar and a margin. Every
+ * position inside a region is stored against this corner, so it has to be
+ * worked out in exactly one place: the last bug here was two pieces of code
+ * that each had their own idea of where it was.
+ */
+export function innerCorner(x: number, y: number): { x: number; y: number } {
+  return { x: x + PADDING, y: y + HEADER + PADDING };
 }
 
 /**
@@ -179,7 +191,7 @@ export function layout(
          */
         const selfW = own?.selfW ?? DEFAULT_W;
         const selfH = own?.selfH ?? DEFAULT_H;
-        const inner = { x: guess.x + PADDING, y: guess.y + HEADER + PADDING / 2 };
+        const inner = innerCorner(guess.x, guess.y);
         const selfAt = {
           x: inner.x + (own?.selfX ?? 0),
           y: inner.y + (own?.selfY ?? 0),
@@ -219,11 +231,17 @@ export function layout(
         };
       }
 
-      const w = Math.max(own?.w ?? DEFAULT_W, isRegion ? inside.w + PADDING * 2 : 0);
-      const h = Math.max(
-        own?.h ?? DEFAULT_H,
-        isRegion ? inside.h + HEADER + PADDING * 1.5 : 0,
-      );
+      /**
+       * A region is exactly as big as what it holds, rather than the larger of
+       * that and whatever it was last time. Kept as a maximum it could only
+       * ever grow: dragging a scene rightwards widened its chapter, and
+       * dragging it back left left the chapter stretched around empty space.
+       *
+       * There is nothing lost by not remembering — a region's size was never
+       * the writer's to choose. Only cards carry one.
+       */
+      const w = isRegion ? inside.w + PADDING * 2 : (own?.w ?? DEFAULT_W);
+      const h = isRegion ? inside.h + HEADER + PADDING * 2 : (own?.h ?? DEFAULT_H);
 
       if (!own) {
         // The row only knew the guessed size; a grown region needs more room.
@@ -311,7 +329,7 @@ export function layout(
    */
   const origin = new Map<string | null, { x: number; y: number }>([[null, { x: 0, y: 0 }]]);
   for (const p of placed) {
-    origin.set(p.id, { x: p.x + PADDING, y: p.y + HEADER + PADDING / 2 });
+    origin.set(p.id, innerCorner(p.x, p.y));
   }
   for (const p of placed) {
     if (p.isSelfCard || saved.has(p.id)) continue;

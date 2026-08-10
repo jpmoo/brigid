@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import type { CanvasNode } from "@brigid/shared";
-import { layout, selfCardId } from "../src/components/canvas-layout.js";
+import { innerCorner, layout, selfCardId } from "../src/components/canvas-layout.js";
 import type { CanvasBlock, Placed } from "../src/components/canvas-layout.js";
 
 /**
@@ -187,6 +187,27 @@ test("chapters are packed into rows, not stacked", () => {
   assert.ok(rows.size < tops.length, `${tops.length} chapters took ${rows.size} rows`);
 });
 
+/**
+ * A region kept its size as a floor once, so it grew with a scene dragged out
+ * to the right and stayed stretched when the scene came back.
+ */
+test("a region shrinks back when a scene is dragged in again", () => {
+  const items = manuscript(3, 4);
+  const first = layout(items, new Map());
+  const settled = saveMap(first.unsaved);
+  const at = (s: Map<string, CanvasNode>) => byId(layout(items, s).placed).get("ch1")!;
+
+  const before = at(settled).w;
+
+  const out = new Map(settled);
+  out.set("ch1-s2", { ...settled.get("ch1-s2")!, x: 1400 });
+  const stretched = at(out).w;
+  assert.ok(stretched > before, `dragging out widened it: ${before} → ${stretched}`);
+
+  const back = new Map(settled);
+  assert.equal(at(back).w, before, "and dragging back in returned it");
+});
+
 /** Where the writer put something is the one thing a redraw may not touch. */
 test("a moved card stays where it was put", () => {
   const items = manuscript(4, 4);
@@ -200,8 +221,11 @@ test("a moved card stays where it was put", () => {
   const after = byId(placed).get("ch1-s3")!;
   const parent = byId(placed).get("ch1")!;
 
-  assert.equal(after.x - (parent.x + 28), 900, "kept its offset across");
-  assert.equal(after.y - (parent.y + 34 + 14), 700, "kept its offset down");
+  // Asked for rather than written out, so a change to the inset moves the test
+  // with the code instead of breaking it.
+  const corner = innerCorner(parent.x, parent.y);
+  assert.equal(after.x - corner.x, 900, "kept its offset across");
+  assert.equal(after.y - corner.y, 700, "kept its offset down");
   assert.ok(
     !unsaved.some((n) => n.blockId === "ch1-s3"),
     "a placed card is not written back over",
