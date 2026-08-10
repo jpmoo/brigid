@@ -464,6 +464,14 @@ export interface CanvasNode {
   /** What the writer dragged it to. Regions grow past this to hold children. */
   w: number;
   h: number;
+  /**
+   * Where this block's own prose sits inside the region it heads. Undefined
+   * until moved, in which case it is laid out at the top of the region.
+   */
+  selfX?: number | null;
+  selfY?: number | null;
+  selfW?: number | null;
+  selfH?: number | null;
 }
 
 /** Which edge of a node a canvas note hangs from. */

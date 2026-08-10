@@ -527,6 +527,15 @@ export const canvasNodes = pgTable(
      *  children, so it is a floor rather than the final size. */
     w: doublePrecision("w").notNull(),
     h: doublePrecision("h").notNull(),
+    /**
+     * Where this block's own prose sits inside the region it heads, when it has
+     * children and so is drawn as one. Part of the same block, so the same row.
+     * Null means never moved — laid out at the top of the region.
+     */
+    selfX: doublePrecision("self_x"),
+    selfY: doublePrecision("self_y"),
+    selfW: doublePrecision("self_w"),
+    selfH: doublePrecision("self_h"),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => ({ byWork: index("canvas_nodes_work_idx").on(t.workId) }),

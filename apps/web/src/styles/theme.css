@@ -5412,8 +5412,10 @@ mark.hit.active {
 
 /* A region's own prose, first inside it. An ordinary card — it is ordinary
    prose — but not draggable on its own, since it belongs to the region. */
+/* A region's own prose, inside the region it heads. An ordinary card holding
+   ordinary prose, and draggable like any other — but only within its region,
+   and it is stored against that region's row rather than one of its own. */
 .canvas-node.self {
-  cursor: default;
   border-style: solid;
 }
 

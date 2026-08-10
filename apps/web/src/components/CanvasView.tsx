@@ -154,13 +154,28 @@ function layout(
 
       let inside = { w: 0, h: 0 };
       if (isRegion) {
-        // The block's own prose, first inside the region it heads.
-        const selfW = DEFAULT_W;
-        const selfH = DEFAULT_H;
+        /**
+         * The block's own prose, inside the region it heads. A block only has
+         * children because a break set it above what follows, so it always has
+         * something of its own to show — at the very least a title — and the
+         * card is always drawn.
+         *
+         * Where it sits is the writer's, once they have moved it. Until then it
+         * goes at the top of the region, which is where the chapter's opening
+         * belongs.
+         */
+        const selfW = own?.selfW ?? DEFAULT_W;
+        const selfH = own?.selfH ?? DEFAULT_H;
+        const inner = { x: guess.x + PADDING, y: guess.y + HEADER + PADDING / 2 };
+        const selfAt = {
+          x: inner.x + (own?.selfX ?? 0),
+          y: inner.y + (own?.selfY ?? 0),
+        };
+
         placed.push({
           id: selfCardId(item.block.id),
-          x: guess.x + PADDING,
-          y: guess.y + HEADER + PADDING / 2,
+          x: selfAt.x,
+          y: selfAt.y,
           w: selfW,
           h: selfH,
           depth: depth + 1,
@@ -169,13 +184,13 @@ function layout(
           isSelfCard: true,
         });
 
-        inside = place(
-          item.block.id,
-          guess.x + PADDING,
-          guess.y + HEADER + PADDING / 2 + selfH + GAP,
-          depth + 1,
-        );
-        inside = { w: Math.max(inside.w, selfW), h: inside.h + selfH + GAP };
+        // The rest flow below wherever the opening ended up, so a moved card
+        // pushes its scenes rather than sitting on them.
+        inside = place(item.block.id, inner.x, selfAt.y + selfH + GAP, depth + 1);
+        inside = {
+          w: Math.max(inside.w, selfAt.x - inner.x + selfW),
+          h: Math.max(inside.h, selfAt.y - inner.y + selfH) + GAP,
+        };
       }
 
       const w = Math.max(own?.w ?? DEFAULT_W, isRegion ? inside.w + PADDING * 2 : 0);
@@ -425,20 +440,30 @@ export function CanvasView({
   };
 
   /** Dragging a node. Position only — never a change of parent. */
-  const dragging = useRef<{ id: string; x: number; y: number; startX: number; startY: number } | null>(
-    null,
-  );
+  const dragging = useRef<{
+    id: string;
+    /** The block whose row this drag writes to — a self card writes its region's. */
+    blockId: string;
+    self: boolean;
+    x: number;
+    y: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
 
   const onNodePointerDown = (event: React.PointerEvent, p: Placed) => {
     event.stopPropagation();
-    onSelect(p.id);
-    const own = saved.get(p.id);
+    const blockId = p.isSelfCard ? (p.parentId ?? p.id) : p.id;
+    onSelect(blockId);
+    const own = saved.get(blockId);
     dragging.current = {
       id: p.id,
+      blockId,
+      self: p.isSelfCard,
       x: event.clientX,
       y: event.clientY,
-      startX: own?.x ?? 0,
-      startY: own?.y ?? 0,
+      startX: (p.isSelfCard ? own?.selfX : own?.x) ?? 0,
+      startY: (p.isSelfCard ? own?.selfY : own?.y) ?? 0,
     };
     (event.target as HTMLElement).setPointerCapture?.(event.pointerId);
   };
@@ -447,12 +472,40 @@ export function CanvasView({
     const held = dragging.current;
     if (!held) return;
     const p = byId.get(held.id);
-    if (!p) return;
+    const region = byId.get(held.blockId);
+    if (!p || !region) return;
+
+    const dx = (event.clientX - held.x) / zoom;
+    const dy = (event.clientY - held.y) / zoom;
+    const own = saved.get(held.blockId);
+
+    if (held.self) {
+      /**
+       * Inside its region, never out of it. Negative would put the opening
+       * above the region's own title bar; the region grows to the right and
+       * downwards on its own, so there is no far edge to hold it against.
+       */
+      onPlace([
+        {
+          blockId: held.blockId,
+          x: own?.x ?? region.x,
+          y: own?.y ?? region.y,
+          w: own?.w ?? region.w,
+          h: own?.h ?? region.h,
+          selfX: Math.max(0, held.startX + dx),
+          selfY: Math.max(0, held.startY + dy),
+          selfW: p.w,
+          selfH: p.h,
+        },
+      ]);
+      return;
+    }
+
     onPlace([
       {
-        blockId: held.id,
-        x: held.startX + (event.clientX - held.x) / zoom,
-        y: held.startY + (event.clientY - held.y) / zoom,
+        blockId: held.blockId,
+        x: held.startX + dx,
+        y: held.startY + dy,
         w: p.w,
         h: p.h,
       },
@@ -583,9 +636,7 @@ export function CanvasView({
                 .filter(Boolean)
                 .join(" ")}
               style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
-              // A self card belongs to its region and moves with it, so it is
-              // not draggable in its own right.
-              onPointerDown={(e) => (p.isSelfCard ? undefined : onNodePointerDown(e, p))}
+              onPointerDown={(e) => onNodePointerDown(e, p)}
               onDoubleClick={(e) => {
                 e.stopPropagation();
                 // The self card stands for its region's block, so it opens it.

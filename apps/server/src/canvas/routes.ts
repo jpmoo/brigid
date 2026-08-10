@@ -27,6 +27,12 @@ const PLACEMENT = z.object({
   // to see is a node that cannot be dragged back.
   w: z.number().finite().min(40),
   h: z.number().finite().min(30),
+  // Where the block's own prose sits inside the region it heads, when it has
+  // children. Absent on a block that is not drawn as a region.
+  selfX: z.number().finite().nullish(),
+  selfY: z.number().finite().nullish(),
+  selfW: z.number().finite().min(40).nullish(),
+  selfH: z.number().finite().min(30).nullish(),
 });
 
 export async function canvasRoutes(app: FastifyInstance): Promise<void> {
@@ -50,6 +56,10 @@ export async function canvasRoutes(app: FastifyInstance): Promise<void> {
         y: canvasNodes.y,
         w: canvasNodes.w,
         h: canvasNodes.h,
+        selfX: canvasNodes.selfX,
+        selfY: canvasNodes.selfY,
+        selfW: canvasNodes.selfW,
+        selfH: canvasNodes.selfH,
       })
       .from(canvasNodes)
       .where(eq(canvasNodes.workId, workId));
@@ -94,7 +104,17 @@ export async function canvasRoutes(app: FastifyInstance): Promise<void> {
 
     await db
       .insert(canvasNodes)
-      .values(wanted.map((n) => ({ ...n, workId, updatedAt: new Date() })))
+      .values(
+        wanted.map((n) => ({
+          ...n,
+          selfX: n.selfX ?? null,
+          selfY: n.selfY ?? null,
+          selfW: n.selfW ?? null,
+          selfH: n.selfH ?? null,
+          workId,
+          updatedAt: new Date(),
+        })),
+      )
       .onConflictDoUpdate({
         target: canvasNodes.blockId,
         set: {
@@ -102,6 +122,15 @@ export async function canvasRoutes(app: FastifyInstance): Promise<void> {
           y: sql`excluded.y`,
           w: sql`excluded.w`,
           h: sql`excluded.h`,
+          /**
+           * Kept when the incoming row says nothing about it. A drag of the
+           * region sends no self position, and coalescing to the new value
+           * would throw away where the opening had been put.
+           */
+          selfX: sql`coalesce(excluded.self_x, ${canvasNodes.selfX})`,
+          selfY: sql`coalesce(excluded.self_y, ${canvasNodes.selfY})`,
+          selfW: sql`coalesce(excluded.self_w, ${canvasNodes.selfW})`,
+          selfH: sql`coalesce(excluded.self_h, ${canvasNodes.selfH})`,
           updatedAt: new Date(),
         },
       });
