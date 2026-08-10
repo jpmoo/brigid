@@ -2,6 +2,7 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import { Grid3x3, Minus, Plus, RotateCcw } from "lucide-react";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block } from "../api.js";
+import { HoldToConfirm } from "./HoldToConfirm.js";
 
 /**
  * The manuscript as nested regions on an endless surface.
@@ -621,16 +622,18 @@ export function CanvasView({
               >
                 Keep this arrangement
               </button>
-              <button
-                className="btn danger"
-                type="button"
-                onClick={() => {
+              {/* Held rather than clicked, as everywhere else that discards
+                  work. An arrangement is quiet, patient work, and it should
+                  not go to a button pressed on the way past. */}
+              <HoldToConfirm
+                seconds={3}
+                label="Hold to lay it out again"
+                holdingLabel="Keep holding…"
+                onConfirm={() => {
                   onReset();
                   setResetting(false);
                 }}
-              >
-                Lay it out again
-              </button>
+              />
             </div>
           </div>
         </div>
