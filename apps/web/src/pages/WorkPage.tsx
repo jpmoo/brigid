@@ -29,6 +29,7 @@ import { ApiError, api } from "../api.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { CanvasView } from "../components/CanvasView.js";
+import { mergePlacement } from "../components/canvas-layout.js";
 import { BOOK_MEASURE_CH, DocumentView, breakRefKey } from "../components/DocumentView.js";
 import type { ViewMode } from "../components/DocumentView.js";
 import { BookmarkStrip } from "../components/BookmarkStrip.js";
@@ -485,11 +486,16 @@ export function WorkPage() {
       if (moved.length === 0) return;
       setCanvasNodes((held) => {
         const by = new Map(held.map((n) => [n.blockId, n]));
-        for (const n of moved) by.set(n.blockId, n);
+        for (const n of moved) by.set(n.blockId, mergePlacement(by.get(n.blockId), n));
         return [...by.values()];
       });
 
-      for (const n of moved) pendingPlaces.current.set(n.blockId, n);
+      // Merged into whatever is already waiting, for the same reason: a region
+      // dragged in the same breath as the card inside it would otherwise send
+      // the region's move alone and the card's would never be written at all.
+      for (const n of moved) {
+        pendingPlaces.current.set(n.blockId, mergePlacement(pendingPlaces.current.get(n.blockId), n));
+      }
 
       if (placeSave.current) window.clearTimeout(placeSave.current);
       placeSave.current = window.setTimeout(() => {

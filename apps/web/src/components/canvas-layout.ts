@@ -144,6 +144,33 @@ export function arrivalAngle(from: Rect, to: Rect): number {
   );
 }
 
+/**
+ * A placement laid over the one already held.
+ *
+ * A drag says only what it changed. Dragging a region sends its own corner and
+ * nothing about where the opening inside it was put, because the drag did not
+ * touch that — so taking the new record whole threw the opening back to the
+ * corner it starts in. It survived a reload, since the write coalesces the
+ * missing fields against what is stored, which is what made it look like the
+ * card was popping back rather than being lost.
+ *
+ * Absent means unchanged, here as in the write.
+ */
+export function mergePlacement(
+  held: CanvasNode | undefined,
+  moved: CanvasNode,
+): CanvasNode {
+  if (!held) return moved;
+  return {
+    ...held,
+    ...moved,
+    selfX: moved.selfX ?? held.selfX,
+    selfY: moved.selfY ?? held.selfY,
+    selfW: moved.selfW ?? held.selfW,
+    selfH: moved.selfH ?? held.selfH,
+  };
+}
+
 /** What a block looks like on the canvas before anyone has moved it. */
 const DEFAULT_W = 260;
 const DEFAULT_H = 120;

@@ -4,6 +4,7 @@ import {
   arrivalAngle,
   arrow,
   innerCorner,
+  mergePlacement,
   layout,
   selfCardId,
 } from "../src/components/canvas-layout.js";
@@ -346,6 +347,64 @@ test("it always leans towards the way the line is travelling", () => {
   // Leftwards, so the lean goes the other way along the x axis.
   const back = arrivalAngle(box(600, 0), box(0, 400));
   assert.ok(back > 91 && back < 180, `down-left leaned to ${back.toFixed(1)}°`);
+});
+
+/**
+ * A drag says only what it changed, so a placement has to be laid over the one
+ * already held rather than taking its place.
+ */
+console.log("\nsaving a placement");
+
+test("moving a chapter leaves its opening where it was put", () => {
+  const items = manuscript(3, 3);
+  const settled = saveMap(layout(items, new Map()).unsaved);
+
+  // The writer drags the opening card somewhere inside its chapter.
+  const withOpening = new Map(settled);
+  withOpening.set("ch1", { ...settled.get("ch1")!, selfX: 300, selfY: 180 });
+  const before = layout(items, withOpening).placed.find(
+    (p) => p.id === selfCardId("ch1"),
+  )!;
+
+  // Then drags the chapter itself, which says nothing about the opening.
+  const drag = { blockId: "ch1", x: 900, y: 700, w: settled.get("ch1")!.w, h: settled.get("ch1")!.h };
+  const after = new Map(withOpening);
+  after.set("ch1", mergePlacement(withOpening.get("ch1"), drag));
+
+  const kept = after.get("ch1")!;
+  assert.equal(kept.selfX, 300, "the opening's offset across survived");
+  assert.equal(kept.selfY, 180, "and its offset down");
+  assert.equal(kept.x, 900, "while the chapter took its new corner");
+
+  // And it is still drawn in the same place inside its chapter. Measured from
+  // the anchor rather than from the drawn rectangle: a region's rectangle grows
+  // around whatever has been dragged out of it and can end up above and left of
+  // its own corner, but the corner things inside are stored against does not
+  // move — which is the whole point of keeping the two apart.
+  const drawn = layout(items, after).placed;
+  const region = drawn.find((p) => p.id === "ch1" && !p.isSelfCard)!;
+  const opening = drawn.find((p) => p.id === selfCardId("ch1"))!;
+  const corner = innerCorner(region.anchorX, region.anchorY);
+  assert.equal(opening.x - corner.x, 300, "same offset after the move");
+  assert.equal(opening.y - corner.y, 180);
+  assert.ok(before, "and it had one before");
+});
+
+test("a batch keeps both halves of a move", () => {
+  // The region and the card inside it dragged in the same breath: merged, or
+  // the second write would drop the first before it ever left the browser.
+  const opening = { blockId: "ch1", x: 0, y: 0, w: 300, h: 200, selfX: 40, selfY: 60 };
+  const region = { blockId: "ch1", x: 500, y: 400, w: 300, h: 200 };
+  const merged = mergePlacement(opening, region);
+  assert.deepEqual(
+    { x: merged.x, y: merged.y, selfX: merged.selfX, selfY: merged.selfY },
+    { x: 500, y: 400, selfX: 40, selfY: 60 },
+  );
+});
+
+test("nothing to lay it over means it is taken whole", () => {
+  const fresh = { blockId: "ch1", x: 10, y: 20, w: 260, h: 120 };
+  assert.deepEqual(mergePlacement(undefined, fresh), fresh);
 });
 
 console.log(failures === 0 ? "\ncanvas layout: all passed" : `\ncanvas layout: ${failures} failed`);
