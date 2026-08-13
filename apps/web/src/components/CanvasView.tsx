@@ -5,7 +5,7 @@ import { foldForSearch, foldForSearchMapped } from "@brigid/shared";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block, Bookmark } from "../api.js";
 import { HoldToConfirm } from "./HoldToConfirm.js";
-import { GAP, layout, selfCardId } from "./canvas-layout.js";
+import { GAP, PADDING, arrow, layout, selfCardId } from "./canvas-layout.js";
 import type { CanvasBlock, Placed } from "./canvas-layout.js";
 
 const ZOOM_MIN = 0.1;
@@ -27,79 +27,6 @@ const wordFmt = new Intl.NumberFormat();
  * changed place in the book. Structure is the outline's business, and a canvas
  * that quietly rewrote it would make every accidental drag an edit.
  */
-
-/**
- * Which edges a connector should use, from where the two boxes actually are.
- *
- * The pair of sides that face each other: whichever axis separates them more
- * decides horizontal or vertical, and the sign decides which way round. Drag a
- * scene above the one before it and the arrow flips to leave from the top —
- * so a connector always takes the short way across the gap rather than looping
- * around a box to reach a side that stopped facing anything.
- */
-function facingSides(from: Rect, to: Rect): { start: Point; end: Point; horizontal: boolean } {
-  const fx = from.x + from.w / 2;
-  const fy = from.y + from.h / 2;
-  const tx = to.x + to.w / 2;
-  const ty = to.y + to.h / 2;
-
-  const dx = tx - fx;
-  const dy = ty - fy;
-
-  // Compared against each box's own size, not in raw pixels: two wide regions
-  // side by side are separated horizontally even when dx is smaller than dy.
-  const spanX = Math.abs(dx) / Math.max(1, (from.w + to.w) / 2);
-  const spanY = Math.abs(dy) / Math.max(1, (from.h + to.h) / 2);
-  const horizontal = spanX >= spanY;
-
-  if (horizontal) {
-    const rightwards = dx >= 0;
-    return {
-      horizontal,
-      start: { x: rightwards ? from.x + from.w : from.x, y: fy },
-      end: { x: rightwards ? to.x : to.x + to.w, y: ty },
-    };
-  }
-
-  const downwards = dy >= 0;
-  return {
-    horizontal,
-    start: { x: fx, y: downwards ? from.y + from.h : from.y },
-    end: { x: tx, y: downwards ? to.y : to.y + to.h },
-  };
-}
-
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/** Where a connector leaves one rectangle and arrives at the next. */
-function arrow(from: Rect, to: Rect): string {
-  const { start, end, horizontal } = facingSides(from, to);
-
-  // A gentle S rather than a straight line: two boxes almost in line would
-  // otherwise be joined by a stub too short to read as a direction.
-  const bend = Math.max(
-    24,
-    (horizontal ? Math.abs(end.x - start.x) : Math.abs(end.y - start.y)) / 2,
-  );
-  const lead = horizontal
-    ? { x: start.x + (end.x >= start.x ? bend : -bend), y: start.y }
-    : { x: start.x, y: start.y + (end.y >= start.y ? bend : -bend) };
-  const trail = horizontal
-    ? { x: end.x - (end.x >= start.x ? bend : -bend), y: end.y }
-    : { x: end.x, y: end.y - (end.y >= start.y ? bend : -bend) };
-
-  return `M ${start.x} ${start.y} C ${lead.x} ${lead.y}, ${trail.x} ${trail.y}, ${end.x} ${end.y}`;
-}
 
 /**
  * A card's preview with the searched term marked.

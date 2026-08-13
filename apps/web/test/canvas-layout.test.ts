@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import type { CanvasNode } from "@brigid/shared";
-import { innerCorner, layout, selfCardId } from "../src/components/canvas-layout.js";
+import {
+  arrivalAngle,
+  arrow,
+  innerCorner,
+  layout,
+  selfCardId,
+} from "../src/components/canvas-layout.js";
 import type { CanvasBlock, Placed } from "../src/components/canvas-layout.js";
 
 /**
@@ -288,6 +294,58 @@ test("a moved card stays where it was put", () => {
     !unsaved.some((n) => n.blockId === "ch1-s3"),
     "a placed card is not written back over",
   );
+});
+
+/**
+ * The arrowhead orients itself to the curve's tangent where it lands, so the
+ * only way to tilt it is to tilt the arrival. Held square to the face, a
+ * connector crossing at an angle ended in an arrowhead pointing flatly
+ * sideways with a kink in the last few pixels.
+ */
+console.log("\ncanvas connectors");
+
+const box = (x: number, y: number, w = 260, h = 120) => ({ x, y, w, h });
+
+test("a connector crossing at an angle lands at an angle", () => {
+  // To the right and well below: the sides that face are left and right, so
+  // this used to arrive dead horizontal.
+  const angle = arrivalAngle(box(0, 0), box(600, 400));
+  assert.ok(
+    Math.abs(angle) > 8 && Math.abs(angle) < 82,
+    `arrived at ${angle.toFixed(1)}°, wanted something between square and straight`,
+  );
+});
+
+test("and one crossing straight still lands straight", () => {
+  // Level with each other: there is no angle to lean into.
+  assert.equal(Math.round(arrivalAngle(box(0, 0), box(600, 0))), 0);
+  // Directly below: straight down.
+  assert.equal(Math.round(arrivalAngle(box(0, 0), box(0, 600))), 90);
+});
+
+test("the lean never doubles back on itself", () => {
+  // A handle longer than the gap would meet its opposite and throw a loop into
+  // the middle of the curve.
+  for (const [dx, dy] of [[40, 900], [900, 40], [300, 300], [-500, 250]]) {
+    const d = arrow(box(0, 0), box(dx, dy));
+    const nums = d.match(/-?\d+(\.\d+)?/g)!.map(Number);
+    assert.ok(nums.every(Number.isFinite), `finite path for ${dx},${dy}: ${d}`);
+  }
+});
+
+test("it always leans towards the way the line is travelling", () => {
+  // Both arrive from above or below, so square-on is ±90 and any lean shows as
+  // an angle strictly inside that. Asserting only the sign would pass without
+  // any lean at all, which is the thing being tested.
+  const down = arrivalAngle(box(0, 0), box(600, 400));
+  assert.ok(down > 0 && down < 89, `down-right leaned to ${down.toFixed(1)}°`);
+
+  const up = arrivalAngle(box(0, 400), box(600, 0));
+  assert.ok(up < 0 && up > -89, `up-right leaned to ${up.toFixed(1)}°`);
+
+  // Leftwards, so the lean goes the other way along the x axis.
+  const back = arrivalAngle(box(600, 0), box(0, 400));
+  assert.ok(back > 91 && back < 180, `down-left leaned to ${back.toFixed(1)}°`);
 });
 
 console.log(failures === 0 ? "\ncanvas layout: all passed" : `\ncanvas layout: ${failures} failed`);

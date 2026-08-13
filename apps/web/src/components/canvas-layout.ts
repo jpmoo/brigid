@@ -10,6 +10,140 @@ import type { Block } from "../api.js";
  * checked, which is what `canvas-layout.test.ts` does.
  */
 
+/**
+ * Which edges a connector should use, from where the two boxes actually are.
+ *
+ * The pair of sides that face each other: whichever axis separates them more
+ * decides horizontal or vertical, and the sign decides which way round. Drag a
+ * scene above the one before it and the arrow flips to leave from the top —
+ * so a connector always takes the short way across the gap rather than looping
+ * around a box to reach a side that stopped facing anything.
+ */
+export function facingSides(from: Rect, to: Rect): { start: Point; end: Point; horizontal: boolean } {
+  const fx = from.x + from.w / 2;
+  const fy = from.y + from.h / 2;
+  const tx = to.x + to.w / 2;
+  const ty = to.y + to.h / 2;
+
+  const dx = tx - fx;
+  const dy = ty - fy;
+
+  // Compared against each box's own size, not in raw pixels: two wide regions
+  // side by side are separated horizontally even when dx is smaller than dy.
+  const spanX = Math.abs(dx) / Math.max(1, (from.w + to.w) / 2);
+  const spanY = Math.abs(dy) / Math.max(1, (from.h + to.h) / 2);
+  const horizontal = spanX >= spanY;
+
+  if (horizontal) {
+    const rightwards = dx >= 0;
+    return {
+      horizontal,
+      start: { x: rightwards ? from.x + from.w : from.x, y: fy },
+      end: { x: rightwards ? to.x : to.x + to.w, y: ty },
+    };
+  }
+
+  const downwards = dy >= 0;
+  return {
+    horizontal,
+    start: { x: fx, y: downwards ? from.y + from.h : from.y },
+    end: { x: tx, y: downwards ? to.y : to.y + to.h },
+  };
+}
+
+export interface Point {
+  x: number;
+  y: number;
+}
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Where a connector leaves one rectangle and arrives at the next. */
+/**
+ * How far the arrival leans from square-on towards the line's own direction.
+ *
+ * Zero arrives perpendicular to the face, one aims straight from one box at the
+ * other. Halfway keeps the sense of leaving and entering by a particular side
+ * while letting the last stretch lie along the way the connector is actually
+ * travelling.
+ */
+const TILT = 0.5;
+
+/**
+ * The path from one box to the next.
+ *
+ * A gentle S rather than a straight line: two boxes almost in line would
+ * otherwise be joined by a stub too short to read as a direction.
+ *
+ * The control points lean. Held square to the face — which is what they were —
+ * the curve's tangent where it lands is exactly horizontal or vertical, and an
+ * arrowhead orients itself to that tangent. So a connector crossing at an angle
+ * ended in an arrowhead pointing flatly sideways, with a visible kink in the
+ * last few pixels where the curve straightened up to meet it. Leaning the
+ * control points tilts the tangent, and the arrowhead comes with it: nothing
+ * rotates the marker, the line simply arrives pointing where it looks like it
+ * is pointing.
+ */
+export function arrow(from: Rect, to: Rect): string {
+  const { start, end, horizontal } = facingSides(from, to);
+
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const span = Math.hypot(dx, dy) || 1;
+
+  // Straight out of the side it leaves by, and straight into the side it
+  // arrives at — before the lean.
+  const square = horizontal
+    ? { x: dx >= 0 ? 1 : -1, y: 0 }
+    : { x: 0, y: dy >= 0 ? 1 : -1 };
+  // Where the connector is heading overall.
+  const along = { x: dx / span, y: dy / span };
+
+  const leaning = {
+    x: square.x * (1 - TILT) + along.x * TILT,
+    y: square.y * (1 - TILT) + along.y * TILT,
+  };
+  const size = Math.hypot(leaning.x, leaning.y) || 1;
+  const dir = { x: leaning.x / size, y: leaning.y / size };
+
+  /**
+   * Never more than half the distance, however far apart the dominant axis
+   * says they are — leaning the handles points them partly at each other, and
+   * two long ones would meet and throw a loop into the middle of the curve.
+   */
+  const reach = Math.max(24, (horizontal ? Math.abs(dx) : Math.abs(dy)) / 2);
+  const bend = Math.min(reach, span / 2);
+
+  const lead = { x: start.x + dir.x * bend, y: start.y + dir.y * bend };
+  const trail = { x: end.x - dir.x * bend, y: end.y - dir.y * bend };
+
+  return `M ${start.x} ${start.y} C ${lead.x} ${lead.y}, ${trail.x} ${trail.y}, ${end.x} ${end.y}`;
+}
+
+/** The direction a connector points as it lands, for checking it looks right. */
+export function arrivalAngle(from: Rect, to: Rect): number {
+  const { start, end, horizontal } = facingSides(from, to);
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  const span = Math.hypot(dx, dy) || 1;
+  const square = horizontal
+    ? { x: dx >= 0 ? 1 : -1, y: 0 }
+    : { x: 0, y: dy >= 0 ? 1 : -1 };
+  return (
+    (Math.atan2(
+      square.y * (1 - TILT) + (dy / span) * TILT,
+      square.x * (1 - TILT) + (dx / span) * TILT,
+    ) *
+      180) /
+    Math.PI
+  );
+}
+
 /** What a block looks like on the canvas before anyone has moved it. */
 const DEFAULT_W = 260;
 const DEFAULT_H = 120;
