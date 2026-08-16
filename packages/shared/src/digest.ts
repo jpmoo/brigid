@@ -188,7 +188,7 @@ export interface CharacterAnalysis {
 /**
  * Somebody the walk found.
  *
- * Characters below the evidence threshold are listed but not analysed. Running
+ * Characters below the evidence threshold are listed but not analyzed. Running
  * a model over three mentions cannot produce anything the rubric would accept —
  * every axis would land at 0 or 1 for want of citable events — so it is time
  * and electricity spent to reach a foregone conclusion. They are reported

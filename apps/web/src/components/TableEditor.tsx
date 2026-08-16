@@ -12,7 +12,7 @@ type TableNode = Extract<TemplateNode, { type: "table" }>;
  * A plain table: rules, widths and alignment, with no shading or color.
  *
  * Column widths are dragged on the boundary between two columns and only ever
- * move width from one to its neighbour, so the row always sums to the full
+ * move width from one to its neighbor, so the row always sums to the full
  * width and the table can't drift out of shape.
  */
 export function TableEditor({

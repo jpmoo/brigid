@@ -138,7 +138,7 @@ export async function progressOf(workId: string): Promise<DigestProgress> {
     total: sections.length,
     lastError: state?.lastError ?? null,
     etaSeconds: average && left > 0 ? Math.round((average * left) / 1000) : null,
-    // An empty manuscript is not ready — there is nothing to analyse.
+    // An empty manuscript is not ready — there is nothing to analyze.
     ready: sections.length > 0 && left === 0,
   };
 }

@@ -235,7 +235,7 @@ pagination is an **export** concern and will be spec'd separately.
 
 _OPEN._ This makes the page-number variables unresolvable in the live view. They
 still belong in the model for export. Options for the live view: render them as
-visible tokens (`[page #]`), render them greyed, or hide headers and footers
+visible tokens (`[page #]`), render them grayed, or hide headers and footers
 entirely while drafting.
 
 ### 4.2 Editing

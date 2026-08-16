@@ -204,7 +204,7 @@ export interface SectionDeviation {
   voice: string | null;
   /** Which baseline it was measured against, once fallback is accounted for. */
   against: string | null;
-  /** Mean absolute z across features — the distance from this writer's centre. */
+  /** Mean absolute z across features — the distance from this writer's center. */
   delta: number;
   /** Whether the section is long enough for that number to mean anything. */
   reliable: boolean;

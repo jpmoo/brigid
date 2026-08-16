@@ -33,10 +33,10 @@ export function StyleMenu({
       <div className="style-sample" style={sampleStyle}>
         <p style={{ margin: 0, textIndent: 0 }}>
           The tide had gone out further than Maren had ever seen it, leaving the harbour a bowl of
-          grey mud studded with the ribs of boats nobody remembered.
+          gray mud studded with the ribs of boats nobody remembered.
         </p>
         <p style={{ margin: 0, textIndent: indent }}>
-          Her father would have called it a judgement. Her father called most weather a judgement.
+          Her father would have called it a judgment. Her father called most weather a judgment.
         </p>
       </div>
 

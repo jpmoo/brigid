@@ -159,7 +159,7 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
   if (context.structure) add(shapeBrief(context.structure));
 
   if (context.profiles.length > 0) {
-    const heads = ["=== CHARACTERS (your notes: each action summarises a scene, it is not a line from it) ==="];
+    const heads = ["=== CHARACTERS (your notes: each action summarizes a scene, it is not a line from it) ==="];
     for (const profile of context.profiles) {
       const line = brief(profile);
       if (spent + line.length > budget) break;

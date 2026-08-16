@@ -10,7 +10,7 @@ import { charBudget, generateJson } from "./client.js";
  * do: name a beat, score an axis, or reach for the vocabulary of any structure
  * model. A reader who has seen one chapter cannot know whether a departure is
  * the Crossing of the First Threshold or a trip to the shops, and a walker
- * allowed to guess would hand the judging pass a book pre-labelled with the
+ * allowed to guess would hand the judging pass a book pre-labeled with the
  * answers — which is exactly how every story comes to "fit" every model.
  * Observations here; verdicts later, once the whole book is in view.
  */
@@ -44,7 +44,7 @@ Recording it is not the same as recording everything it does. A narrator with a 
 
 An action of the voice earns its place only if it is CONSEQUENTIAL — if it changes what the reader knows or believes, in a way an ordinary character's action would be scored for:
   - It withholds something from the reader that matters later, or reveals something no character knows.
-  - It passes judgment that steers how the reader takes a character, rather than merely colouring a sentence.
+  - It passes judgment that steers how the reader takes a character, rather than merely coloring a sentence.
   - It addresses the reader directly, or breaks the frame of the telling.
   - It is shown to be unreliable, mistaken, or hiding its own stake in events.
 
@@ -280,7 +280,7 @@ export async function digestSection(
  *  - some part of their name, or one of their aliases, appears in the prose —
  *    a name in the text is a name the reading did not invent; or
  *  - the book has already established them, in which case naming them from a
- *    pronoun is resolution rather than invention, and is the behaviour the
+ *    pronoun is resolution rather than invention, and is the behavior the
  *    known-names list was added to encourage.
  *
  * Anything meeting neither test was invented in this section, and goes.

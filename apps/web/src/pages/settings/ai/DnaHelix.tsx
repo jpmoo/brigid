@@ -11,7 +11,7 @@ import { useState } from "react";
  * The two backbones are the same wave half a turn apart, which is what makes it
  * read as a helix rather than as a ribbon. Every rung is one measure. The bead
  * on it is the only thing carrying information: left where the writer sits low
- * against ordinary published fiction, right where they sit high, on the centre
+ * against ordinary published fiction, right where they sit high, on the center
  * line where the two agree. The waving is decoration and says so — which is
  * why the bead is placed against a fixed width rather than along its rung.
  *
@@ -31,18 +31,29 @@ export interface Strand {
 }
 
 /**
- * Where ordinary published fiction sits, for the handful of measures where
- * saying so is common knowledge rather than invention.
+ * What "usual" means here, said out loud.
  *
- * Anything absent is drawn against itself instead. Making up a norm for
- * "semicolons per thousand words" would be inventing a fact and dressing it as
- * a measurement, which is worse than showing nothing.
+ * These are rules of thumb about published fiction — the kind of figure that
+ * turns up in style guidance and in rough surveys of novels. They are not
+ * measured from a corpus, because there is no corpus in this application to
+ * measure: nothing leaves the machine, so there is nothing here to compare a
+ * manuscript against except numbers written down in advance.
+ *
+ * That is a real limitation and the reason it is stated on the graph rather
+ * than buried. A band is drawn for each so the range is visible instead of
+ * asserted, and a writer who disagrees with one can see exactly what they are
+ * disagreeing with.
+ *
+ * There are only four because there are only four worth claiming. Inventing a
+ * usual rate of semicolons would be dressing a guess as a measurement, which
+ * is worse than showing nothing — so the rest are drawn with no comparison at
+ * all and only their own figure beside them.
  */
-const TYPICAL: Record<string, { low: number; high: number; note: string }> = {
-  length: { low: 12, high: 18, note: "most published fiction runs 12–18 words" },
-  paragraph: { low: 40, high: 90, note: "most published fiction runs 40–90 words" },
-  adverbs: { low: 8, high: 20, note: "most published fiction runs 8–20 per thousand" },
-  dialogue: { low: 6, high: 18, note: "most published fiction runs 6–18 per thousand" },
+const TYPICAL: Record<string, { low: number; high: number; unit: string }> = {
+  length: { low: 12, high: 18, unit: "words" },
+  paragraph: { low: 40, high: 90, unit: "words" },
+  adverbs: { low: 8, high: 20, unit: "per thousand words" },
+  dialogue: { low: 6, high: 18, unit: "per thousand words" },
 };
 
 const WIDTH = 460;
@@ -54,7 +65,7 @@ const MARGIN = 42;
 function position(strand: Strand): { at: number; kind: "compared" | "own"; note: string } {
   const norm = TYPICAL[strand.key];
   if (norm) {
-    // Centred when the writer sits inside the ordinary range, and running out
+    // Centered when the writer sits inside the ordinary range, and running out
     // to the edges at twice the width of that range either side.
     const mid = (norm.low + norm.high) / 2;
     const half = Math.max(1e-6, (norm.high - norm.low) / 2);
@@ -62,24 +73,26 @@ function position(strand: Strand): { at: number; kind: "compared" | "own"; note:
     return {
       at: Math.max(0.04, Math.min(0.96, 0.5 + offset / 2)),
       kind: "compared",
-      note: norm.note,
+      note: `most published fiction runs ${norm.low}–${norm.high} ${norm.unit}`,
     };
   }
 
   /**
-   * No published norm worth claiming, so the bead sits on the centre line and
+   * No published norm worth claiming, so the bead sits on the center line and
    * the figure beside it is the reading.
    *
    * Drawing it anywhere else would imply a comparison that was never made.
    * There is a real temptation to place it against the spread across the
    * writer's own sections instead, which would fill the graph out nicely and
    * mean nothing at all: the book-wide value is the middle of those sections by
-   * construction, so it would sit dead centre however it was scaled.
+   * construction, so it would sit dead center however it was scaled.
    */
   return {
     at: 0.5,
     kind: "own",
-    note: `varies by about ${fmt(strand.spread)} between your sections`,
+    note: `no published figure worth quoting — yours varies by about ${fmt(
+      strand.spread,
+    )} between sections`,
   };
 }
 
@@ -93,12 +106,12 @@ export function DnaHelix({ strands }: { strands: Strand[] }) {
   if (strands.length === 0) return null;
 
   const height = strands.length * ROW + MARGIN * 2;
-  const centre = WIDTH / 2;
+  const center = WIDTH / 2;
 
   // One wave down the page and its mirror. Sampled rather than drawn as a
   // curve, so the rungs can meet it exactly at every row.
   const waveAt = (y: number, phase: number) =>
-    centre + Math.sin((y / (ROW * 4)) * Math.PI * 2 + phase) * AMPLITUDE;
+    center + Math.sin((y / (ROW * 4)) * Math.PI * 2 + phase) * AMPLITUDE;
 
   const backbone = (phase: number) => {
     const points: string[] = [];
@@ -120,10 +133,10 @@ export function DnaHelix({ strands }: { strands: Strand[] }) {
       >
         {/* Where a measure sits when it matches ordinary published fiction. */}
         <line
-          className="dna-centre"
-          x1={centre}
+          className="dna-center"
+          x1={center}
           y1={MARGIN - 14}
-          x2={centre}
+          x2={center}
           y2={MARGIN + (strands.length - 1) * ROW + 14}
         />
         <path className="dna-backbone" d={backbone(0)} />
@@ -145,7 +158,7 @@ export function DnaHelix({ strands }: { strands: Strand[] }) {
            * beads read down the column against each other, so they are spaced
            * against the same width whatever the rung behind them is doing.
            */
-          const x = centre + (at - 0.5) * 2 * AMPLITUDE;
+          const x = center + (at - 0.5) * 2 * AMPLITUDE;
           const on = hovered === strand.key;
 
           return (
@@ -170,6 +183,18 @@ export function DnaHelix({ strands }: { strands: Strand[] }) {
                 y2={y}
                 className="dna-hit"
               />
+              {/* The range itself. Always the middle third of the axis, since
+                  the scale is defined from it — so "inside the band" reads the
+                  same on every rung that has one. */}
+              {kind === "compared" ? (
+                <line
+                  x1={center - AMPLITUDE / 3}
+                  y1={y}
+                  x2={center + AMPLITUDE / 3}
+                  y2={y}
+                  className="dna-band"
+                />
+              ) : null}
               <circle cx={x} cy={y} r={on ? 7 : 5} className="dna-bead" />
 
               <text x={12} y={y + 4} className="dna-name">
@@ -190,11 +215,20 @@ export function DnaHelix({ strands }: { strands: Strand[] }) {
       </svg>
 
       <p className="dna-key">
-        A bead to the right of centre means more of that than usual, to the left
-        means less. Only sentence length, paragraph length, adverbs and speech
-        tags are set against published fiction — there is no norm worth quoting
-        for the rest, so those sit at their own value and the figure beside them
-        is what to read.
+        The four thicker rungs are the only ones compared to anything. The bar
+        across them is roughly where published fiction sits — sentences of
+        12–18 words, paragraphs of 40–90, 8–20 <i>-ly</i> adverbs and 6–18
+        speech tags per thousand words — and your bead sits inside it, or to the
+        left for less, or to the right for more. Those are rules of thumb rather
+        than a measured survey: nothing leaves this machine, so there is no
+        library of novels here to compare you against.
+      </p>
+      <p className="dna-key">
+        The hollow beads have no comparison at all. There is no honest figure
+        for how many semicolons a novel usually has, so those sit on the center
+        line and the number beside them is the whole of the reading. What they
+        are useful for is further down — a section is compared to{" "}
+        <em>the rest of your own book</em>, which needs no outside authority.
       </p>
     </div>
   );

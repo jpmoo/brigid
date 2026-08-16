@@ -39,7 +39,7 @@ interface PromptOptions {
 
 interface Dialogs {
   confirm: (options: ConfirmOptions) => Promise<boolean>;
-  /** Resolves with one value per field, or null if cancelled. */
+  /** Resolves with one value per field, or null if canceled. */
   prompt: (options: PromptOptions) => Promise<string[] | null>;
 }
 

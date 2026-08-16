@@ -137,7 +137,7 @@ async function readyDigest(workId: string): Promise<PlacedDigest[]> {
   if (!progress.ready) {
     throw badRequest(
       progress.total === 0
-        ? "there is nothing written to analyse yet"
+        ? "there is nothing written to analyze yet"
         : `still reading — ${progress.done} of ${progress.total} sections done`,
     );
   }

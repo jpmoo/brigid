@@ -31,7 +31,7 @@
 const OPENS_AFTER = /[\s([{“‘]/u;
 const DASHES = new Set(["—", "–"]);
 
-/** Letters or digits, so an apostrophe inside a word can be recognised. */
+/** Letters or digits, so an apostrophe inside a word can be recognized. */
 function isWordChar(ch: string | undefined): boolean {
   return ch !== undefined && /[\p{L}\p{N}]/u.test(ch);
 }

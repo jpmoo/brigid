@@ -164,7 +164,7 @@ rewrite it.
   belongs to. Notes are bookmarks — the same list at the top of the outline — so
   one made here appears there, and one dropped on a line while writing appears
   here beside the section holding it.
-- **Colour.** Cards shade against their level's word goal, the same reading the
+- **Color.** Cards shade against their level's word goal, the same reading the
   outline gives — short of it, or past it. The goal belongs to the chapter, so
   it is the chapter that shades and not the card holding its opening.
 - **Searching.** There is no reading order to scroll along, so search works

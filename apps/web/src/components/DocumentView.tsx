@@ -339,7 +339,7 @@ function Nodes({
               * to the node under the pointer when the press lands — swap that
               * node for the editor at that moment and the browser has nothing
               * left to extend a selection from. So the rendered text does the
-              * selecting, natively, with all the behaviour that comes free with
+              * selecting, natively, with all the behavior that comes free with
               * it, and what it produced is carried across the swap here.
               *
               * Released, rather than clicked: a click only fires when the press

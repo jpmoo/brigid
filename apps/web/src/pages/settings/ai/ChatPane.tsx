@@ -129,7 +129,7 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   if (!ready) {
     return (
       <p className="tpl-note">
-        Available once the story shape has been analysed and at least one character has
+        Available once the story shape has been analyzed and at least one character has
         been profiled. Both are the context this works from &mdash; without them there
         would be nothing to talk about but the prose, which the model has not read.
       </p>

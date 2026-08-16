@@ -5,7 +5,7 @@
 -- on the level, so each level has at most its own — a chapter and a scene can
 -- both have one, neither can have two.
 --
--- Null means no goal. Cancelling one is setting it back to null, not deleting a
+-- Null means no goal. Canceling one is setting it back to null, not deleting a
 -- row, so there is nothing to tidy up afterwards.
 
 ALTER TABLE works ADD COLUMN total_word_goal integer;

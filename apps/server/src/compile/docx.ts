@@ -89,7 +89,7 @@ const NONE = { style: BorderStyle.NONE, size: 0, color: "auto" } as const;
  * A table stays a table.
  *
  * A title page uses one to place a few lines on a page, and flattening it to
- * centred paragraphs loses exactly the thing it was for. Widths travel as
+ * centered paragraphs loses exactly the thing it was for. Widths travel as
  * percentages, because the page is a known width and the template thought in
  * shares of it.
  */

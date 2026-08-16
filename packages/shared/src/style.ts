@@ -207,7 +207,7 @@ export function splitSpeech(text: string): { spoken: string; narrated: string } 
     buffer += ch;
   }
 
-  // An unclosed quotation is a typo, not a licence to call the rest of the
+  // An unclosed quotation is a typo, not a license to call the rest of the
   // section dialogue. What is left goes back to narration.
   narrated += buffer;
   return { spoken: spoken.trim(), narrated: narrated.trim() };

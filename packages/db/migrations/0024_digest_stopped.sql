@@ -1,7 +1,7 @@
 -- Being able to call the reading off.
 --
 -- Reading a novel takes the better part of an hour of a machine's full
--- attention, and the writer may want that machine back — or may have realised
+-- attention, and the writer may want that machine back — or may have realized
 -- the run is against a manuscript they are about to restructure anyway. Until
 -- now the only way to stop it was to stop the server.
 --

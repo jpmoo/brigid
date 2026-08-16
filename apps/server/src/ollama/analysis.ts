@@ -42,7 +42,7 @@ const MIN_SECTIONS = 2;
  * Deliberately tiny. This used to catch "the narrator", "the author" and their
  * kin, which was wrong: whether a narrator is a character is a question about a
  * particular book, and plenty of books answer yes — an unnamed first-person
- * narrator with a presence throughout is the story's centre, not an artefact of
+ * narrator with a presence throughout is the story's center, not an artefact of
  * the reading. Deciding that in code meant the one character the writer most
  * wanted profiled could not be.
  *
@@ -343,7 +343,7 @@ Score ${opts.name} on all ten axes, using these exact keys: ${AXIS_KEYS.join(", 
 
 For every axis give:
 - "aligned": the actions from the record above that MOST support this score — the citable events the rubric demands. For a score of 2 or higher this must not be empty; if you cannot name the events, lower the score.
-- "contradictory": the actions that cut AGAINST this reading, or complicate it — what a careful reader would raise as an objection. If the character's behaviour is consistent on this axis, return an empty list rather than inventing an objection.
+- "contradictory": the actions that cut AGAINST this reading, or complicate it — what a careful reader would raise as an objection. If the character's behavior is consistent on this axis, return an empty list rather than inventing an objection.
 
 Then: "epithet", ONE short line for this character's card — at most twelve words. Either a wry description of what they are in this story, or a line of their own dialogue that captures them. It must come from THIS manuscript: quote or paraphrase what is actually on the page, never what you may know of a character with this name from elsewhere. Dry and specific beats grand and vague — "would rather be right than liked" over "a complex and compelling figure". No quotation marks unless it is their speech.${
     opts.taken?.length

@@ -70,7 +70,7 @@ export interface Rect {
  * Zero arrives perpendicular to the face, one aims straight from one box at the
  * other. Halfway keeps the sense of leaving and entering by a particular side
  * while letting the last stretch lie along the way the connector is actually
- * travelling.
+ * traveling.
  */
 const TILT = 0.5;
 
@@ -322,7 +322,7 @@ export function layout(
    * child was laid out below the opening and then written down as though the
    * corner were below the opening too — and the next draw added that height
    * again, and the one after that again, until the region had a hole in it and
-   * had grown through its neighbours.
+   * had grown through its neighbors.
    */
   const place = (
     parentId: string | null,

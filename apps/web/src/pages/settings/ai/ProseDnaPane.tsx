@@ -316,7 +316,7 @@ function Outliers({
         <h4>Most like the rest of your book</h4>
         <p className="muted small">
           Closest to the middle of everything counted. This is what the model is
-          shown when it needs to sound like you — not a judgement about which
+          shown when it needs to sound like you — not a judgment about which
           pages are best.
         </p>
         <ul className="dna-list">

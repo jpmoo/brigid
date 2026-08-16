@@ -44,7 +44,7 @@ const local = (y: number, m: number, d: number, h: number, min: number) =>
   const stamp = stampFor(new Date(Date.UTC(2026, 7, 1, 1, 0, 0)));
   check("the stamp is compact UTC", stamp, "20260801T010000Z");
   check("a plain name is accepted", isBackupName(`brigid-${stamp}.dump`), true);
-  check("so is a labelled one", isBackupName(`brigid-${stamp}-before-restore.dump`), true);
+  check("so is a labeled one", isBackupName(`brigid-${stamp}-before-restore.dump`), true);
 
   // Anything that could walk out of the backup directory is refused before it
   // is ever joined onto a path.

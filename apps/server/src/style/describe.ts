@@ -35,7 +35,7 @@ Rules:
 - Numbers are evidence, not content. Write "sentences run long — around 24 words, where most novels sit nearer 15" rather than reciting rates.
 - Address the writer as "you". Plain English, no jargon, no stylometry vocabulary.
 - Comparisons to "most published fiction" are allowed only for the handful of measures where a rough norm is common knowledge: sentence length (typically 12-18 words), paragraph length, adverb use, and the share of dialogue. Say nothing comparative about the rest.
-- Be specific and short. A writer who reads this should recognise themselves.`;
+- Be specific and short. A writer who reads this should recognize themselves.`;
 
 const SCHEMA = {
   type: "object",

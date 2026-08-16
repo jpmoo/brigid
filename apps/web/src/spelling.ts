@@ -28,7 +28,7 @@ export interface Speller {
  *
  * Letters and the apostrophes inside them — "don't" and "o'clock" are single
  * words, and the typeset apostrophe is the same character the renderer puts
- * there, so both forms have to be recognised. Anything with a digit in it is
+ * there, so both forms have to be recognized. Anything with a digit in it is
  * left alone: "1990s" and "3pm" are not spelling mistakes, and a dictionary has
  * no opinion about them.
  */

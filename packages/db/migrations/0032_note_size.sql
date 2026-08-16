@@ -7,7 +7,7 @@
 --
 -- Null until it has been resized, which means "whatever the default is" rather
 -- than a size of zero — so changing that default later moves every note that
--- was never given one of its own, which is the right behaviour.
+-- was never given one of its own, which is the right behavior.
 
 ALTER TABLE bookmarks ADD COLUMN note_w double precision;
 ALTER TABLE bookmarks ADD COLUMN note_h double precision;

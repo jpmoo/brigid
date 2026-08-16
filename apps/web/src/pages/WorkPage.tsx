@@ -141,7 +141,7 @@ export function WorkPage() {
    *
    * Leaving for the settings or the library is not writing. Unmounting is what
    * that leaving looks like from here, so the session is banked on the way out
-   * — paused, never cancelled, because it is still yours when you come back.
+   * — paused, never canceled, because it is still yours when you come back.
    */
   useEffect(() => {
     return () => {
@@ -200,7 +200,7 @@ export function WorkPage() {
    *
    * Renaming a section, editing a title page, setting a break, adding a block:
    * all of it is worth doing and none of it is the thing the clock is counting.
-   * Paused rather than cancelled, and not resumed when the dialog closes —
+   * Paused rather than canceled, and not resumed when the dialog closes —
    * typing is what starts it again, and closing a dialog is not typing.
    */
   const editingSomething =
@@ -955,7 +955,7 @@ export function WorkPage() {
       const marks = pane.querySelectorAll("mark.hit");
 
       // While the current result is still on screen it stays the current one.
-      // Without this the two rules fought: stepping centred a hit, this then
+      // Without this the two rules fought: stepping centered a hit, this then
       // re-anchored to whichever hit was highest in view — an earlier one, when
       // several sit close together — and Next walked backwards for ever. The
       // reader can see the match they are on; nothing is gained by moving off it.
@@ -1009,12 +1009,12 @@ export function WorkPage() {
     };
     // Once the pane exists, and only then. It reads the document rather than
     // any rendered value, so nothing else here can go stale — and depending on
-    // `items` instead meant tearing down the listener and cancelling a pending
+    // `items` instead meant tearing down the listener and canceling a pending
     // measurement every time the manuscript was touched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paneEl]);
 
-  // Centre the current block in the outline, so there is always context above
+  // Center the current block in the outline, so there is always context above
   // and below it rather than it sitting against an edge. Also runs when the
   // panel comes back into view: it can't scroll while it's retracted, so it
   // would otherwise reappear showing wherever it was left.
@@ -1028,7 +1028,7 @@ export function WorkPage() {
     // tracker measures from, so following the document changed what the
     // document appeared to be showing. Its smooth animation was the other half
     // of the trouble: a continuous scroll changes the current block every few
-    // hundred milliseconds, and each call cancelled the last one mid-flight, so
+    // hundred milliseconds, and each call canceled the last one mid-flight, so
     // the panel spent its time animating toward positions already stale.
     //
     // Setting scrollTop on the panel alone has neither problem: nothing else
@@ -1191,11 +1191,11 @@ export function WorkPage() {
     /**
      * The marked line put in the middle, rather than the paragraph.
      *
-     * Centring the paragraph is right only while it fits: a paragraph taller
+     * Centering the paragraph is right only while it fits: a paragraph taller
      * than the pane has its middle in the middle, so a bookmark on a long one
      * landed halfway down it with the line it marks scrolled off the top. The
      * marker sits against the paragraph's first line, so that is what is
-     * centred — which needs no cases, and puts the marked line in the same
+     * centered — which needs no cases, and puts the marked line in the same
      * place whether the paragraph is one line or a hundred.
      */
     const pane = paneRef.current;
@@ -1325,10 +1325,10 @@ export function WorkPage() {
       // name is one nobody can tell from the others a week later, and the
       // moment you know why you marked the place is this one.
       //
-      // Cancelling here means "I didn't mean to make this", not "keep it
+      // Canceling here means "I didn't mean to make this", not "keep it
       // unnamed": the dialog opened by itself rather than being asked for, so
       // the only way to back out of an accidental drop is for cancel to undo
-      // it. Cancelling a rename on an existing bookmark still just leaves it be.
+      // it. Canceling a rename on an existing bookmark still just leaves it be.
       const named = await renameBookmark(bookmark);
       if (!named) await removeBookmark(bookmark, { confirm: false });
     } catch (err) {
@@ -1370,7 +1370,7 @@ export function WorkPage() {
      * A bookmark is a note to yourself about a place, and the note is the part
      * that cannot be reconstructed — the place you could find again.
      *
-     * Not asked when undoing a drop the writer has just cancelled out of. They
+     * Not asked when undoing a drop the writer has just canceled out of. They
      * said no a moment ago, and asking again about a bookmark that never really
      * existed is noise.
      */
@@ -1775,7 +1775,7 @@ export function WorkPage() {
         *
         * A canvas shows the shape of the book, not its text, so a section
         * opened here gets a room of its own rather than expanding a card into
-        * something the size of a page and pushing its neighbours about. It is
+        * something the size of a page and pushing its neighbors about. It is
         * zen without the outline: nothing but the section, its length, and the
         * usual controls — the same editor the manuscript uses, so everything
         * that works there works here.

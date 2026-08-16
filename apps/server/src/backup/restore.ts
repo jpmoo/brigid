@@ -188,7 +188,7 @@ export async function restoreWork(
  * owner: rewriting the password hash, reading the other manuscripts, dropping
  * the schema. The restore is scoped to one manuscript; the file was not.
  *
- * So nothing passes unless it is recognised. Outside a data section only blank
+ * So nothing passes unless it is recognized. Outside a data section only blank
  * lines, comments, SET, and a COPY header naming one of the tables asked for
  * are allowed. Inside one, every line is data until the terminator, and data is
  * never interpreted. Anything else stops the restore rather than being handed

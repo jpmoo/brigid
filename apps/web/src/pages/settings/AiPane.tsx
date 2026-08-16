@@ -557,7 +557,7 @@ function StructurePane({
       <div className="be-line" style={{ marginTop: 12 }}>
         <button className="btn" type="button" disabled={busy || working} onClick={onRun}>
           {result ? <RefreshCw size={14} /> : <Play size={14} />}
-          {working ? "Reading the shape…" : result ? "Run again" : "Analyse the story's shape"}
+          {working ? "Reading the shape…" : result ? "Run again" : "Analyze the story's shape"}
         </button>
         {working ? (
           <span className="muted">

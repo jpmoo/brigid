@@ -8,7 +8,7 @@ import type { FitRating, ModelFit } from "@brigid/shared";
  * to respect: **"not applicable" is not a low score.** Fifteen timed beats
  * cannot be asked of a three-thousand-word story, and rendering that as an
  * empty bar would read as "your manuscript fails Save the Cat" — an accusation
- * the reference document never makes. It gets its own greyed treatment and no
+ * the reference document never makes. It gets its own grayed treatment and no
  * bar at all.
  */
 

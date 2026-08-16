@@ -343,7 +343,7 @@ export function LibraryPage() {
 
 /**
  * Deleting a manuscript is not undoable and there is no backup inside Brigid,
- * so it takes two deliberate steps: an acknowledgement of exactly what is
+ * so it takes two deliberate steps: an acknowledgment of exactly what is
  * about to be lost, and then a sustained hold. Only reachable from the archive.
  */
 function DeleteWorkDialog({

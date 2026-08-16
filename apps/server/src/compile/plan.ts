@@ -188,7 +188,7 @@ function lineFrom(
 /**
  * Turns one item of the stitched document into lines.
  *
- * A table becomes its cells, one line each, centred. A title page's table is
+ * A table becomes its cells, one line each, centered. A title page's table is
  * doing layout rather than tabulation — it is a way of placing a few lines on a
  * page — and neither output format needs a grid to say that.
  */

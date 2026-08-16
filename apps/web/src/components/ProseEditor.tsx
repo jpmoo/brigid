@@ -97,7 +97,7 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Wraps what the checker doesn't recognise.
+ * Wraps what the checker doesn't recognize.
  *
  * The wrapper is a plain inline span, so typing through one behaves like typing
  * through any other styled run — the caret doesn't get trapped and the text
@@ -1670,7 +1670,7 @@ export function ProseEditor({
           onOpenBookmark(id);
         }}
         // The browser's own checker would underline the same words in a second
-        // colour, from a dictionary this app can't add to.
+        // color, from a dictionary this app can't add to.
         spellCheck={false}
         onKeyDown={onKeyDown}
         onCopy={(event) => {

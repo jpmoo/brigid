@@ -12,7 +12,7 @@ import type { CharacterAnalysis } from "@brigid/shared";
  */
 
 const SIZE = 300;
-const CENTRE = SIZE / 2;
+const CENTER = SIZE / 2;
 const RADIUS = SIZE / 2 - 46;
 const MAX = 5;
 /** Room either side for the labels. */
@@ -22,7 +22,7 @@ function point(index: number, count: number, value: number): [number, number] {
   // Straight up for the first axis, then clockwise — a radar read like a clock.
   const angle = (Math.PI * 2 * index) / count - Math.PI / 2;
   const r = (value / MAX) * RADIUS;
-  return [CENTRE + Math.cos(angle) * r, CENTRE + Math.sin(angle) * r];
+  return [CENTER + Math.cos(angle) * r, CENTER + Math.sin(angle) * r];
 }
 
 export function SpiderGraph({
@@ -68,13 +68,13 @@ export function SpiderGraph({
           const [lx, ly] = point(i, count, MAX + 1.15);
           return (
             <g key={axis.axis}>
-              <line className="spider-spoke" x1={CENTRE} y1={CENTRE} x2={x} y2={y} />
+              <line className="spider-spoke" x1={CENTER} y1={CENTER} x2={x} y2={y} />
               <text
                 className={`spider-label${openAxis === axis.axis ? " open" : ""}`}
 
                 x={lx}
                 y={ly}
-                textAnchor={lx < CENTRE - 4 ? "end" : lx > CENTRE + 4 ? "start" : "middle"}
+                textAnchor={lx < CENTER - 4 ? "end" : lx > CENTER + 4 ? "start" : "middle"}
                 dominantBaseline="middle"
                 onClick={compact ? undefined : () => setOpenAxis(openAxis === axis.axis ? null : axis.axis)}
               >

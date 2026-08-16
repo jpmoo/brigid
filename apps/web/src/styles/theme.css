@@ -99,7 +99,7 @@ a:hover {
   text-decoration: underline;
 }
 
-/* --- Centred single-panel screens: setup, login ----------------------- */
+/* --- Centered single-panel screens: setup, login ----------------------- */
 
 .screen {
   min-height: 100%;
@@ -998,7 +998,7 @@ input::placeholder {
 .page-sheet.manuscript {
   max-width: none;
   width: 100%;
-  /* auto so that capping the measure re-centres the sheet rather than
+  /* auto so that capping the measure re-centers the sheet rather than
      stranding it against the outline. */
   margin: 0 auto;
   padding: 48px 56px 96px;
@@ -2053,7 +2053,7 @@ input::placeholder {
 }
 
 /* Sits on the boundary between two columns; dragging moves width from one to
-   its neighbour, never off the end of the table. */
+   its neighbor, never off the end of the table. */
 .te-handle {
   position: absolute;
   top: 0;
@@ -2970,7 +2970,7 @@ mark.hit.misspelled {
   /* Thin on purpose. The thickness also sets the wave's amplitude, so a heavier
      line is a taller ripple as well, and at manuscript sizes that stopped being
      a mark under the word and started being a second line of its own. The
-     colour is what carries it; the wave only has to be legible. */
+     color is what carries it; the wave only has to be legible. */
   text-decoration-thickness: 1px;
   text-decoration-skip-ink: none;
   text-underline-offset: 3px;
@@ -3775,7 +3775,7 @@ mark.hit.misspelled {
 /* --- Sections against their goal --------------------------------------- */
 
 /* The shape of the book at a glance: short of its goal, or past it. Tinted
-   rather than coloured — these sit behind chapter titles that still have to be
+   rather than colored — these sit behind chapter titles that still have to be
    read, and the break cap above already owns the accent green, so this is a
    cooler one that won't be mistaken for it. */
 .outline-item.short .outline-card {
@@ -3866,7 +3866,7 @@ mark.hit.misspelled {
   border-radius: 999px;
   transition: width 0.5s ease;
 }
-/* Green throughout, deepening with the verdict — one scale, not four colours. */
+/* Green throughout, deepening with the verdict — one scale, not four colors. */
 .fit-fill.good { background: #2f7d4f; }
 .fit-fill.moderate { background: #5d9a5f; }
 .fit-fill.low { background: #93b083; }
@@ -4154,7 +4154,7 @@ mark.hit.misspelled {
 
 /* --- The cast, as tiles --------------------------------------------------- */
 
-/* Two or three across, never more: a radar with ten labelled spokes stops
+/* Two or three across, never more: a radar with ten labeled spokes stops
    being readable well before it stops being drawable, and "Rival / False Hero"
    needs the room. The minimum is what keeps the labels legible; auto-fit lets
    a narrow window drop to two and then to one. */
@@ -4250,7 +4250,7 @@ mark.hit.misspelled {
 .fit-caret {
   flex: none;
   /* The row is baseline-aligned for its text; an icon has no baseline worth
-     aligning, so it centres itself against the line instead. */
+     aligning, so it centers itself against the line instead. */
   align-self: center;
   color: var(--text-faint);
   transition: transform 0.14s;
@@ -4426,7 +4426,7 @@ mark.hit.misspelled {
    bounded height, and a plain `.modal` is neither, so the body simply grew past
    the screen and the end of the report was unreachable. Scoped here rather than
    applied to `.modal` itself, so the modals that were laid out against the old
-   behaviour keep it. */
+   behavior keep it. */
 .cast-modal {
   display: flex;
   flex-direction: column;
@@ -4841,7 +4841,7 @@ mark.hit.misspelled {
 
 /* The writer's turn is the tinted one: it is short, it is the thing being
    answered, and tinting the long replies instead would make the panel a wall
-   of colour. */
+   of color. */
 .chat-turn.user {
   background: color-mix(in srgb, var(--accent) 7%, transparent);
 }
@@ -4947,7 +4947,7 @@ mark.hit.misspelled {
 }
 
 /* The flex lives on a wrapper, not on the cell: `display: flex` on a `td`
-   takes it out of the table and the column stops aligning with its neighbours. */
+   takes it out of the table and the column stops aligning with its neighbors. */
 .rec-to-inner {
   display: flex;
   align-items: center;
@@ -5204,7 +5204,7 @@ mark.hit.misspelled {
 }
 
 /* The hit being stepped through, inside the editor. Stronger than its
-   neighbours for the same reason as in the reading view: several hits are on
+   neighbors for the same reason as in the reading view: several hits are on
    screen at once and only one of them is where you are. */
 .prose-editor [contenteditable] mark.hit.active {
   background: color-mix(in srgb, var(--accent) 45%, transparent);
@@ -5307,7 +5307,7 @@ mark.hit.misspelled {
   touch-action: none;
 
   /* A drag here moves things; it never selects them. Without this, dragging a
-     card across its neighbours highlights their titles as though the canvas
+     card across its neighbors highlights their titles as though the canvas
      were a page of text, and the browser then treats the next press as a
      click on a selection. */
   user-select: none;
@@ -5508,7 +5508,7 @@ mark.hit.misspelled {
   padding: 32px clamp(20px, 6vw, 64px) 40vh;
 }
 
-/* Centred, so a wide sheet does not put the prose against its left edge. */
+/* Centered, so a wide sheet does not put the prose against its left edge. */
 .canvas-zen-measure {
   margin: 0 auto;
 }
@@ -5749,7 +5749,7 @@ mark.hit.misspelled {
   color: var(--text-muted);
 }
 
-/* The helix. Centred and given room, because it is the thing the pane is for
+/* The helix. Centered and given room, because it is the thing the pane is for
    and a chart squeezed against a column of text reads as an illustration
    rather than as the finding. */
 .dna-wrap {
@@ -5773,10 +5773,18 @@ mark.hit.misspelled {
 }
 
 /* The line a bead is read against. Faint: it is a reference, not a reading. */
-.dna-centre {
+.dna-center {
   stroke: color-mix(in srgb, var(--text) 12%, transparent);
   stroke-width: 1;
   stroke-dasharray: 2 4;
+}
+
+/* The range a compared measure is read against, drawn so "usual" is something
+   you can see rather than something the caption asserts. */
+.dna-band {
+  stroke: color-mix(in srgb, var(--accent) 22%, transparent);
+  stroke-width: 9;
+  stroke-linecap: round;
 }
 
 .dna-bar {

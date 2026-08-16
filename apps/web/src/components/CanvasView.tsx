@@ -280,7 +280,7 @@ export function CanvasView({
    * A drag on the surface pans, which is what an endless canvas is expected to
    * do and what a trackpad's two fingers send as a wheel event anyway. Ctrl or
    * the pinch gesture — which browsers deliver as a wheel with ctrlKey set —
-   * zooms about the pointer rather than the centre, so the thing under the
+   * zooms about the pointer rather than the center, so the thing under the
    * cursor stays under it.
    */
   const panning = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
@@ -363,7 +363,7 @@ export function CanvasView({
    * Bring the stepped-to card into the middle.
    *
    * Panning rather than scrolling, since there is nothing to scroll: the pan
-   * is chosen so the card's centre lands on the surface's centre. Zoom is left
+   * is chosen so the card's center lands on the surface's center. Zoom is left
    * where the writer put it unless it is too small to read the card at, in
    * which case it is lifted just far enough — stepping through results should
    * not quietly undo the zoom you chose.
@@ -374,7 +374,7 @@ export function CanvasView({
     if (!focusId) return;
     const box = surface.current?.getBoundingClientRect();
     // A region's prose sits in the card standing for it, so that is what is
-    // brought into view — centring the whole chapter would leave the writer
+    // brought into view — centering the whole chapter would leave the writer
     // looking at a rectangle and hunting inside it for the word.
     const card =
       placed.find((p) => p.isSelfCard && p.parentId === focusId) ??
@@ -625,7 +625,7 @@ export function CanvasView({
     const north = held.corner === "nw" || held.corner === "ne";
 
     // A west or north drag takes width off the near edge, so the far edge is
-    // what stays still; clamped first, or the corner would keep travelling
+    // what stays still; clamped first, or the corner would keep traveling
     // after the card had stopped shrinking.
     const w = Math.max(MIN_W, held.startW + (west ? -dx : dx));
     const h = Math.max(MIN_H, held.startH + (north ? -dy : dy));

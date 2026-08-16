@@ -52,7 +52,7 @@ export function contextLengthFrom(show: ShowResponse): number | null {
  * Does this model think before answering?
  *
  * Null rather than false when Ollama doesn't say, because the two lead to
- * different behaviour: a model known not to think can be sent `think: false`
+ * different behavior: a model known not to think can be sent `think: false`
  * safely, while a model whose capabilities are unknown must not be — Ollama
  * rejects the field outright on a model that lacks the capability, and a
  * rejected request is worse than a slow one.

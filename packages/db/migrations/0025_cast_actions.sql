@@ -11,7 +11,7 @@
 -- has not changed produces the same pairs and so changes nothing. `character_name`
 -- and `action` are what the writer settled on, and start as copies. Moving an
 -- action to someone else, or rewording it, edits those and leaves the origin
--- alone, so a re-read can still recognise its own line.
+-- alone, so a re-read can still recognize its own line.
 --
 -- State is the gate. New material arrives 'pending' and is invisible to
 -- profiling until committed; 'dropped' is a line the writer threw out, kept as

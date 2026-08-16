@@ -388,7 +388,7 @@ export const ChipEditor = forwardRef<ChipEditorHandle, ChipEditorProps>(function
    * thing that handles the caret case natively — with nothing selected it sets
    * the typing state, so the next characters come out marked. Small caps and
    * all caps have no such command, so an empty marked span is planted and the
-   * caret put inside it, which produces the same behaviour.
+   * caret put inside it, which produces the same behavior.
    */
   const toggleMark = (mark: keyof TemplateMarks) => {
     const el = ref.current;

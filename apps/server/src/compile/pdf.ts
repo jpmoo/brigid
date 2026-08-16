@@ -142,11 +142,11 @@ function drawLine(doc: PDFKit.PDFDocument, line: CompiledLine): void {
   const indent = line.firstLineIndentIn * INCH;
 
   /**
-   * Centred and right-aligned lines are placed by hand.
+   * Centered and right-aligned lines are placed by hand.
    *
-   * pdfkit aligns each `continued` segment on its own, so a centred line built
+   * pdfkit aligns each `continued` segment on its own, so a centered line built
    * from two runs — "Chapter " and "One", or a title and its subtitle — draws
-   * both centred, one on top of the other. These lines are short by nature: a
+   * both centered, one on top of the other. These lines are short by nature: a
    * chapter head, a title, a byline. Measured and laid end to end, they keep
    * both their alignment and their marks.
    */
@@ -221,7 +221,7 @@ function drawTable(doc: PDFKit.PDFDocument, table: CompiledTable): void {
       let y = top + offset;
       for (const line of cell.lines) {
         const leading = line.fontSizePt * line.lineHeight;
-        // Runs within a cell are laid end to end for the same reason a centred
+        // Runs within a cell are laid end to end for the same reason a centered
         // line is: each would otherwise be aligned on its own.
         let total = 0;
         for (const run of line.runs) {

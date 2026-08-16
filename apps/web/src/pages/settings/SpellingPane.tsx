@@ -78,7 +78,7 @@ export function SpellingPane() {
             onChange={(e) => void toggle(e.target.checked)}
           />
           <span>
-            Check spelling as I write <em>&mdash; underlines what it doesn&rsquo;t recognise</em>
+            Check spelling as I write <em>&mdash; underlines what it doesn&rsquo;t recognize</em>
           </span>
         </label>
       </div>

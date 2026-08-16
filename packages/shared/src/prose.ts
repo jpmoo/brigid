@@ -114,7 +114,7 @@ const MARK_TYPES: ProseMarkType[] = ["strong", "em", "underline"];
 const markKey = (run: ProseText): string =>
   MARK_TYPES.map((type) => (hasMark(run, type) ? "1" : "0")).join("");
 
-/** Drops empty runs and fuses neighbours that carry the same marks. */
+/** Drops empty runs and fuses neighbors that carry the same marks. */
 export function normalizeProse(doc: ProseDoc): ProseDoc {
   return {
     type: "doc",

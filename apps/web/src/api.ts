@@ -359,7 +359,7 @@ export const api = {
         });
 
         xhr.addEventListener("error", () => reject(new ApiError(0, "could not reach the server")));
-        xhr.addEventListener("abort", () => reject(new ApiError(0, "upload cancelled")));
+        xhr.addEventListener("abort", () => reject(new ApiError(0, "upload canceled")));
         xhr.send(form);
       },
     ),

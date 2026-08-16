@@ -39,7 +39,7 @@ export const STRUCTURE_MODELS = `THE SEVEN MODELS
 Distinctive claims: two distinct worlds separated by a threshold with a ROUND TRIP between them; a mentor figure; symbolic death and rebirth; the return matters — value is brought back to a community; internal transformation is mandatory and mirrors the external quest.
 Strong fit: literal or figurative world-crossing; a mentor; a central ordeal near the midpoint or shortly after; a SECOND climax near the end (Resurrection distinct from Ordeal); the hero returns changed.
 Weak fit: no return; no transformation; no mentor and no threshold; ensemble stories with no single arc; stories whose engine is not a quest.
-Common misclassification: any story with a protagonist and obstacles gets labelled Hero's Journey. Require the distinctive claims, not "character faces challenges and grows".
+Common misclassification: any story with a protagonist and obstacles gets labeled Hero's Journey. Require the distinctive claims, not "character faces challenges and grows".
 
 2. FREYTAG'S PYRAMID. Exposition (ending in the inciting moment), Rising Action, Climax, Falling Action, Catastrophe.
 Distinctive claims: THE CLIMAX IS CENTRAL, NOT TERMINAL — roughly the midpoint. The second half is as long and as dramatically important as the first. A symmetrical arc of fortune: rise, peak, fall. A late moment of final suspense (false hope) before the catastrophe.
@@ -80,7 +80,7 @@ Even if the text resembles a work you recognize, you must not use any outside kn
 
 If the material given to you does not settle a question, say so. Never fill a gap from memory.
 
-The examples named in the axis descriptions below (Nick Carraway, Watson, Samwise, Gandalf) are there to illustrate the RUBRIC ONLY. They are not licence to identify this manuscript or to import anything remembered about any other book into your scoring.
+The examples named in the axis descriptions below (Nick Carraway, Watson, Samwise, Gandalf) are there to illustrate the RUBRIC ONLY. They are not license to identify this manuscript or to import anything remembered about any other book into your scoring.
 
 Governing principles:
 
@@ -90,7 +90,7 @@ Governing principles:
 4. All axes are scored relative to a focal perspective — normally the protagonist's arc, or the story's central conflict if the story is ensemble-structured. State which you used.
 5. Multiple high scores are normal and informative. The chart's value is the combination. Do not suppress secondary functions to make a character cleanly one thing.
 6. LOW, FLAT PROFILES ARE A VALID FINDING for genuinely minor or decorative characters. Do not inflate.
-7. The protagonist is NOT automatically Hero-5. Passive, static, or witness-narrators can centre a story while transforming little.
+7. The protagonist is NOT automatically Hero-5. Passive, static, or witness-narrators can center a story while transforming little.
 
 Rubric, applying to every axis:
 0 Absent — no story events instantiate this function.
@@ -104,7 +104,7 @@ Ordinarily only one character can hold a 5 on a given axis. If two seem to, one 
 
 export const AXES = `THE TEN AXES
 
-1. HERO — the transforming centre. The dramatic question is answered in and through them; they carry the arc of change and bear the cost of the climax. Look for: the inciting disruption lands on them; they make the consequential choices; measurable difference between opening and closing state; they pay the story's costs; the narrative attends to their inner life.
+1. HERO — the transforming center. The dramatic question is answered in and through them; they carry the arc of change and bear the cost of the climax. Look for: the inciting disruption lands on them; they make the consequential choices; measurable difference between opening and closing state; they pay the story's costs; the narrative attends to their inner life.
 Do NOT score up for: mere point-of-view status — a narrator who watches another's transformation (Nick Carraway, Watson) is a WITNESS, not the Hero; score the observed character up and consider the narrator for Ally. Prominence without change and without cost.
 vs. Beloved: pursues rather than is pursued. vs. Ally: owns the arc rather than accompanying it.
 
@@ -221,7 +221,7 @@ export const MODEL_BLURBS: Record<(typeof MODEL_KEYS)[number], string> = {
  * point of reading is worth more than a reference document nobody opens.
  */
 export const AXIS_BLURBS: Record<(typeof AXIS_KEYS)[number], string> = {
-  hero: "The transforming centre. The story's question is answered through them; they make the climactic choice and pay for it. Not merely the point-of-view character — a narrator who watches someone else change is not the Hero.",
+  hero: "The transforming center. The story's question is answered through them; they make the climactic choice and pay for it. Not merely the point-of-view character — a narrator who watches someone else change is not the Hero.",
   mentor:
     "Teaches, equips, or emboldens, then typically cannot finish the journey for them. Includes gift-givers who test before giving, and dark mentors whose lesson must be outgrown.",
   shadow:
