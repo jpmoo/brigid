@@ -6187,6 +6187,26 @@ mark.hit.misspelled {
   box-shadow: inset 3px 0 0 var(--pp-c);
 }
 
+/* The band, which is the readable answer. Weighted rather than colored: a
+   green-to-red scale would read as good-to-bad, and measuring unlike a
+   nineteenth-century novel is neither. */
+.pp-band {
+  margin-left: auto;
+  padding-left: 8px;
+  white-space: nowrap;
+}
+
+.pp-band.r0 { color: var(--text); font-weight: 600; }
+.pp-band.r1 { color: var(--text); }
+.pp-band.r2 { color: var(--text-muted); }
+.pp-band.r3 { color: var(--text-faint); }
+.pp-band.r4 { color: var(--text-faint); font-style: italic; }
+
+.pp-pick-meta {
+  display: flex;
+  align-items: baseline;
+}
+
 .pp-pick-name {
   font-size: 12px;
 }

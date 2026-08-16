@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { REFERENCE_WORKS, howAlike, place, resemblance } from "@brigid/shared";
+import {
+  REFERENCE_WORKS,
+  alikeBand,
+  distanceNote,
+  howAlike,
+  place,
+  resemblance,
+} from "@brigid/shared";
 import type { ReferenceWork } from "@brigid/shared";
 
 /**
@@ -211,6 +218,7 @@ function Resemblances({
               type="button"
               className={`pp-pick${on ? ` on c${colour}` : ""}`}
               onClick={() => onToggle(r.work)}
+              title={distanceNote(r.distance)}
             >
               <span className="pp-pick-name">
                 {r.work.author} — {r.work.title}
@@ -221,7 +229,15 @@ function Resemblances({
                     author's. Worth saying on the row rather than in a footnote:
                     nothing of Homer's sentences survives into a count of a
                     translation of them. */}
-                {r.work.translated ? " · translated" : ""} · {r.distance.toFixed(2)}
+                {r.work.translated ? " · translated" : ""}
+                {/* The band, not the figure. A bare decimal beside a year reads
+                    as a score out of one, and the distance has no ceiling — so
+                    1.17 looked like a broken scale rather than "about one
+                    standard deviation apart on the average measure". The number
+                    is on the hover for anyone who wants it. */}
+                <span className={`pp-band r${alikeBand(r.distance).rank}`}>
+                  {alikeBand(r.distance).label}
+                </span>
               </span>
             </button>
           );

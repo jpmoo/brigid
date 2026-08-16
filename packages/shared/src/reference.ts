@@ -138,11 +138,16 @@ export function resemblance(mine: StyleFeatures): Resemblance[] {
 /**
  * How alike, in words.
  *
- * Distances in standard deviations mean nothing to anyone reading them, and a
- * percentage would be worse — it would imply a precision that a sample of
- * thirty-two books cannot support. These are broad bands, and the phrasing is
- * deliberately hedged: what is being claimed is that some numbers are close
- * together, not that two books read alike.
+ * The distance is a mean gap in standard deviations across every measure, which
+ * has no ceiling and no floor but zero. Printed bare beside a genre and a year
+ * it reads as a score out of one — so a figure of 1.17 looks like a broken
+ * scale rather than what it is, which is "about one standard deviation apart on
+ * the average measure".
+ *
+ * Hence bands. A percentage would be worse than the raw number: it would imply
+ * a precision that a sample of this size cannot support. The phrasing is
+ * deliberately hedged, because what is being claimed is that some numbers sit
+ * close together, not that two books read alike.
  */
 export function howAlike(distance: number): string {
   if (distance < 0.45) return "measures very much like";
@@ -150,4 +155,24 @@ export function howAlike(distance: number): string {
   if (distance < 1.0) return "has something in common with";
   if (distance < 1.4) return "measures some way from";
   return "measures nothing like";
+}
+
+/** The same bands, short enough to sit on a row. */
+export function alikeBand(distance: number): { label: string; rank: number } {
+  if (distance < 0.45) return { label: "very close", rank: 0 };
+  if (distance < 0.7) return { label: "close", rank: 1 };
+  if (distance < 1.0) return { label: "some in common", rank: 2 };
+  if (distance < 1.4) return { label: "some way off", rank: 3 };
+  return { label: "nothing alike", rank: 4 };
+}
+
+/**
+ * What the number actually is, for anyone who wants to know.
+ *
+ * Kept out of the row and put on the hover, because it is the answer to a
+ * question most people will not ask and a distraction from the band, which is
+ * the answer to the one they will.
+ */
+export function distanceNote(distance: number): string {
+  return `${distance.toFixed(2)} — the average gap across ${COMPARABLE.length} measures, in standard deviations. Zero is identical; there is no upper limit.`;
 }
