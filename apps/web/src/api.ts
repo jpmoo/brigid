@@ -384,6 +384,34 @@ export const api = {
       input,
     ),
 
+  /**
+   * ProseDNA. One call returns the measurements, the writer's normal, and how
+   * far every section sits from it — all of it worked out server-side on the
+   * way out, because none of it is stored.
+   */
+  proseDna: (workId: string) => request<ProseDna>(`/works/${workId}/style`),
+
+  setStyleSections: (
+    workId: string,
+    patch: { blockIds: string[]; included?: boolean; voice?: string | null },
+  ) =>
+    request<{ ok: true; changed: number }>(`/works/${workId}/style/sections`, {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }),
+
+  describeProse: (workId: string, force = false) =>
+    request<{ ok: true; card: string; commentary: { heading: string; body: string }[] }>(
+      `/works/${workId}/style/describe`,
+      { method: "POST", body: JSON.stringify({ force }) },
+    ),
+
+  saveStyleCard: (workId: string, card: string) =>
+    request<{ ok: true }>(`/works/${workId}/style/card`, {
+      method: "PATCH",
+      body: JSON.stringify({ card }),
+    }),
+
   listBookmarks: (workId: string) =>
     request<{ bookmarks: Bookmark[] }>(`/works/${workId}/bookmarks`),
   createBookmark: (
@@ -679,3 +707,55 @@ export const api = {
   revertFormat: (id: string) =>
     request<{ block: Block }>(`/blocks/${id}/format`, { method: "DELETE" }),
 };
+
+/** One measure of the writing, as the helix draws it. */
+export interface ProseStrand {
+  key: string;
+  name: string;
+  unit: string;
+  value: number;
+  spread: number;
+}
+
+export interface ProseSection {
+  blockId: string;
+  label: string;
+  words: number;
+  dialogueShare: number;
+  included: boolean;
+  voice: string | null;
+  /** Distance from the writer's normal, in standard deviations. */
+  delta: number;
+  /** Whether the section is long enough for that to mean anything. */
+  reliable: boolean;
+  /** Which voice's normal it was measured against, null for the book's own. */
+  against: string | null;
+  byStream: { overall: number; narration: number; dialogue: number };
+  moved: { key: string; label: string; z: number; value: number; mean: number }[];
+}
+
+export interface ProseDna {
+  corpus: {
+    sections: number;
+    words: number;
+    thin: boolean;
+    thinBelow: number;
+    reliableAbove: number;
+    voices: string[];
+  };
+  sections: ProseSection[];
+  strands: ProseStrand[];
+  /** Sections nearest the middle of everything counted — not "best". */
+  typical: string[];
+  atypical: string[];
+  profile: {
+    card: string;
+    cardEdited: boolean;
+    exemplars: string[];
+    commentary: { heading: string; body: string }[];
+    model: string | null;
+    generatedAt: string | null;
+    /** Written about a different set of sections than are counted now. */
+    stale: boolean;
+  } | null;
+}

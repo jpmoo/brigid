@@ -26,6 +26,7 @@ import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
 import { IdentityDialog } from "./ai/IdentityDialog.js";
 import { ReconcilePane } from "./ai/ReconcilePane.js";
+import { ProseDnaPane } from "./ai/ProseDnaPane.js";
 import { ChatPane } from "./ai/ChatPane.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
 
@@ -38,7 +39,7 @@ import { HoldToConfirm } from "../../components/HoldToConfirm.js";
  * buttons that would refuse.
  */
 
-type Tab = "structure" | "characters" | "chat" | "raw";
+type Tab = "structure" | "characters" | "dna" | "chat" | "raw";
 
 export function AiPane({ workId }: { workId: string }) {
   const [bundle, setBundle] = useState<AnalysisBundle | null>(null);
@@ -128,6 +129,7 @@ export function AiPane({ workId }: { workId: string }) {
               [
                 ["structure", "Story shape"],
                 ["characters", "Characters"],
+                ["dna", "ProseDNA"],
                 ["chat", "Chat"],
                 ["raw", "What was collected"],
               ] as const
@@ -169,6 +171,8 @@ export function AiPane({ workId }: { workId: string }) {
               pending={bundle.pendingActions}
               onCommitted={() => void reload()}
             />
+          ) : tab === "dna" ? (
+            <ProseDnaPane workId={workId} />
           ) : tab === "chat" ? (
             <ChatPane workId={workId} ready={chatReady} />
           ) : (

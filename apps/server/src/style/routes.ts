@@ -45,6 +45,18 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
     await workOr404(workId);
 
     const samples = await refresh(workId);
+
+    // Named here rather than in the measurement: a label is a fact about the
+    // outline, and threading it through the arithmetic would tie the two
+    // together for no reason beyond saving a query.
+    const named = new Map(
+      (
+        await db
+          .select({ id: blocks.id, label: blocks.label })
+          .from(blocks)
+          .where(eq(blocks.workId, workId))
+      ).map((b) => [b.id, b.label]),
+    );
     const built = baselines(samples);
     const found = deviations(samples, built);
     const book = built.get(null);
@@ -72,6 +84,7 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
         const d = found.find((f) => f.blockId === s.blockId);
         return {
           blockId: s.blockId,
+          label: named.get(s.blockId) ?? "",
           words: s.measurement.words,
           dialogueShare: s.measurement.dialogueShare,
           included: s.included,

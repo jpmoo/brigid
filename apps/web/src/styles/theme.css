@@ -5735,3 +5735,307 @@ mark.hit.misspelled {
 .canvas-node.region > .cn-meta {
   margin-top: 2px;
 }
+
+/* --- ProseDNA --------------------------------------------------------- */
+
+.dna-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.dna-summary {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* The helix. Centred and given room, because it is the thing the pane is for
+   and a chart squeezed against a column of text reads as an illustration
+   rather than as the finding. */
+.dna-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 0 4px;
+}
+
+.dna {
+  max-width: 560px;
+  overflow: visible;
+}
+
+.dna-backbone {
+  fill: none;
+  stroke: color-mix(in srgb, var(--accent) 42%, transparent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+/* The line a bead is read against. Faint: it is a reference, not a reading. */
+.dna-centre {
+  stroke: color-mix(in srgb, var(--text) 12%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.dna-bar {
+  stroke: color-mix(in srgb, var(--text) 18%, transparent);
+  stroke-width: 1.5;
+}
+
+/* Wide and invisible, so a rung can be pointed at without being aimed at. */
+.dna-hit {
+  stroke: transparent;
+  stroke-width: 22;
+}
+
+.dna-bead {
+  fill: var(--accent);
+  transition: r 120ms ease;
+}
+
+/* A measure with no published norm behind it is drawn hollow: the bead sits at
+   the middle because there is nothing to place it against, and a solid one
+   would imply a comparison that was never made. */
+.dna-rung.own .dna-bead {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.dna-rung.on .dna-bar {
+  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.dna-rung { cursor: default; }
+
+.dna-name {
+  font-size: 11px;
+  fill: var(--text-muted);
+  font-family: var(--sans);
+}
+
+.dna-value {
+  font-size: 11px;
+  fill: var(--text-faint);
+  font-family: var(--sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.dna-rung.on .dna-name,
+.dna-rung.on .dna-value {
+  fill: var(--text);
+}
+
+.dna-key {
+  max-width: 60ch;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-faint);
+  text-align: center;
+}
+
+.dna-card,
+.dna-commentary,
+.dna-corpus,
+.dna-outliers {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  background: var(--surface);
+}
+
+.dna-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.dna-card-head h4 {
+  margin: 0;
+  font-size: 13px;
+}
+
+.dna-card-text {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--accent);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.dna-card-edit {
+  width: 100%;
+  font: inherit;
+  line-height: 1.6;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--text);
+  resize: vertical;
+}
+
+.dna-entry + .dna-entry {
+  border-top: 1px solid var(--border);
+}
+
+.dna-entry-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 0;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dna-entry-head .twisty {
+  transition: transform 120ms ease;
+  color: var(--text-faint);
+}
+
+.dna-entry.open .dna-entry-head .twisty {
+  transform: rotate(90deg);
+}
+
+.dna-entry-body {
+  padding: 0 0 12px 20px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.dna-outliers {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+@media (max-width: 720px) {
+  .dna-outliers { grid-template-columns: 1fr; }
+}
+
+.dna-col h4 {
+  margin: 0 0 4px;
+  font-size: 12.5px;
+}
+
+.dna-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dna-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  font-size: 12.5px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dna-delta {
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+}
+
+.dna-why {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.dna-corpus-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: none;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dna-corpus-head .twisty {
+  transition: transform 120ms ease;
+  color: var(--text-faint);
+}
+
+.dna-corpus-head .twisty.open {
+  transform: rotate(90deg);
+}
+
+.dna-corpus-head .muted {
+  margin-left: auto;
+}
+
+.dna-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.dna-table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 11px;
+  color: var(--text-faint);
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dna-table td {
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.dna-table td.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  padding-right: 16px;
+}
+
+/* An excluded section is still measured and still listed — a draft is exactly
+   what someone wants to ask "does this sound like me yet?" about. */
+.dna-table tr.out td {
+  opacity: 0.5;
+}
+
+.dna-voice {
+  width: 9em;
+  font: inherit;
+  font-size: 12px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.pane-lede {
+  max-width: 68ch;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
