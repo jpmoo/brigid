@@ -1,3 +1,4 @@
+import { measure } from "@brigid/shared";
 import type { CharacterAnalysis, PlacedDigest, StructureAnalysis } from "@brigid/shared";
 import { AXIS_LABELS, MODEL_LABELS } from "./frameworks.js";
 import { charBudget } from "./client.js";
@@ -70,7 +71,10 @@ If YOUR VOICE appears below, you have a measured description of how this writer 
 
 - Work from the exemplars first. The measurements tell you what to aim at; the exemplars tell you what it sounds like. Imitate the second, check yourself against the first.
 - Put every piece of prose you write for them inside a fenced block opened with \`\`\`manuscript and closed with \`\`\`. Nothing else goes in those fences — no notes, no headings, no explanation. Everything you want to say about the passage goes outside them.
-- Revising means revising. Keep what happens, keep who is there, keep the order of events; a revision that changes the story is a different scene, not a better version of this one. Notes and half-finished lines in a draft are instructions to you, not prose to preserve — write what they were reaching for.
+- Revising means revising. Keep what happens, keep who is there, keep the order of events; a revision that changes the story is a different scene, not a better version of this one.
+- What you must NOT keep is the draft's form. Its paragraphing, its punctuation and its lack of either carry no authority whatever. Drafts arrive as dictation, as a transcript of a voice recording, as a wall of notes with no full stops in it — that is a fact about how the writer captured the material, not about how the scene should read. The exemplars show you how their finished prose is set. The draft does not.
+- So: notes and half-finished lines are instructions to you, not prose to preserve — write what they were reaching for. A block of unbroken text becomes paragraphs. Missing punctuation gets supplied. Speech buried in a transcript — "and then she said well I don't know" — is a line of dialogue, and comes back as one, in its own paragraph, in quotation marks.
+- Never return more than a hundred words of prose as a single paragraph. If the draft you were given was one block, that is the strongest possible sign it needs breaking up, not a pattern to copy.
 - Say plainly, outside the fence, what you changed and what you were unsure of. If a note in the draft was ambiguous, say which way you read it.
 - Never claim the result sounds like them. You produced an imitation from measurements and samples; whether it lands is theirs to judge.
 
@@ -124,6 +128,37 @@ function shapeBrief(structure: StructureAnalysis): string {
  * about how the book starts, and it is the passage a writer is most likely to
  * have in mind.
  */
+/**
+ * Whether a section is finished prose or the notes it was captured as.
+ *
+ * Measured rather than guessed at, and told to the model outright. A transcript
+ * of a voice recording is one unbroken block with no quotation marks in it, and
+ * a model handed that alongside "revise this" reads the shape as intentional
+ * and gives back another block. Saying so removes the ambiguity — and the
+ * evidence is exactly the same arithmetic the fingerprint runs on, so it costs
+ * nothing and cannot be wrong about what it counted.
+ */
+function shapeNote(text: string): string {
+  const m = measure(text);
+  if (m.words < 80) return "";
+
+  const found: string[] = [];
+  if (m.paragraphs <= 1 && m.words > 150) {
+    found.push(`${m.words} words in one unbroken paragraph`);
+  }
+  const quotes = (text.match(/["“”]/g) ?? []).length;
+  if (quotes === 0 && /\b(said|says|asked|told|replied)\b/i.test(text)) {
+    found.push("speech reported with no quotation marks anywhere in it");
+  }
+  const stops = (text.match(/[.!?]/g) ?? []).length;
+  if (m.words > 200 && stops < m.words / 45) {
+    found.push("almost no sentence punctuation");
+  }
+
+  if (found.length === 0) return "";
+  return `\n[RAW MATERIAL: ${found.join("; ")}. That is how this was captured — dictation, a transcript, or notes — and not how it should read. Its shape tells you nothing about how to set the prose; the exemplars tell you that.]`;
+}
+
 function passagesFor(context: ChatContext, room: number): string {
   const prose = context.prose;
   if (!prose || room < 800) return "";
@@ -184,7 +219,8 @@ function passagesFor(context: ChatContext, room: number): string {
       const entire = wanted.has(section.blockId);
       const body = entire || text.length <= each ? text : `${text.slice(0, each)}…`;
       const note = entire ? " — COMPLETE, you were asked about this one" : "";
-      return `[${at}] ${section.label ?? "section"}${note}\n${body}`;
+      const shape = entire ? shapeNote(text) : "";
+      return `[${at}] ${section.label ?? "section"}${note}${shape}\n${body}`;
     });
 
   return `=== MANUSCRIPT PASSAGES ===
