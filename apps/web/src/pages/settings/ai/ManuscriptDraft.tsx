@@ -34,6 +34,27 @@ const SHOWN = [
   { strand: "adverbs", feature: "mod.adverb", label: "-ly adverbs per 1,000", round: 1 },
 ] as const;
 
+/**
+ * The passage as paragraphs.
+ *
+ * A blank line is what separates them in the manuscript and what the model is
+ * told to use. But a model that forgets and puts single line breaks between
+ * paragraphs has still written paragraphs, and rendering the lot as one wall
+ * would misreport what it did — so a single break counts when there are no
+ * blank ones to be found.
+ */
+function paragraphsOf(prose: string): string[] {
+  const blank = prose
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (blank.length > 1) return blank;
+  return prose
+    .split(/\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
 export function ManuscriptDraft({
   prose,
   dna,
@@ -84,8 +105,8 @@ export function ManuscriptDraft({
       </div>
 
       <div className="ms-draft-body">
-        {prose.split(/\n{2,}/).map((para, i) => (
-          <p key={i}>{para.trim()}</p>
+        {paragraphsOf(prose).map((para, i) => (
+          <p key={i}>{para}</p>
         ))}
       </div>
 

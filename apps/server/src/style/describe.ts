@@ -12,6 +12,7 @@ import { db } from "../db.js";
 import { generateJson } from "../ollama/client.js";
 import { readerOrFail } from "../ollama/reader.js";
 import { refresh } from "./measure.js";
+import { excerpt } from "../ollama/excerpt.js";
 import { signature } from "./routes.js";
 
 /**
@@ -97,11 +98,7 @@ function contrast(baseline: Baseline): string {
   return lines.join("\n");
 }
 
-/** A passage, trimmed to something a model can hold several of. */
-function excerpt(text: string, words = 220): string {
-  const parts = text.trim().split(/\s+/);
-  return parts.length <= words ? text.trim() : `${parts.slice(0, words).join(" ")}…`;
-}
+
 
 export async function describe(
   workId: string,
@@ -145,7 +142,7 @@ export async function describe(
   const typicalText = typicalIds
     .map((id) => byId.get(id))
     .filter(Boolean)
-    .map((p) => `--- ${p!.label || "Untitled"} ---\n${excerpt(p!.text)}`)
+    .map((p) => `--- ${p!.label || "Untitled"} ---\n${excerpt(p!.text, 220)}`)
     .join("\n\n");
 
   const oddText = atypical

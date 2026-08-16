@@ -12,6 +12,7 @@ import type { AddressInfo } from "node:net";
 import { parseJson, thinksFrom } from "../src/ollama/client.js";
 import { buildRoster, foldName } from "../src/ollama/analysis.js";
 import { ground } from "../src/ollama/digest.js";
+import { excerpt } from "../src/ollama/excerpt.js";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -267,6 +268,61 @@ check("a title alone does not ground a name", grounded([{ name: "Mr Fairfax" }])
 // would delete it every time — which is how it went missing in the first place.
 check("the narrator survives grounding", grounded([{ name: "Narrator" }]).length === 1);
 check("and so does a titled form of it", grounded([{ name: "The Narrator" }]).length === 1);
+
+console.log("\nshowing the model a passage without flattening it");
+
+/**
+ * The obvious way to trim prose to a word count splits on whitespace and joins
+ * the first n back with spaces — and paragraph breaks are whitespace. Every
+ * exemplar reached the model as one unbroken block, so it learned that this
+ * writer does not break paragraphs, and wrote back the same way. A sample is an
+ * instruction, and a sample with its shape removed is a wrong one.
+ */
+const SCENE = [
+  '"Where were you," she said.',
+  '"Out."',
+  "He put the cup down on the sill where the paint had gone. There was nothing in the yard to have been out in, and they both knew it, and neither of them said so.",
+  '"All right," she said. "All right."',
+].join("\n\n");
+
+{
+  const whole = excerpt(SCENE, 500);
+  check("a passage keeps its paragraphs", whole.split(/\n{2,}/).length === 4, whole);
+  check("including a one-word reply of its own", whole.includes('"Out."'));
+
+  /**
+   * The path a real exemplar takes. A whole section runs past any sane budget,
+   * and it was only on being trimmed that the old cut flattened what it kept —
+   * so a short fixture passes either way and guards nothing.
+   */
+  const trimmed = excerpt(`${SCENE}\n\n${SCENE}\n\n${SCENE}`, 60);
+  check(
+    "a long passage keeps them through the trim",
+    trimmed.split(/\n{2,}/).filter((p) => p !== "…").length >= 3,
+    trimmed,
+  );
+  check("and still breaks for each speaker", trimmed.includes('"Out."'), trimmed);
+  check(
+    "and every quotation mark",
+    (whole.match(/"/g) ?? []).length === (SCENE.match(/"/g) ?? []).length,
+  );
+  check("a passage that fits is not marked as cut", !whole.endsWith("…"));
+
+  const short = excerpt(SCENE, 12);
+  check("a cut passage says it was cut", short.endsWith("…"), short);
+  check(
+    "and is cut between paragraphs, not through one",
+    short
+      .split(/\n{2,}/)
+      .filter((p) => p !== "…")
+      .every((p) => SCENE.includes(p)),
+    short,
+  );
+
+  const long = excerpt("word ".repeat(400).trim(), 50);
+  check("a single paragraph longer than the budget is cut inside it", long.split(/\s+/).length <= 55);
+  check("and says so too", long.includes("…"));
+}
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

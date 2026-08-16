@@ -46,6 +46,7 @@ import { placedDigests, progressOf } from "./worker.js";
 import { backfill, castFor, commitCast, pendingCount, resetCharacter } from "./cast.js";
 import { CHAT_SYSTEM, buildBrief } from "./chat.js";
 import { refresh } from "../style/measure.js";
+import { excerpt } from "./excerpt.js";
 
 /**
  * Running the frameworks over a finished digest.
@@ -176,8 +177,10 @@ async function voiceFor(workId: string) {
       .filter((r) => r.text.trim())
       .map((r) => ({
         label: r.label || "Untitled",
-        // Enough to hear the cadence without crowding out the rest of the brief.
-        text: r.text.trim().split(/\s+/).slice(0, 320).join(" "),
+        // Enough to hear the cadence without crowding out the rest of the
+        // brief — and cut at paragraph breaks, because those are part of the
+        // cadence and a sample without them teaches the wrong lesson.
+        text: excerpt(r.text, 320),
       })),
   };
 }
