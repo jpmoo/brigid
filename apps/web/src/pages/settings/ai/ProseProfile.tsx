@@ -67,11 +67,9 @@ const nameOf = (work: ReferenceWork): string =>
 
 export function ProseProfile({
   features,
-  dialogueShare,
   voices,
 }: {
   features: Record<string, number>;
-  dialogueShare: number;
   voices: ProseDna["voices"];
 }) {
   const [beside, setBeside] = useState<string[]>([]);
@@ -88,7 +86,6 @@ export function ProseProfile({
 
   const showing = voices.find((v) => v.name === voice) ?? null;
   const shownFeatures = showing?.features ?? features;
-  const shownShare = showing?.dialogueShare ?? dialogueShare;
 
   const ranked = useMemo(() => resemblance(shownFeatures), [shownFeatures]);
 
@@ -214,7 +211,6 @@ export function ProseProfile({
         ranked={ranked}
         beside={beside}
         onToggle={toggle}
-        dialogueShare={shownShare}
         subject={showing ? `your ${showing.name}` : "your prose"}
       />
     </div>
@@ -225,13 +221,11 @@ function Resemblances({
   ranked,
   beside,
   onToggle,
-  dialogueShare,
   subject,
 }: {
   ranked: ReturnType<typeof resemblance>;
   beside: string[];
   onToggle: (work: ReferenceWork) => void;
-  dialogueShare: number;
   /** What is being compared — the book, or one of its tagged voices. */
   subject: string;
 }) {
@@ -314,12 +308,7 @@ function Resemblances({
         {all ? "Show the nearest few" : `Show all ${ranked.length}, nearest first`}
       </button>
 
-      <p className="muted small">
-        Dialogue is {Math.round(dialogueShare * 100)}% of {subject === "your prose" ? "your words" : `the words in ${subject}`}.
-        Speech is found by its quotation marks, so a book that marks it another
-        way — Joyce uses dashes — measures as having none, and its figure here
-        is wrong rather than low.
-      </p>
+
     </section>
   );
 }

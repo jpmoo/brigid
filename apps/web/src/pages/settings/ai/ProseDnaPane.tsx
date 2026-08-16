@@ -112,11 +112,7 @@ export function ProseDnaPane({ workId }: { workId: string }) {
         </div>
       ) : null}
 
-      <ProseProfile
-        features={dna.features}
-        dialogueShare={dna.dialogueShare}
-        voices={dna.voices}
-      />
+      <ProseProfile features={dna.features} voices={dna.voices} />
 
       <Commentary profile={profile} busy={describing} onDescribe={describe} />
 

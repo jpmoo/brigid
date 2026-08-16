@@ -184,6 +184,22 @@ export function paragraphs(text: string): string[] {
 /**
  * The spoken and the unspoken, separated.
  *
+ * WHAT THIS DOES NOT MEASURE, which is more than it looks.
+ *
+ * Speech is found by its quotation marks, and plenty of books do not mark it
+ * that way. In the reference set the failure runs in both directions and is
+ * large: Wodehouse reads as 0.1% spoken while using eleven speech tags per
+ * thousand words, because his dialogue is in single quotes and single quotes
+ * are indistinguishable from apostrophes; Joyce marks speech with dashes and
+ * reads as zero. At the other end, Heart of Darkness reads as 97% spoken,
+ * because Marlow's entire narration sits inside one pair of quotation marks.
+ *
+ * So `dialogueShare` is sound for a manuscript written the ordinary way and
+ * badly wrong for one that is not, with no way from inside to tell which it is
+ * looking at. It is used for splitting the two streams — where being wrong
+ * degrades gracefully, since the streams are compared with themselves — and it
+ * is deliberately not shown to the writer as a figure about their book.
+ *
  * Straight and typeset double quotes both, since a manuscript may hold either
  * depending on whether its format typesets them. Single quotes are deliberately
  * not treated as speech: an apostrophe is the same character, and "don't" would
