@@ -737,6 +737,14 @@ export interface ProseDna {
    */
   features: Record<string, number>;
   dialogueShare: number;
+  /** The same figures per tagged voice, once one has enough behind it. */
+  voices: {
+    name: string;
+    sections: number;
+    words: number;
+    dialogueShare: number;
+    features: Record<string, number>;
+  }[];
   /** Sections nearest the middle of everything counted — not "best". */
   typical: string[];
   atypical: string[];

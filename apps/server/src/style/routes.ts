@@ -115,9 +115,30 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
           ([, value]) => value !== 0 || book?.overall,
         ),
       ),
-      dialogueShare:
-        samples.filter((s) => s.included).reduce((sum, s) => sum + s.measurement.words * s.measurement.dialogueShare, 0) /
-        Math.max(1, book?.words ?? 1),
+      dialogueShare: spokenShare(samples.filter((s) => s.included)),
+      /**
+       * The same figures again, per tagged voice.
+       *
+       * Tagging a section as a letter or a dream has an effect the writer
+       * cannot otherwise see: it earns that voice a normal of its own, and the
+       * sections in it stop being reported as departures from the book. Sending
+       * the figures lets the tracks be switched to it, which is the only way to
+       * look at what the tag actually did.
+       */
+      voices: [...built.entries()]
+        .filter(([voice]) => voice !== null)
+        .map(([voice, baseline]) => {
+          const mine = samples.filter((s) => s.included && s.voice === voice);
+          return {
+            name: voice as string,
+            sections: baseline.sections,
+            words: baseline.words,
+            dialogueShare: spokenShare(mine),
+            features: Object.fromEntries(
+              COMPARABLE.map((key) => [key, baseline.overall[key]?.mean ?? 0]),
+            ),
+          };
+        }),
       typical: mostCharacteristic(found, samples),
       atypical: leastCharacteristic(found, samples).map((d) => d.blockId),
       profile: profile
@@ -176,6 +197,15 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
     return describe(workId);
   });
 
+}
+
+/** The share of a set of sections' words that are spoken aloud. */
+function spokenShare(samples: { measurement: { words: number; dialogueShare: number } }[]): number {
+  const words = samples.reduce((sum, s) => sum + s.measurement.words, 0);
+  if (words === 0) return 0;
+  return (
+    samples.reduce((sum, s) => sum + s.measurement.words * s.measurement.dialogueShare, 0) / words
+  );
 }
 
 /** A feature key as a reader should see it, stream and all. */

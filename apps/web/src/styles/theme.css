@@ -5913,9 +5913,13 @@ mark.hit.misspelled {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 4px 2px;
+  padding: 2px;
   border-bottom: 1px solid var(--border);
   font-size: 12.5px;
+}
+
+.dna-sections li:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .dna-sections label {
@@ -5943,17 +5947,42 @@ mark.hit.misspelled {
    The form styles set `width: 100%` on `input[type="text"]`, which is
    specificity (0,1,1) and beats a lone class — so this input filled the row,
    squeezed the section's name out of existence and crushed the checkbox to a
-   sliver. A single class looked like enough and was not. */
+   sliver. A single class looked like enough and was not.
+
+   Drawn as a box only when it holds something or is being used. Most sections
+   are in the book's own voice and always will be, so eighty-three outlined
+   boxes reading "voice" is eighty-three pieces of furniture for a field that
+   will stay empty on nearly all of them — and the list stopped looking like a
+   list of sections. It is still a real input, focusable and reachable by
+   keyboard; it just does not shout until it has something to say. */
 .dna-sections .dna-voice {
-  flex: 0 0 9em;
-  width: 9em;
+  flex: 0 0 8em;
+  width: 8em;
   font: inherit;
   font-size: 12px;
   padding: 2px 6px;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: var(--bg);
+  background: none;
   color: var(--text);
+  text-align: right;
+}
+
+.dna-sections .dna-voice::placeholder {
+  color: transparent;
+}
+
+.dna-sections li:hover .dna-voice,
+.dna-sections .dna-voice:focus,
+.dna-sections .dna-voice:not(:placeholder-shown) {
+  border-color: var(--border);
+  background: var(--bg);
+  text-align: left;
+}
+
+.dna-sections li:hover .dna-voice::placeholder,
+.dna-sections .dna-voice:focus::placeholder {
+  color: var(--text-faint);
 }
 
 /* Never squeezed by whatever shares the row. */
@@ -6044,6 +6073,12 @@ mark.hit.misspelled {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+.pp-voices {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .pp-tracks {

@@ -112,7 +112,11 @@ export function ProseDnaPane({ workId }: { workId: string }) {
         </div>
       ) : null}
 
-      <ProseProfile features={dna.features} dialogueShare={dna.dialogueShare} />
+      <ProseProfile
+        features={dna.features}
+        dialogueShare={dna.dialogueShare}
+        voices={dna.voices}
+      />
 
       <Commentary profile={profile} busy={describing} onDescribe={describe} />
 
@@ -338,6 +342,14 @@ function Corpus({
           <p className="muted small">
             Everything counts unless you take it out. Leave out anything too
             rough to be typical of you — it is still measured either way.
+          </p>
+          <p className="muted small">
+            Name a <strong>voice</strong> on any section meant to read
+            differently — letters, a dream, a second narrator, a document. Once
+            three sections share a name and run to a few thousand words between
+            them, that voice gets a normal of its own: its sections stop being
+            reported as departures from the book, and you can switch the tracks
+            at the top of this tab to look at it on its own.
           </p>
 
           <ul className="dna-sections">

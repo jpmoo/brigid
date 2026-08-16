@@ -8,6 +8,7 @@ import {
   resemblance,
 } from "@brigid/shared";
 import type { ReferenceWork } from "@brigid/shared";
+import type { ProseDna } from "../../../api.js";
 
 /**
  * Where a manuscript sits among books that were actually measured.
@@ -52,14 +53,29 @@ const nameOf = (work: ReferenceWork): string =>
 export function ProseProfile({
   features,
   dialogueShare,
+  voices,
 }: {
   features: Record<string, number>;
   dialogueShare: number;
+  voices: ProseDna["voices"];
 }) {
   const [beside, setBeside] = useState<string[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
+  /**
+   * Which voice the tracks are showing: the book, or one of the tagged ones.
+   *
+   * Without this a tag has no visible effect at all. It quietly earns a voice
+   * its own normal — which is what stops a book of letters reporting every
+   * letter as a departure from itself — and there was nowhere to go and look at
+   * what that did.
+   */
+  const [voice, setVoice] = useState<string | null>(null);
 
-  const ranked = useMemo(() => resemblance(features), [features]);
+  const showing = voices.find((v) => v.name === voice) ?? null;
+  const shownFeatures = showing?.features ?? features;
+  const shownShare = showing?.dialogueShare ?? dialogueShare;
+
+  const ranked = useMemo(() => resemblance(shownFeatures), [shownFeatures]);
 
   const chosen = useMemo(
     () => REFERENCE_WORKS.filter((w) => beside.includes(`${w.author}|${w.title}`)),
@@ -75,9 +91,37 @@ export function ProseProfile({
 
   return (
     <div className="pp">
+      {voices.length > 0 ? (
+        <div className="pp-voices">
+          <span className="muted small">Showing</span>
+          <div className="segmented compact" role="group" aria-label="Which voice">
+            <button
+              type="button"
+              aria-pressed={voice === null}
+              className={voice === null ? "selected" : ""}
+              onClick={() => setVoice(null)}
+            >
+              The book
+            </button>
+            {voices.map((v) => (
+              <button
+                key={v.name}
+                type="button"
+                aria-pressed={voice === v.name}
+                className={voice === v.name ? "selected" : ""}
+                onClick={() => setVoice(v.name)}
+                title={`${v.sections} sections, ${v.words.toLocaleString()} words`}
+              >
+                {v.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       <div className="pp-tracks">
         {ROWS.map((row) => {
-          const value = features[row.key];
+          const value = shownFeatures[row.key];
           if (value === undefined) return null;
           const at = place(row.key, value);
           if (at === null) return null;
@@ -152,7 +196,8 @@ export function ProseProfile({
         ranked={ranked}
         beside={beside}
         onToggle={toggle}
-        dialogueShare={dialogueShare}
+        dialogueShare={shownShare}
+        subject={showing ? `your ${showing.name}` : "your prose"}
       />
     </div>
   );
@@ -163,11 +208,14 @@ function Resemblances({
   beside,
   onToggle,
   dialogueShare,
+  subject,
 }: {
   ranked: ReturnType<typeof resemblance>;
   beside: string[];
   onToggle: (work: ReferenceWork) => void;
   dialogueShare: number;
+  /** What is being compared — the book, or one of its tagged voices. */
+  subject: string;
 }) {
   const [all, setAll] = useState(false);
   const top = ranked[0];
@@ -187,7 +235,7 @@ function Resemblances({
 
       {top ? (
         <p className="pp-verdict">
-          Of the {REFERENCE_WORKS.length}, your prose {howAlike(top.distance)}{" "}
+          Of the {REFERENCE_WORKS.length}, {subject} {howAlike(top.distance)}{" "}
           <strong>
             {top.work.author}&rsquo;s <em>{top.work.title}</em>
           </strong>
@@ -249,7 +297,7 @@ function Resemblances({
       </button>
 
       <p className="muted small">
-        Your dialogue is {Math.round(dialogueShare * 100)}% of your words.
+        Dialogue is {Math.round(dialogueShare * 100)}% of {subject === "your prose" ? "your words" : `the words in ${subject}`}.
         Speech is found by its quotation marks, so a book that marks it another
         way — Joyce uses dashes — measures as having none, and its figure here
         is wrong rather than low.
