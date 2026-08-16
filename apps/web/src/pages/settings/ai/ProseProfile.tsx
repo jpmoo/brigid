@@ -53,8 +53,6 @@ export function ProseProfile({
   const [hovered, setHovered] = useState<string | null>(null);
 
   const ranked = useMemo(() => resemblance(features), [features]);
-  const nearest = ranked.slice(0, 6);
-  const furthest = ranked.slice(-3).reverse();
 
   const chosen = useMemo(
     () => REFERENCE_WORKS.filter((w) => beside.includes(`${w.author}|${w.title}`)),
@@ -144,8 +142,7 @@ export function ProseProfile({
       </p>
 
       <Resemblances
-        nearest={nearest}
-        furthest={furthest}
+        ranked={ranked}
         beside={beside}
         onToggle={toggle}
         dialogueShare={dialogueShare}
@@ -155,19 +152,27 @@ export function ProseProfile({
 }
 
 function Resemblances({
-  nearest,
-  furthest,
+  ranked,
   beside,
   onToggle,
   dialogueShare,
 }: {
-  nearest: ReturnType<typeof resemblance>;
-  furthest: ReturnType<typeof resemblance>;
+  ranked: ReturnType<typeof resemblance>;
   beside: string[];
   onToggle: (work: ReferenceWork) => void;
   dialogueShare: number;
 }) {
-  const top = nearest[0];
+  const [all, setAll] = useState(false);
+  const top = ranked[0];
+  /**
+   * All of them, nearest first, in something that scrolls.
+   *
+   * It used to show the six nearest and the three furthest and nothing else,
+   * which reads as a list that has been cut off rather than one that is
+   * complete — and the interesting question is often not "who am I nearest" but
+   * "where does this particular book sit", which the short list cannot answer.
+   */
+  const shown = all ? ranked : ranked.slice(0, 12);
 
   return (
     <section className="pp-alike">
@@ -191,12 +196,12 @@ function Resemblances({
       <p className="muted small">
         This says some numbers sit close together. It does not say two books read
         alike, and it is not a compliment or a criticism — resembling nobody in
-        the set is an ordinary result. Pick up to three to lay over the
-        tracks above.
+        the set is an ordinary result. Pick up to three to lay over the tracks
+        above.
       </p>
 
-      <div className="pp-list">
-        {[...nearest, ...furthest].map((r, i) => {
+      <div className={`pp-list${all ? " tall" : ""}`}>
+        {shown.map((r) => {
           const id = `${r.work.author}|${r.work.title}`;
           const on = beside.includes(id);
           const colour = beside.indexOf(id);
@@ -204,7 +209,7 @@ function Resemblances({
             <button
               key={id}
               type="button"
-              className={`pp-pick${on ? ` on c${colour}` : ""}${i >= nearest.length ? " far" : ""}`}
+              className={`pp-pick${on ? ` on c${colour}` : ""}`}
               onClick={() => onToggle(r.work)}
             >
               <span className="pp-pick-name">
@@ -222,6 +227,10 @@ function Resemblances({
           );
         })}
       </div>
+
+      <button className="btn ghost" type="button" onClick={() => setAll(!all)}>
+        {all ? "Show the nearest few" : `Show all ${ranked.length}, nearest first`}
+      </button>
 
       <p className="muted small">
         Your dialogue is {Math.round(dialogueShare * 100)}% of your words.

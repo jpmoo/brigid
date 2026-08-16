@@ -5951,7 +5951,6 @@ mark.hit.misspelled {
 }
 
 .pane-lede {
-  max-width: 68ch;
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
@@ -6128,9 +6127,11 @@ mark.hit.misspelled {
   color: var(--text-faint);
 }
 
+/* Full width. These were held to 68ch, which is right for a column of prose
+   and wrong here — the pane is wider than that, so the text stopped halfway
+   and read as though it had been cut off. */
 .pp-key,
 .pp-verdict {
-  max-width: 68ch;
   margin: 0;
   font-size: 12px;
   line-height: 1.55;
@@ -6154,6 +6155,15 @@ mark.hit.misspelled {
   margin: 12px 0;
 }
 
+/* Opened out to the whole set, which is more than fits: it scrolls rather than
+   pushing everything below it off the screen. */
+.pp-list.tall {
+  max-height: 340px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+}
+
 .pp-pick {
   display: flex;
   flex-direction: column;
@@ -6175,13 +6185,6 @@ mark.hit.misspelled {
 .pp-pick.on {
   border-color: var(--pp-c);
   box-shadow: inset 3px 0 0 var(--pp-c);
-}
-
-/* The three at the bottom are the ones it measures least like, and are marked
-   so the list does not read as a ranking of merit. */
-.pp-pick.far {
-  opacity: 0.72;
-  border-style: dashed;
 }
 
 .pp-pick-name {

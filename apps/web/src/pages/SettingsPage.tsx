@@ -214,7 +214,7 @@ export function SettingsPage() {
                     onSaved={() => void reloadWork()}
                   />
                 ) : projectTab === "stats" ? (
-                  <StatsPane blocks={blocks} levels={levels} templates={templates} />
+                  <StatsPane workId={workId} blocks={blocks} levels={levels} templates={templates} />
                 ) : projectTab === "ai" ? (
                   <AiPane workId={workId} />
                 ) : (

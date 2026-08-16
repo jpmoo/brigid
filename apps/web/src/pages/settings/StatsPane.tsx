@@ -7,6 +7,7 @@ import {
   wordFrequency,
 } from "@brigid/shared";
 import type { Block, Template, WorkLevel } from "../../api.js";
+import { ProseDnaPane } from "./ai/ProseDnaPane.js";
 
 const fmt = new Intl.NumberFormat();
 
@@ -19,15 +20,25 @@ const fmt = new Intl.NumberFormat();
  * request to nobody and is as current as the page.
  */
 export function StatsPane({
+  workId,
   blocks,
   levels,
   templates,
 }: {
+  workId: string;
   blocks: Block[];
   levels: WorkLevel[];
   templates: Template[];
 }) {
   const [ownWords, setOwnWords] = useState(true);
+  /**
+   * ProseDNA belongs here rather than under AI. Almost none of it needs a
+   * model: it is arithmetic over the manuscript, which is what this pane is
+   * for. Only the paragraph describing what the numbers mean asks Ollama
+   * anything, and that reads as a footnote to the measuring rather than a
+   * reason to file the whole thing under the machine.
+   */
+  const [tab, setTab] = useState<"counts" | "dna">("counts");
 
   const stats = useMemo(() => {
     const formats = new Map(templates.map((t) => [t.id, t.formatSettings]));
@@ -66,7 +77,10 @@ export function StatsPane({
 
   if (blocks.length === 0) return <p className="tpl-empty">Nothing written yet.</p>;
 
-  return (
+  /** The counts themselves, as a value: a component declared inside a
+   *  render is a new type every time, so React would throw the whole
+   *  subtree away and rebuild it on each keystroke. */
+  const counts = (
     <div className="tpl-detail">
       <h4 className="tpl-section">Sections</h4>
       {stats.levels.length === 0 ? (
@@ -155,5 +169,31 @@ export function StatsPane({
       </ol>
       {stats.words.length === 0 ? <p className="tpl-empty">No prose to count yet.</p> : null}
     </div>
+  );
+
+  return (
+    <>
+      <nav className="subtabs" role="tablist">
+        {(
+          [
+            ["counts", "What it is made of"],
+            ["dna", "ProseDNA"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={tab === key}
+            className={tab === key ? "selected" : ""}
+            onClick={() => setTab(key)}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {tab === "dna" ? <ProseDnaPane workId={workId} /> : counts}
+    </>
   );
 }
