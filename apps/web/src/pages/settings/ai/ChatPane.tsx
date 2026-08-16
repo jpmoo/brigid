@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { Send, Square, Trash2 } from "lucide-react";
 import { apiUrl } from "../../../base.js";
 import { ApiError, api } from "../../../api.js";
+import type { ProseDna } from "../../../api.js";
 import { Markdown } from "./Markdown.js";
+import { ManuscriptDraft } from "./ManuscriptDraft.js";
 
 /**
  * Talking about the manuscript, once both analyses are in.
@@ -29,6 +31,27 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   const abort = useRef<AbortController | null>(null);
   const foot = useRef<HTMLDivElement | null>(null);
   const [clearing, setClearing] = useState(false);
+  /**
+   * The writer's own measurements, so a passage the model writes can be held
+   * against them the moment it arrives. Fetched once and kept: the extractor is
+   * shared and pure, so the comparison itself costs nothing and needs no
+   * server. Null if no fingerprint has been taken, in which case the prose is
+   * shown without one rather than not shown.
+   */
+  const [dna, setDna] = useState<ProseDna | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void api
+      .proseDna(workId)
+      .then((found) => {
+        if (alive) setDna(found);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [workId]);
 
   /**
    * The conversation is kept, so returning to this tab picks up where it left
@@ -209,7 +232,12 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
                 // rendered, because it writes Markdown whether or not anyone
                 // asked and asterisks are not emphasis.
                 message.role === "assistant" ? (
-                  <Markdown text={message.content} />
+                  <Markdown
+                    text={message.content}
+                    onManuscript={(prose, key) => (
+                      <ManuscriptDraft key={key} prose={prose} dna={dna} />
+                    )}
+                  />
                 ) : (
                   message.content
                 )

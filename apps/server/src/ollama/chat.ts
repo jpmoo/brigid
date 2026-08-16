@@ -27,6 +27,20 @@ export interface ChatContext {
   prose?: Map<string, string>;
   /** What was just asked, so the passages chosen bear on it. */
   question?: string;
+  /**
+   * The writer's own voice, measured and described.
+   *
+   * Carried into the conversation because a question about how something is
+   * written, or a request to write something that sounds like them, cannot be
+   * answered from summaries of what happens. The card steers; the exemplars
+   * are what actually transfer a voice; the targets are what the answer can be
+   * checked against afterwards.
+   */
+  dna?: {
+    card: string;
+    targets: { label: string; value: string }[];
+    exemplars: { label: string; text: string }[];
+  };
 }
 
 const SYSTEM = `You are discussing an unpublished manuscript with the writer who wrote it.
@@ -49,6 +63,16 @@ So:
 - Questions about STRUCTURE and ROLE are the reverse: answer those from your notes, which cover the whole book, rather than generalising from whichever few passages happen to be quoted here.
 
 THIS IS AN ORIGINAL, UNPUBLISHED WORK. If it resembles something you recognize, that resemblance is a trap: what you remember of the published book may differ from what is actually here, and this writer may have changed it deliberately. Use only the material in this brief and the passages quoted in it. If they do not settle a question, say so plainly and say what would settle it — never fill the gap from memory.
+
+WRITING IN THE WRITER'S VOICE.
+
+If YOUR VOICE appears below, you have a measured description of how this writer writes and passages of their own prose to work from. When they ask you to revise a section, draft one, or continue something, use it.
+
+- Work from the exemplars first. The measurements tell you what to aim at; the exemplars tell you what it sounds like. Imitate the second, check yourself against the first.
+- Put every piece of prose you write for them inside a fenced block opened with \`\`\`manuscript and closed with \`\`\`. Nothing else goes in those fences — no notes, no headings, no explanation. Everything you want to say about the passage goes outside them.
+- Revising means revising. Keep what happens, keep who is there, keep the order of events; a revision that changes the story is a different scene, not a better version of this one. Notes and half-finished lines in a draft are instructions to you, not prose to preserve — write what they were reaching for.
+- Say plainly, outside the fence, what you changed and what you were unsure of. If a note in the draft was ambiguous, say which way you read it.
+- Never claim the result sounds like them. You produced an imitation from measurements and samples; whether it lands is theirs to judge.
 
 Cite positions when they matter — the timeline gives each section's place as a percentage of the book, and a claim about where something falls should carry one.
 
@@ -98,6 +122,24 @@ function passagesFor(context: ChatContext, room: number): string {
   const asked = (context.question ?? "").toLowerCase();
   const terms = [...new Set(asked.split(/[^a-z0-9']+/).filter((w) => w.length > 3))];
 
+  /**
+   * A section the question names outright.
+   *
+   * "Revise 14.4 in my voice" is unanswerable from an excerpt: a revision has
+   * to be of the whole thing, and half a scene rewritten is worse than none.
+   * So a label appearing in the question wins the space it needs before
+   * anything else is chosen, and arrives whole however long it is.
+   *
+   * Matched on the label as written — the numbering a writer sees in the
+   * outline is what they will type — and bounded so a bare "4" cannot claim
+   * every section whose label contains one.
+   */
+  const named = context.sections.filter((section) => {
+    const label = (section.label ?? "").trim().toLowerCase();
+    if (label.length < 2) return false;
+    return new RegExp(`(^|[^\\w.])${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w.]|$)`).test(asked);
+  });
+
   const scored = context.sections.map((section) => {
     const text = prose.get(section.blockId) ?? "";
     const hay = `${section.label ?? ""} ${section.summary ?? ""} ${text.slice(0, 4000)}`.toLowerCase();
@@ -109,20 +151,31 @@ function passagesFor(context: ChatContext, room: number): string {
     return { section, text, score };
   });
 
+  const wanted = new Set(named.map((n) => n.blockId));
+  const whole = named
+    .map((section) => ({ section, text: prose.get(section.blockId) ?? "" }))
+    .filter((n) => n.text.trim());
+
+  // What the named sections do not take, shared among the rest.
+  let left = room - whole.reduce((sum, n) => sum + n.text.length + 80, 0);
+
   const chosen = scored
-    .filter((s) => s.text.trim() && s.score > 0)
+    .filter((s) => s.text.trim() && s.score > 0 && !wanted.has(s.section.blockId))
     .sort((a, b) => b.score - a.score || a.section.start - b.section.start)
-    .slice(0, 4);
-  if (chosen.length === 0) return "";
+    .slice(0, left > 1200 ? 4 : 0);
+
+  if (chosen.length === 0 && whole.length === 0) return "";
 
   // Split evenly, so one long chapter cannot crowd out the other three.
-  const each = Math.floor((room - 200) / chosen.length);
-  const blocks = chosen
+  const each = chosen.length > 0 ? Math.floor((left - 200) / chosen.length) : 0;
+  const blocks = [...whole, ...chosen]
     .sort((a, b) => a.section.start - b.section.start)
     .map(({ section, text }) => {
       const at = `${Math.round(section.start * 100)}%`;
-      const body = text.length <= each ? text : `${text.slice(0, each)}…`;
-      return `[${at}] ${section.label ?? "section"}\n${body}`;
+      const entire = wanted.has(section.blockId);
+      const body = entire || text.length <= each ? text : `${text.slice(0, each)}…`;
+      const note = entire ? " — COMPLETE, you were asked about this one" : "";
+      return `[${at}] ${section.label ?? "section"}${note}\n${body}`;
     });
 
   return `=== MANUSCRIPT PASSAGES ===
@@ -130,6 +183,40 @@ THE WRITER'S ACTUAL PROSE, VERBATIM. The only material here in their words, and 
 
 ${blocks.join("\n\n- - - - -\n\n")}
 === END OF MANUSCRIPT PASSAGES ===`;
+}
+
+/**
+ * The writer's voice, for questions about how the book is written.
+ *
+ * The card is the description; the targets are the handful of numbers an answer
+ * can be measured against afterwards; the exemplars are passages of the
+ * writer's own prose closest to the middle of everything they have written.
+ *
+ * The exemplars are the part that does the work. A model cannot be steered by
+ * statistics — nothing conditions generation on a mean sentence length — but it
+ * imitates a sample readily. The numbers are for checking, not for steering.
+ */
+function voiceBrief(dna: NonNullable<ChatContext["dna"]>): string {
+  const parts = [
+    "=== YOUR VOICE (measured from the sections the writer counts as typical of them) ===",
+  ];
+  if (dna.card.trim()) parts.push(dna.card.trim());
+  if (dna.targets.length > 0) {
+    parts.push(
+      `What the measurements say:\n${dna.targets
+        .map((t) => `- ${t.label}: ${t.value}`)
+        .join("\n")}`,
+    );
+  }
+  if (dna.exemplars.length > 0) {
+    parts.push(
+      `PASSAGES MOST TYPICAL OF THEM — their own prose, verbatim. This is what "in my voice" means. Imitate the cadence, the punctuation, the distance; do not borrow the content.\n\n${dna.exemplars
+        .map((e) => `--- ${e.label} ---\n${e.text}`)
+        .join("\n\n")}`,
+    );
+  }
+  parts.push("=== END OF YOUR VOICE ===");
+  return parts.join("\n\n");
 }
 
 /**
@@ -155,6 +242,10 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
     spent += text.length;
     return true;
   };
+
+  // Before anything else: it is short, and a request to write in the writer's
+  // voice is unanswerable without it while everything else degrades gracefully.
+  if (context.dna) add(voiceBrief(context.dna));
 
   if (context.structure) add(shapeBrief(context.structure));
 

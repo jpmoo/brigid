@@ -97,7 +97,21 @@ function tableAt(lines: string[], from: number): { node: ReactNode; next: number
   };
 }
 
-export function Markdown({ text }: { text: string }) {
+export function Markdown({
+  text,
+  onManuscript,
+}: {
+  text: string;
+  /**
+   * How to draw a block of prose the model wrote for the manuscript.
+   *
+   * Fenced like code because a fence is the only thing in markdown that holds
+   * text exactly as given, but it is not code and must not be set as code —
+   * and it is the one part of an answer that can be measured against the
+   * writer's own fingerprint, which is what the caller does with it.
+   */
+  onManuscript?: (prose: string, key: string) => ReactNode;
+}) {
   const lines = text.split("\n");
   const out: ReactNode[] = [];
   let at = 0;
@@ -107,6 +121,7 @@ export function Markdown({ text }: { text: string }) {
 
     // A fenced block runs to its closing fence, or to the end while streaming.
     if (line.trim().startsWith("```")) {
+      const tag = line.trim().slice(3).trim().toLowerCase();
       const body: string[] = [];
       at += 1;
       while (at < lines.length && !lines[at]!.trim().startsWith("```")) {
@@ -114,9 +129,15 @@ export function Markdown({ text }: { text: string }) {
         at += 1;
       }
       at += 1;
+
+      const prose = body.join("\n");
+      if (tag === "manuscript" && onManuscript) {
+        out.push(onManuscript(prose, `m${at}`));
+        continue;
+      }
       out.push(
         <pre className="md-pre" key={`p${at}`}>
-          <code>{body.join("\n")}</code>
+          <code>{prose}</code>
         </pre>,
       );
       continue;

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -14,7 +14,9 @@ import {
   structureRuns,
   works,
   excludedCharacters,
+  styleProfiles,
 } from "@brigid/db";
+import { baselines, featureLabel } from "@brigid/shared";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -43,6 +45,7 @@ import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./framewor
 import { placedDigests, progressOf } from "./worker.js";
 import { backfill, castFor, commitCast, pendingCount, resetCharacter } from "./cast.js";
 import { CHAT_SYSTEM, buildBrief } from "./chat.js";
+import { refresh } from "../style/measure.js";
 
 /**
  * Running the frameworks over a finished digest.
@@ -120,6 +123,64 @@ function driftFrom(
   };
 }
 
+
+/**
+ * The voice, gathered for a conversation.
+ *
+ * Measured, described, and exemplified: the numbers to aim at, the description
+ * to steer by, and two passages of the writer's own prose — which are the part
+ * that actually transfers a voice, since nothing conditions a model's
+ * generation on a mean sentence length.
+ */
+async function voiceFor(workId: string) {
+  const [profile] = await db
+    .select()
+    .from(styleProfiles)
+    .where(eq(styleProfiles.workId, workId))
+    .limit(1);
+
+  const samples = await refresh(workId);
+  const book = baselines(samples).get(null);
+  if (!book || book.sections === 0) return null;
+  if (!profile?.card.trim() && book.words === 0) return null;
+
+  const spoken =
+    samples.filter((s) => s.included).reduce((sum, s) => sum + s.measurement.words * s.measurement.dialogueShare, 0) /
+    Math.max(1, book.words);
+
+  const round = (v: number) => (v >= 10 ? v.toFixed(0) : v.toFixed(2));
+  const targets: { label: string; value: string }[] = [];
+  for (const key of ["sent.mean", "sent.sd", "punct.comma", "para.words", "mod.adverb", "pov.filtering", "tag.rate", "tag.said"]) {
+    const norm = book.overall[key];
+    if (norm) targets.push({ label: featureLabel(key), value: round(norm.mean) });
+  }
+  targets.push({ label: "share of words spoken aloud", value: `${Math.round(spoken * 100)}%` });
+
+  /**
+   * Two, not five. The brief has a novel's worth of findings to fit beside
+   * these, and a third exemplar buys less than the timeline it would cost.
+   */
+  const ids = (profile?.exemplars ?? []).slice(0, 2);
+  const rows =
+    ids.length > 0
+      ? await db
+          .select({ id: blocks.id, label: blocks.label, text: blocks.contentText })
+          .from(blocks)
+          .where(inArray(blocks.id, ids))
+      : [];
+
+  return {
+    card: profile?.card ?? "",
+    targets,
+    exemplars: rows
+      .filter((r) => r.text.trim())
+      .map((r) => ({
+        label: r.label || "Untitled",
+        // Enough to hear the cadence without crowding out the rest of the brief.
+        text: r.text.trim().split(/\s+/).slice(0, 320).join(" "),
+      })),
+  };
+}
 
 async function workOr404(workId: string) {
   const [work] = await db
@@ -489,9 +550,20 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       ).map((b) => [b.id, b.text]),
     );
 
+    /**
+     * The writer's voice, when there is one.
+     *
+     * Optional: a manuscript nobody has described still chats perfectly well
+     * about its shape and its people. What it cannot do without this is answer
+     * a question about how it is written, or write anything that sounds like
+     * the person who wrote it.
+     */
+    const dna = await voiceFor(workId);
+
     const brief = buildBrief(
       {
         title: work.title,
+        ...(dna ? { dna } : {}),
         totalWords: sections.reduce((sum, s) => sum + s.words, 0),
         structure,
         profiles,

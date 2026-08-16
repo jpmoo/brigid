@@ -6047,3 +6047,72 @@ mark.hit.misspelled {
   line-height: 1.6;
   color: var(--text-muted);
 }
+
+/* Prose the model wrote for the manuscript. Set as prose, never as code — it
+   arrives in a fence because a fence is the only thing in markdown that holds
+   text exactly as given, which is a fact about markdown and not about what the
+   text is. */
+.ms-draft {
+  margin: 10px 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--accent) 4%, var(--surface));
+  overflow: hidden;
+}
+
+.ms-draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px 6px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 20%, var(--border));
+}
+
+.ms-draft-tag {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.ms-draft-body {
+  padding: 14px 16px;
+  font-family: var(--serif, Georgia, serif);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.ms-draft-body p {
+  margin: 0;
+  text-indent: 1.4em;
+}
+
+.ms-draft-body p:first-child {
+  text-indent: 0;
+}
+
+.ms-draft-check {
+  padding: 10px 16px 14px;
+  border-top: 1px dashed color-mix(in srgb, var(--accent) 25%, var(--border));
+}
+
+.ms-draft-check ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+}
+
+.ms-draft-check li {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.ms-draft-check strong {
+  font-variant-numeric: tabular-nums;
+}
