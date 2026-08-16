@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { api, ApiError } from "../../../api.js";
 import type { ProseDna, ProseSection } from "../../../api.js";
-import { DnaHelix } from "./DnaHelix.js";
+import { ProseProfile } from "./ProseProfile.js";
 import { Markdown } from "./Markdown.js";
 
 /**
@@ -50,11 +50,11 @@ export function ProseDnaPane({ workId }: { workId: string }) {
     }
   };
 
-  const describe = async (force: boolean) => {
+  const describe = async () => {
     setDescribing(true);
     setError(null);
     try {
-      await api.describeProse(workId, force);
+      await api.describeProse(workId);
       await load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "the model did not answer");
@@ -112,27 +112,14 @@ export function ProseDnaPane({ workId }: { workId: string }) {
         </div>
       ) : null}
 
-      <DnaHelix strands={dna.strands} />
+      <ProseProfile features={dna.features} dialogueShare={dna.dialogueShare} />
 
-      <Card
-        profile={profile}
-        busy={describing}
-        onDescribe={describe}
-        onSave={async (card) => {
-          await api.saveStyleCard(workId, card);
-          await load();
-        }}
-      />
-
-      {profile && profile.commentary.length > 0 ? (
-        <Commentary entries={profile.commentary} />
-      ) : null}
+      <Commentary profile={profile} busy={describing} onDescribe={describe} />
 
       <Outliers dna={dna} labels={labels} />
 
       <Corpus
         sections={dna.sections}
-        labels={labels}
         busy={busy}
         counted={counted.length}
         onChange={setSections}
@@ -141,52 +128,51 @@ export function ProseDnaPane({ workId }: { workId: string }) {
   );
 }
 
-/** The voice in prose. The writer's own words outrank the model's. */
-function Card({
+/**
+ * What the measurements say, opening with the summary of them.
+ *
+ * The summary used to sit in a box of its own headed "Your voice, described",
+ * above a second box headed "What the measurements say" — two containers, two
+ * headings, and no way to tell from the outside that the first was a précis of
+ * the second. It is the first paragraph now, which is what it always was.
+ */
+function Commentary({
   profile,
   busy,
   onDescribe,
-  onSave,
 }: {
   profile: ProseDna["profile"];
   busy: boolean;
-  onDescribe: (force: boolean) => Promise<void>;
-  onSave: (card: string) => Promise<void>;
+  onDescribe: () => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
+  const entries = profile?.commentary ?? [];
+  const [open, setOpen] = useState<Set<number>>(new Set());
+  const allOpen = entries.length > 0 && open.size === entries.length;
 
   return (
-    <section className="dna-card">
+    <section className="dna-commentary">
       <div className="dna-card-head">
-        <h4>Your voice, described</h4>
+        <h4>What the measurements say</h4>
         <div className="row-actions">
+          {entries.length > 0 ? (
+            <button
+              className="btn ghost"
+              type="button"
+              onClick={() => setOpen(allOpen ? new Set() : new Set(entries.map((_, i) => i)))}
+            >
+              {allOpen ? "Collapse all" : "Expand all"}
+            </button>
+          ) : null}
           {profile ? (
             <button
               className="btn ghost"
               type="button"
               disabled={busy}
-              onClick={() => void onDescribe(profile.cardEdited)}
-              title={
-                profile.cardEdited
-                  ? "Rewrite it, discarding your edit"
-                  : "Read the measurements again"
-              }
+              onClick={() => void onDescribe()}
+              title="Read the measurements again"
             >
               {busy ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />}
-              {profile.cardEdited ? "Rewrite" : "Refresh"}
-            </button>
-          ) : null}
-          {profile && !editing ? (
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={() => {
-                setDraft(profile.card);
-                setEditing(true);
-              }}
-            >
-              Edit
+              Refresh
             </button>
           ) : null}
         </div>
@@ -198,93 +184,47 @@ function Card({
             The measurements are ready. Ask the model to read them and say what
             they describe — this is the only part of ProseDNA that needs it.
           </p>
-          <button className="btn" type="button" disabled={busy} onClick={() => void onDescribe(false)}>
+          <button className="btn" type="button" disabled={busy} onClick={() => void onDescribe()}>
             {busy ? <Loader2 size={14} className="spin" /> : null}
             {busy ? "Reading…" : "Describe my voice"}
           </button>
         </>
-      ) : editing ? (
-        <>
-          <textarea
-            className="dna-card-edit"
-            rows={6}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-          />
-          <div className="row-actions">
-            <button
-              className="btn"
-              type="button"
-              onClick={async () => {
-                await onSave(draft);
-                setEditing(false);
-              }}
-            >
-              Save
-            </button>
-            <button className="btn ghost" type="button" onClick={() => setEditing(false)}>
-              Cancel
-            </button>
-          </div>
-        </>
       ) : (
         <>
-          <blockquote className="dna-card-text">{profile.card || "—"}</blockquote>
-          <p className="muted small">
-            {profile.cardEdited ? "Edited by you. " : null}
-            {profile.stale
-              ? "Written about a different set of sections than are counted now."
-              : null}
-          </p>
+          {/* The summary, which is the thing to read if only one thing is read. */}
+          <p className="dna-summary-para">{profile.card || "—"}</p>
+          {profile.stale ? (
+            <p className="muted small">
+              Written about a different set of sections than are counted now.
+            </p>
+          ) : null}
+
+          {entries.map((entry, i) => (
+            <div key={entry.heading} className={`dna-entry${open.has(i) ? " open" : ""}`}>
+              <button
+                type="button"
+                className="dna-entry-head"
+                onClick={() =>
+                  setOpen((held) => {
+                    const next = new Set(held);
+                    if (next.has(i)) next.delete(i);
+                    else next.add(i);
+                    return next;
+                  })
+                }
+              >
+                <ChevronRight size={14} className="twisty" />
+                {entry.heading}
+              </button>
+              {open.has(i) ? (
+                <div className="dna-entry-body">
+                  <Markdown text={entry.body} />
+                </div>
+              ) : null}
+            </div>
+          ))}
         </>
       )}
-    </section>
-  );
-}
-
-function Commentary({ entries }: { entries: { heading: string; body: string }[] }) {
-  const [open, setOpen] = useState<Set<number>>(new Set([0]));
-  const allOpen = open.size === entries.length;
-
-  return (
-    <section className="dna-commentary">
-      <div className="dna-card-head">
-        <h4>What the measurements say</h4>
-        <button
-          className="btn ghost"
-          type="button"
-          onClick={() =>
-            setOpen(allOpen ? new Set() : new Set(entries.map((_, i) => i)))
-          }
-        >
-          {allOpen ? "Collapse all" : "Expand all"}
-        </button>
-      </div>
-
-      {entries.map((entry, i) => (
-        <div key={entry.heading} className={`dna-entry${open.has(i) ? " open" : ""}`}>
-          <button
-            type="button"
-            className="dna-entry-head"
-            onClick={() =>
-              setOpen((held) => {
-                const next = new Set(held);
-                if (next.has(i)) next.delete(i);
-                else next.add(i);
-                return next;
-              })
-            }
-          >
-            <ChevronRight size={14} className="twisty" />
-            {entry.heading}
-          </button>
-          {open.has(i) ? (
-            <div className="dna-entry-body">
-              <Markdown text={entry.body} />
-            </div>
-          ) : null}
-        </div>
-      ))}
     </section>
   );
 }
@@ -359,16 +299,21 @@ function Outliers({
   );
 }
 
-/** Which sections count, and which voice each is written in. */
+/**
+ * Which sections count towards the writer's normal.
+ *
+ * A list and a checkbox, in the order the sections are read. It had a word
+ * count, a distance, and three sentences explaining the difference between
+ * being excluded and being unmeasured — all of it true, none of it what
+ * somebody opening this needs, which is to find a chapter and take it out.
+ */
 function Corpus({
   sections,
-  labels,
   busy,
   counted,
   onChange,
 }: {
   sections: ProseSection[];
-  labels: Map<string, string>;
   busy: boolean;
   counted: number;
   onChange: (
@@ -391,66 +336,40 @@ function Corpus({
       {open ? (
         <>
           <p className="muted small">
-            Everything counts unless you take it out. Exclude anything too rough
-            to be typical of you — it is still measured, so you can still ask
-            whether it sounds like you yet. Give a section a voice when it is
-            meant to read differently: letters, a dream, a second narrator. Each
-            voice gets its own normal once there are three of them and a few
-            thousand words.
+            Everything counts unless you take it out. Leave out anything too
+            rough to be typical of you — it is still measured either way.
           </p>
 
-          <table className="dna-table">
-            <thead>
-              <tr>
-                <th>Section</th>
-                <th>Words</th>
-                <th>Distance</th>
-                <th>Voice</th>
-                <th>Counts</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sections.map((section) => (
-                <tr key={section.blockId} className={section.included ? "" : "out"}>
-                  <td>{labels.get(section.blockId) ?? "Untitled"}</td>
-                  <td className="num">{wordFmt.format(section.words)}</td>
-                  <td className="num">
-                    {section.reliable ? (
-                      section.delta.toFixed(2)
-                    ) : (
-                      <span className="muted" title="Too short to draw a conclusion from">
-                        —
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <input
-                      type="text"
-                      className="dna-voice"
-                      defaultValue={section.voice ?? ""}
-                      placeholder="—"
-                      disabled={busy}
-                      onBlur={(e) => {
-                        const value = e.target.value.trim();
-                        if (value === (section.voice ?? "")) return;
-                        void onChange([section.blockId], { voice: value || null });
-                      }}
-                    />
-                  </td>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={section.included}
-                      disabled={busy}
-                      onChange={(e) =>
-                        void onChange([section.blockId], { included: e.target.checked })
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <ul className="dna-sections">
+            {sections.map((section) => (
+              <li key={section.blockId} className={section.included ? "" : "out"}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={section.included}
+                    disabled={busy}
+                    onChange={(e) =>
+                      void onChange([section.blockId], { included: e.target.checked })
+                    }
+                  />
+                  <span>{section.label || "Untitled"}</span>
+                </label>
+                <input
+                  type="text"
+                  className="dna-voice"
+                  defaultValue={section.voice ?? ""}
+                  placeholder="voice"
+                  title="Name a voice when a section is meant to read differently — letters, a dream, a second narrator"
+                  disabled={busy}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    if (value === (section.voice ?? "")) return;
+                    void onChange([section.blockId], { voice: value || null });
+                  }}
+                />
+              </li>
+            ))}
+          </ul>
         </>
       ) : null}
     </section>

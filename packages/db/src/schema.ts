@@ -604,8 +604,6 @@ export const styleProfiles = pgTable("style_profiles", {
     .references(() => works.id, { onDelete: "cascade" }),
   /** The voice in prose. Editable, because it steers everything downstream. */
   card: text("card").notNull().default(""),
-  /** So a regeneration can refuse to overwrite what a person wrote. */
-  cardEdited: boolean("card_edited").notNull().default(false),
   /** Sections nearest the middle of everything included, by id. */
   exemplars: jsonb("exemplars").$type<string[]>().notNull().default([]),
   /** What the numbers say, in paragraphs. */

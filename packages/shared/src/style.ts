@@ -162,10 +162,21 @@ export function tokens(text: string): string[] {
   return found ? found.map((w) => w.replace(/[’]/g, "'")) : [];
 }
 
-/** Paragraphs, as the manuscript stores them. */
+/**
+ * Paragraphs, as the manuscript stores them.
+ *
+ * Line endings are normalized first. A blank line between paragraphs is two
+ * newlines when the text was written here and `\r\n\r\n` when it came from
+ * anywhere Windows has been — and a rule looking for two consecutive newlines
+ * finds none of the second kind. Every book in the reference set measured as a
+ * single paragraph the length of the whole novel before this, which is the
+ * loudest a bug of this shape ever gets: had it been subtler it would simply
+ * have been wrong.
+ */
 export function paragraphs(text: string): string[] {
   return text
-    .split(/\n{2,}/)
+    .replace(/\r\n?/g, "\n")
+    .split(/\n[ \t]*\n/)
     .map((p) => p.trim())
     .filter(Boolean);
 }

@@ -332,7 +332,18 @@ export function deviations(
         ? overallFound.reduce((sum, d) => sum + contribution(d.z), 0) / overallFound.length
         : 0;
 
+    /**
+     * What to report, which is not the same as what to measure.
+     *
+     * The function words are the strongest part of the distance and the worst
+     * possible explanation of it. "Your use of 'show' is up; 'year' is up" is
+     * true, unactionable, and reads like a broken feature — nobody writes by
+     * deciding how often to say "year", and a writer told that has been given
+     * noise dressed as a finding. They stay in the arithmetic, where they earn
+     * their place, and out of the sentence describing it.
+     */
     const moved = [...overallFound, ...all]
+      .filter((d) => !d.key.replace(/^\w+:/, "").startsWith("fw."))
       .sort((a, b) => Math.abs(b.z) - Math.abs(a.z))
       .slice(0, 12);
 

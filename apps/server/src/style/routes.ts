@@ -4,6 +4,7 @@ import { z } from "zod";
 import { blocks, styleProfiles, works } from "@brigid/db";
 import {
   baselines,
+  COMPARABLE,
   deviations,
   featureLabel,
   leastCharacteristic,
@@ -103,14 +104,25 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
             })) ?? [],
         };
       }),
-      /** The strands of the graph: one figure per family, book-wide. */
-      strands: book ? strandsOf(book.overall) : [],
+      /**
+       * The writer's own figures, book-wide, for every measure the reference
+       * novels also carry. Sent raw: the comparison is arithmetic the browser
+       * can do for itself against a table it already has, so picking a
+       * different novel to sit beside costs nothing and asks nothing.
+       */
+      features: Object.fromEntries(
+        COMPARABLE.map((key) => [key, book?.overall[key]?.mean ?? 0]).filter(
+          ([, value]) => value !== 0 || book?.overall,
+        ),
+      ),
+      dialogueShare:
+        samples.filter((s) => s.included).reduce((sum, s) => sum + s.measurement.words * s.measurement.dialogueShare, 0) /
+        Math.max(1, book?.words ?? 1),
       typical: mostCharacteristic(found, samples),
       atypical: leastCharacteristic(found, samples).map((d) => d.blockId),
       profile: profile
         ? {
             card: profile.card,
-            cardEdited: profile.cardEdited,
             exemplars: profile.exemplars,
             commentary: profile.commentary,
             model: profile.model,
@@ -160,28 +172,10 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
   app.post("/works/:workId/style/describe", async (req) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const { force } = z.object({ force: z.boolean().optional() }).parse(req.body ?? {});
     await workOr404(workId);
-    return describe(workId, { force: force ?? false });
+    return describe(workId);
   });
 
-  /** The writer's own words about their voice, which outrank the model's. */
-  app.patch("/works/:workId/style/card", async (req) => {
-    requireUser(req);
-    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const { card } = z.object({ card: z.string().max(20000) }).parse(req.body);
-    await workOr404(workId);
-
-    await db
-      .insert(styleProfiles)
-      .values({ workId, card, cardEdited: true })
-      .onConflictDoUpdate({
-        target: styleProfiles.workId,
-        set: { card, cardEdited: true },
-      });
-
-    return { ok: true as const };
-  });
 }
 
 /** A feature key as a reader should see it, stream and all. */
@@ -206,41 +200,4 @@ export function signature(samples: { blockId: string; included: boolean; measure
     .map((s) => `${s.blockId}:${s.measurement.words}`)
     .sort()
     .join("|");
-}
-
-/**
- * The strands of the graph.
- *
- * Two hundred numbers is not a picture. The families are, and each collapses to
- * one figure a reader can hold: how long the sentences run, how heavily the
- * prose is punctuated, how far the narrator stands back. The detail is still
- * there underneath for anything that asks.
- */
-const STRANDS: { key: string; name: string; of: string; from: string[] }[] = [
-  { key: "length", name: "Sentence length", of: "words", from: ["sent.mean"] },
-  { key: "variety", name: "Variety", of: "spread", from: ["sent.sd"] },
-  { key: "punctuation", name: "Punctuation", of: "per sentence", from: ["punct.comma"] },
-  { key: "paragraph", name: "Paragraph length", of: "words", from: ["para.words"] },
-  { key: "vocabulary", name: "Vocabulary", of: "range", from: ["lex.ttr"] },
-  { key: "wordlength", name: "Word length", of: "syllables", from: ["lex.syllables"] },
-  { key: "latinate", name: "Latinate", of: "per 100 words", from: ["lex.latinate"] },
-  { key: "dialogue", name: "Speech tags", of: "per 1000", from: ["tag.rate"] },
-  { key: "distance", name: "Filtering", of: "per 1000", from: ["pov.filtering"] },
-  { key: "adverbs", name: "-ly adverbs", of: "per 1000", from: ["mod.adverb"] },
-  { key: "hedging", name: "Hedging", of: "per 1000", from: ["mod.hedge"] },
-  { key: "negation", name: "Negation", of: "per 1000", from: ["mod.negation"] },
-];
-
-function strandsOf(norms: Record<string, { mean: number; sd: number }>) {
-  return STRANDS.map((strand) => {
-    const source = strand.from[0]!;
-    const norm = norms[source];
-    return {
-      key: strand.key,
-      name: strand.name,
-      unit: strand.of,
-      value: norm?.mean ?? 0,
-      spread: norm?.sd ?? 0,
-    };
-  });
 }

@@ -400,17 +400,11 @@ export const api = {
       body: JSON.stringify(patch),
     }),
 
-  describeProse: (workId: string, force = false) =>
+  describeProse: (workId: string) =>
     request<{ ok: true; card: string; commentary: { heading: string; body: string }[] }>(
       `/works/${workId}/style/describe`,
-      { method: "POST", body: JSON.stringify({ force }) },
+      { method: "POST", body: "{}" },
     ),
-
-  saveStyleCard: (workId: string, card: string) =>
-    request<{ ok: true }>(`/works/${workId}/style/card`, {
-      method: "PATCH",
-      body: JSON.stringify({ card }),
-    }),
 
   listBookmarks: (workId: string) =>
     request<{ bookmarks: Bookmark[] }>(`/works/${workId}/bookmarks`),
@@ -708,15 +702,6 @@ export const api = {
     request<{ block: Block }>(`/blocks/${id}/format`, { method: "DELETE" }),
 };
 
-/** One measure of the writing, as the helix draws it. */
-export interface ProseStrand {
-  key: string;
-  name: string;
-  unit: string;
-  value: number;
-  spread: number;
-}
-
 export interface ProseSection {
   blockId: string;
   label: string;
@@ -744,13 +729,19 @@ export interface ProseDna {
     voices: string[];
   };
   sections: ProseSection[];
-  strands: ProseStrand[];
+  /**
+   * The writer's own figures, book-wide, for every measure the reference novels
+   * also carry. The comparison is done in the browser against a table it
+   * already ships with, so choosing a different novel to sit beside costs
+   * nothing.
+   */
+  features: Record<string, number>;
+  dialogueShare: number;
   /** Sections nearest the middle of everything counted — not "best". */
   typical: string[];
   atypical: string[];
   profile: {
     card: string;
-    cardEdited: boolean;
     exemplars: string[];
     commentary: { heading: string; body: string }[];
     model: string | null;

@@ -5749,102 +5749,6 @@ mark.hit.misspelled {
   color: var(--text-muted);
 }
 
-/* The helix. Centered and given room, because it is the thing the pane is for
-   and a chart squeezed against a column of text reads as an illustration
-   rather than as the finding. */
-.dna-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 18px 0 4px;
-}
-
-.dna {
-  max-width: 560px;
-  overflow: visible;
-}
-
-.dna-backbone {
-  fill: none;
-  stroke: color-mix(in srgb, var(--accent) 42%, transparent);
-  stroke-width: 2.5;
-  stroke-linecap: round;
-}
-
-/* The line a bead is read against. Faint: it is a reference, not a reading. */
-.dna-center {
-  stroke: color-mix(in srgb, var(--text) 12%, transparent);
-  stroke-width: 1;
-  stroke-dasharray: 2 4;
-}
-
-/* The range a compared measure is read against, drawn so "usual" is something
-   you can see rather than something the caption asserts. */
-.dna-band {
-  stroke: color-mix(in srgb, var(--accent) 22%, transparent);
-  stroke-width: 9;
-  stroke-linecap: round;
-}
-
-.dna-bar {
-  stroke: color-mix(in srgb, var(--text) 18%, transparent);
-  stroke-width: 1.5;
-}
-
-/* Wide and invisible, so a rung can be pointed at without being aimed at. */
-.dna-hit {
-  stroke: transparent;
-  stroke-width: 22;
-}
-
-.dna-bead {
-  fill: var(--accent);
-  transition: r 120ms ease;
-}
-
-/* A measure with no published norm behind it is drawn hollow: the bead sits at
-   the middle because there is nothing to place it against, and a solid one
-   would imply a comparison that was never made. */
-.dna-rung.own .dna-bead {
-  fill: var(--surface);
-  stroke: var(--accent);
-  stroke-width: 2;
-}
-
-.dna-rung.on .dna-bar {
-  stroke: color-mix(in srgb, var(--accent) 55%, transparent);
-}
-
-.dna-rung { cursor: default; }
-
-.dna-name {
-  font-size: 11px;
-  fill: var(--text-muted);
-  font-family: var(--sans);
-}
-
-.dna-value {
-  font-size: 11px;
-  fill: var(--text-faint);
-  font-family: var(--sans);
-  font-variant-numeric: tabular-nums;
-}
-
-.dna-rung.on .dna-name,
-.dna-rung.on .dna-value {
-  fill: var(--text);
-}
-
-.dna-key {
-  max-width: 60ch;
-  margin: 0;
-  font-size: 11.5px;
-  line-height: 1.5;
-  color: var(--text-faint);
-  text-align: center;
-}
-
 .dna-card,
 .dna-commentary,
 .dna-corpus,
@@ -5996,36 +5900,42 @@ mark.hit.misspelled {
   margin-left: auto;
 }
 
-.dna-table {
-  width: 100%;
-  margin-top: 12px;
-  border-collapse: collapse;
+/* Sections, in reading order, with a box each. */
+.dna-sections {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.dna-sections li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+  border-bottom: 1px solid var(--border);
   font-size: 12.5px;
 }
 
-.dna-table th {
-  text-align: left;
-  font-weight: 600;
-  font-size: 11px;
-  color: var(--text-faint);
-  padding-bottom: 6px;
-  border-bottom: 1px solid var(--border);
+.dna-sections label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
 }
 
-.dna-table td {
-  padding: 5px 8px 5px 0;
-  border-bottom: 1px solid var(--border);
+.dna-sections label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.dna-table td.num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  padding-right: 16px;
-}
-
-/* An excluded section is still measured and still listed — a draft is exactly
-   what someone wants to ask "does this sound like me yet?" about. */
-.dna-table tr.out td {
+/* An excluded section stays on the list and stays measured — a draft is
+   exactly what someone wants to ask "does this sound like me yet?" about. */
+.dna-sections li.out label span {
   opacity: 0.5;
 }
 
@@ -6114,5 +6024,172 @@ mark.hit.misspelled {
 }
 
 .ms-draft-check strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Where a manuscript sits among measured novels --------------------- */
+
+.pp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pp-tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pp-row {
+  display: grid;
+  grid-template-columns: 11em 1fr 3.5em;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 6px;
+  border-radius: 5px;
+}
+
+.pp-row.on {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.pp-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pp-track {
+  position: relative;
+  height: 18px;
+}
+
+.pp-rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+/* One published novel. Faint on purpose — together they are the range, and no
+   single one of them is a target. */
+.pp-tick {
+  position: absolute;
+  top: 5px;
+  width: 1px;
+  height: 8px;
+  margin-left: -0.5px;
+  background: color-mix(in srgb, var(--text) 30%, transparent);
+}
+
+.pp-me {
+  position: absolute;
+  top: 3px;
+  width: 12px;
+  height: 12px;
+  margin-left: -6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* A novel laid over the top. Diamonds rather than circles, so the writer's own
+   marker is never mistaken for one of them at a glance. */
+.pp-them {
+  position: absolute;
+  top: 4px;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  transform: rotate(45deg);
+  border: 2px solid var(--pp-c, var(--text-muted));
+  background: var(--surface);
+}
+
+.pp-them.c0, .pp-pick.c0 { --pp-c: #b4692f; }
+.pp-them.c1, .pp-pick.c1 { --pp-c: #4a6fa8; }
+.pp-them.c2, .pp-pick.c2 { --pp-c: #8a5390; }
+
+.pp-value {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-ends {
+  grid-column: 2;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+
+.pp-key,
+.pp-verdict {
+  max-width: 68ch;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-faint);
+}
+
+.pp-verdict {
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.pp-alike h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.pp-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 6px;
+  margin: 12px 0;
+}
+
+.pp-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pp-pick:hover {
+  border-color: var(--border-strong);
+}
+
+.pp-pick.on {
+  border-color: var(--pp-c);
+  box-shadow: inset 3px 0 0 var(--pp-c);
+}
+
+/* The three at the bottom are the ones it measures least like, and are marked
+   so the list does not read as a ranking of merit. */
+.pp-pick.far {
+  opacity: 0.72;
+  border-style: dashed;
+}
+
+.pp-pick-name {
+  font-size: 12px;
+}
+
+.pp-pick-meta {
+  font-size: 10.5px;
+  color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }

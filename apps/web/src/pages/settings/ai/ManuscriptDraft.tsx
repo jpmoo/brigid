@@ -28,10 +28,10 @@ import type { ProseDna } from "../../../api.js";
  * in one place — two lists would eventually disagree about which is which.
  */
 const SHOWN = [
-  { strand: "length", feature: "sent.mean", label: "words per sentence", round: 1 },
-  { strand: "punctuation", feature: "punct.comma", label: "commas per sentence", round: 2 },
-  { strand: "paragraph", feature: "para.words", label: "words per paragraph", round: 0 },
-  { strand: "adverbs", feature: "mod.adverb", label: "-ly adverbs per 1,000", round: 1 },
+  { feature: "sent.mean", label: "words per sentence", round: 1 },
+  { feature: "punct.comma", label: "commas per sentence", round: 2 },
+  { feature: "para.words", label: "words per paragraph", round: 0 },
+  { feature: "mod.adverb", label: "-ly adverbs per 1,000", round: 1 },
 ] as const;
 
 /**
@@ -73,13 +73,12 @@ export function ManuscriptDraft({
     if (words < 120) return null;
 
     const mine = measure(prose);
-    const yours = new Map(dna.strands.map((s) => [s.key, s]));
 
-    const rows = SHOWN.map(({ strand, feature, label, round }) => {
-      const target = yours.get(strand);
+    const rows = SHOWN.map(({ feature, label, round }) => {
+      const want = dna.features[feature];
       const got = mine.overall[feature];
-      if (!target || got === undefined) return null;
-      return { label, got, want: target.value, round };
+      if (want === undefined || got === undefined) return null;
+      return { label, got, want, round };
     }).filter((r): r is NonNullable<typeof r> => r !== null);
 
     return { words, rows };

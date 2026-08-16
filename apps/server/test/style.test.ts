@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {
+  REFERENCE_WORKS,
+  resemblance,
   baselines,
   deviations,
   leastCharacteristic,
@@ -139,6 +141,18 @@ test("every feature a report can name has a name", () => {
   for (const key of Object.keys(m.overall)) {
     assert.notEqual(featureLabel(key), key, `${key} has no plain-English label`);
   }
+});
+
+test("paragraphs are found however the line endings were written", () => {
+  const unix = "One paragraph here.\n\nAnd a second one.\n\nAnd a third.";
+  const windows = unix.replace(/\n/g, "\r\n");
+  assert.equal(measure(unix).paragraphs, 3);
+  assert.equal(
+    measure(windows).paragraphs,
+    3,
+    "a blank line is two newlines here and \\r\\n\\r\\n anywhere Windows has been",
+  );
+  assert.equal(measure(windows).overall["para.words"], measure(unix).overall["para.words"]);
 });
 
 console.log("\nthe writer's normal");
@@ -408,6 +422,43 @@ test("an excluded section is never held up as characteristic", () => {
   ];
   const found = deviations(samples, baselines(samples));
   assert.ok(!mostCharacteristic(found, samples).includes("draft"));
+});
+
+console.log("\nmeasuring against books that were measured");
+
+test("every reference work is nearest to itself", () => {
+  // The one property the metric cannot be allowed to get wrong. If a book is
+  // not its own closest match, the distance is not measuring what it claims to.
+  for (const work of REFERENCE_WORKS.slice(0, 12)) {
+    const nearest = resemblance(work.features)[0]!;
+    assert.equal(
+      `${nearest.work.author}|${nearest.work.title}`,
+      `${work.author}|${work.title}`,
+      `${work.title} was nearest to ${nearest.work.title}`,
+    );
+    assert.ok(nearest.distance < 1e-9, `and at zero distance, not ${nearest.distance}`);
+  }
+});
+
+test("the ornate books group together and away from the clipped ones", () => {
+  const melville = REFERENCE_WORKS.find((w) => w.title === "Moby-Dick")!;
+  const ranked = resemblance(melville.features);
+  const furthest = ranked.at(-1)!;
+  // Hemingway is the far end of this axis by any reading, and the arithmetic
+  // should find that without being told.
+  assert.ok(
+    /Hemingway|Christie|Carroll|Baum/.test(furthest.work.author + furthest.work.title),
+    `Moby-Dick measured furthest from ${furthest.work.author} — ${furthest.work.title}`,
+  );
+});
+
+test("a resemblance says where the two are apart, not only how far", () => {
+  const hemingway = REFERENCE_WORKS.find((w) => w.author.includes("Hemingway"))!;
+  const against = resemblance(hemingway.features).find((r) => r.work.title === "Moby-Dick")!;
+  assert.ok(against.apart.length > 0);
+  for (const gap of against.apart) {
+    assert.ok(Number.isFinite(gap.gap) && gap.label.length > 0);
+  }
 });
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILED`);

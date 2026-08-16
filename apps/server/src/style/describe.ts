@@ -102,7 +102,6 @@ function contrast(baseline: Baseline): string {
 
 export async function describe(
   workId: string,
-  opts: { force: boolean },
 ): Promise<{ ok: true; card: string; commentary: { heading: string; body: string }[] }> {
   const config = await readerOrFail();
 
@@ -177,12 +176,6 @@ Write two things.
 
 "commentary": four to six sections, each with a short heading and a paragraph. Cover: sentence rhythm; punctuation and paragraphing; word choice; how dialogue is written and attributed; how close the narrator stands to the scene. Where a passage above illustrates the point, quote a few words of it. If the numbers show a habit the writer may not have noticed — repeated sentence openings, heavy filtering, adverbs on speech tags — say so plainly and without recommending anything.`;
 
-  const [existing] = await db
-    .select()
-    .from(styleProfiles)
-    .where(eq(styleProfiles.workId, workId))
-    .limit(1);
-
   const answer = await generateJson<{ card?: string; commentary?: { heading: string; body: string }[] }>({
     url: config.url,
     model: config.model,
@@ -194,19 +187,13 @@ Write two things.
   });
 
   const commentary = (answer.value.commentary ?? []).filter((c) => c?.heading && c?.body);
-  /**
-   * An edited card is the writer's own words about their own voice and outrank
-   * the model's. Overwritten only when they ask for it in so many words.
-   */
-  const keepCard = existing?.cardEdited && !opts.force;
-  const card = keepCard ? existing.card : (answer.value.card ?? "").trim();
+  const card = (answer.value.card ?? "").trim();
 
   await db
     .insert(styleProfiles)
     .values({
       workId,
       card,
-      cardEdited: keepCard ? true : false,
       exemplars: typicalIds,
       commentary,
       model: config.model,
@@ -216,7 +203,7 @@ Write two things.
     .onConflictDoUpdate({
       target: styleProfiles.workId,
       set: {
-        ...(keepCard ? {} : { card, cardEdited: false }),
+        card,
         exemplars: typicalIds,
         commentary,
         model: config.model,

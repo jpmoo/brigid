@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { blocks, styleFeatures, templates } from "@brigid/db";
-import { measure } from "@brigid/shared";
+import { buildOutline, measure } from "@brigid/shared";
 import type { StyleSample } from "@brigid/shared";
 import { db } from "../db.js";
 import { hashContent } from "../ollama/digest.js";
@@ -27,6 +27,8 @@ async function proseBlocks(workId: string) {
   const rows = await db
     .select({
       id: blocks.id,
+      parentId: blocks.parentId,
+      sortKey: blocks.sortKey,
       contentText: blocks.contentText,
       styleExcluded: blocks.styleExcluded,
       styleVoice: blocks.styleVoice,
@@ -36,7 +38,30 @@ async function proseBlocks(workId: string) {
     .innerJoin(templates, eq(templates.id, blocks.formatId))
     .where(eq(blocks.workId, workId));
 
-  return rows.filter((r) => r.structural?.structural !== false);
+  /**
+   * In the order they are read, which is the only order that means anything to
+   * the person choosing what counts. A query returns rows in whatever order
+   * the database finds convenient, so the list arrived shuffled — chapter
+   * eleven above chapter two — and there was no way to tell from looking at it
+   * that it was not deliberate.
+   */
+  const order = new Map(
+    buildOutline(
+      // Only what the walk needs to order them; the rest is this query's.
+      rows.map((r) => ({
+        id: r.id,
+        parentId: r.parentId,
+        sortKey: r.sortKey,
+        label: null,
+        formatId: "",
+        wordCount: 0,
+      })),
+    ).map((entry, at) => [entry.block.id, at] as const),
+  );
+
+  return rows
+    .filter((r) => r.structural?.structural !== false)
+    .sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
 }
 
 /**
