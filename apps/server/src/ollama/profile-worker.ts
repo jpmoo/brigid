@@ -7,6 +7,7 @@ import type {
   StructureRunProgress,
 } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
+import { reader } from "./reader.js";
 import { analyseCharacter, analyseStructure, dossierFromCast, reconcilePrimacy } from "./analysis.js";
 import { castFor } from "./cast.js";
 import { placedDigests } from "./worker.js";
@@ -39,19 +40,6 @@ let inFlight = false;
 /** How often to look for queued work when nobody has asked. */
 const IDLE_MS = 20_000;
 
-async function reader() {
-  const [row] = await db
-    .select({
-      url: settings.ollamaUrl,
-      model: settings.inferenceModel,
-      numCtx: settings.ollamaNumCtx,
-      thinks: settings.ollamaThinks,
-    })
-    .from(settings)
-    .limit(1);
-  if (!row?.url || !row.model) return null;
-  return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
-}
 
 /** Each section as it stands, for measuring how far the book moves afterwards. */
 function snapshot(sections: PlacedDigest[]): [string, string, number][] {

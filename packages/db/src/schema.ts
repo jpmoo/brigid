@@ -283,6 +283,18 @@ export const blocks = pgTable(
     /** Decisions about this block rather than about its format. */
     options: jsonb("options").$type<BlockOptions>(),
     /**
+     * Kept out of the ProseDNA baseline. Still measured — a draft is exactly
+     * what someone wants to ask "does this sound like me yet?" about.
+     */
+    styleExcluded: boolean("style_excluded").notNull().default(false),
+    /**
+     * A section meant to read differently: a letter, a dream, a second
+     * narrator. Each named voice gets its own normal once there is enough of it
+     * to have one, so a book of letters doesn't report every letter as a
+     * departure from itself.
+     */
+    styleVoice: text("style_voice"),
+    /**
      * Always maintained, for every block, regardless of whether the block's
      * format contributes to the manuscript total.
      */
@@ -545,3 +557,61 @@ export const canvasNodes = pgTable(
   },
   (t) => ({ byWork: index("canvas_nodes_work_idx").on(t.workId) }),
 );
+
+/**
+ * One section, measured.
+ *
+ * Arithmetic only, so unlike the digest this needs no model and no connection —
+ * a manuscript with Ollama switched off still has a fingerprint. Keyed on a
+ * hash of what was measured, so a section whose prose has changed no longer
+ * matches its row and nothing has to remember to invalidate anything.
+ *
+ * Nothing here is relative to anything. A baseline averages whichever sections
+ * the writer counts, and that changes with a click, so every comparison is
+ * worked out on reading and only the raw numbers are kept.
+ */
+export const styleFeatures = pgTable(
+  "style_features",
+  {
+    blockId: uuid("block_id")
+      .primaryKey()
+      .references(() => blocks.id, { onDelete: "cascade" }),
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    /** Of the prose that was measured. Stale when this stops matching. */
+    contentHash: text("content_hash").notNull(),
+
+    words: integer("words").notNull(),
+    sentences: integer("sentences").notNull(),
+    paragraphs: integer("paragraphs").notNull(),
+    dialogueShare: doublePrecision("dialogue_share").notNull(),
+
+    /** Everything, then what is spoken and what is not, held apart. */
+    overall: jsonb("overall").$type<Record<string, number>>().notNull().default({}),
+    narration: jsonb("narration").$type<Record<string, number>>().notNull().default({}),
+    dialogue: jsonb("dialogue").$type<Record<string, number>>().notNull().default({}),
+
+    measuredAt: timestamp("measured_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => ({ byWork: index("style_features_work").on(t.workId) }),
+);
+
+/** The model's reading of the measurements, and the writer's edit of it. */
+export const styleProfiles = pgTable("style_profiles", {
+  workId: uuid("work_id")
+    .primaryKey()
+    .references(() => works.id, { onDelete: "cascade" }),
+  /** The voice in prose. Editable, because it steers everything downstream. */
+  card: text("card").notNull().default(""),
+  /** So a regeneration can refuse to overwrite what a person wrote. */
+  cardEdited: boolean("card_edited").notNull().default(false),
+  /** Sections nearest the middle of everything included, by id. */
+  exemplars: jsonb("exemplars").$type<string[]>().notNull().default([]),
+  /** What the numbers say, in paragraphs. */
+  commentary: jsonb("commentary").$type<{ heading: string; body: string }[]>().notNull().default([]),
+  model: text("model"),
+  /** What it was written from. When this stops matching, it describes another book. */
+  corpusSignature: text("corpus_signature"),
+  generatedAt: timestamp("generated_at", { withTimezone: true }),
+});

@@ -23,6 +23,7 @@ import type {
 } from "@brigid/shared";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
+import { readerOrFail as reader } from "./reader.js";
 import { badRequest, notFound } from "../lib/errors.js";
 import {
   analyseStructure,
@@ -119,19 +120,6 @@ function driftFrom(
   };
 }
 
-async function reader() {
-  const [row] = await db
-    .select({
-      url: settings.ollamaUrl,
-      model: settings.inferenceModel,
-      numCtx: settings.ollamaNumCtx,
-      thinks: settings.ollamaThinks,
-    })
-    .from(settings)
-    .limit(1);
-  if (!row?.url || !row.model) throw badRequest("no model is connected");
-  return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
-}
 
 async function workOr404(workId: string) {
   const [work] = await db

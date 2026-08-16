@@ -10,6 +10,7 @@ import { ZodError } from "zod";
 import { authRoutes } from "./auth/routes.js";
 import { blocksRoutes } from "./blocks/routes.js";
 import { canvasRoutes } from "./canvas/routes.js";
+import { styleRoutes } from "./style/routes.js";
 import { bookmarksRoutes } from "./bookmarks/routes.js";
 import { env, runtimeConfig } from "./config.js";
 import { isDbReady } from "./db.js";
@@ -74,6 +75,7 @@ export async function buildApp(): Promise<FastifyInstance> {
       await scope.register(blocksRoutes);
       await scope.register(bookmarksRoutes);
       await scope.register(canvasRoutes);
+      await scope.register(styleRoutes);
       await scope.register(templatesRoutes);
       await scope.register(importRoutes);
       await scope.register(spellingRoutes);

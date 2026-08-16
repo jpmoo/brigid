@@ -46,7 +46,10 @@ try {
    * browser. These are the specific paths the AI panel calls, so a route that
    * quietly fails to register now fails here instead.
    */
-  for (const path of ["cast", "commit", "chat", "identities", "not-a-character", "canvas"]) {
+  for (const path of [
+    "cast", "commit", "chat", "identities", "not-a-character", "canvas",
+    "style", "sections", "describe", "card",
+  ]) {
     check(`the ${path} route is registered`, routes.includes(path));
   }
 
