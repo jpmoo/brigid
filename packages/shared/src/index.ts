@@ -22,6 +22,7 @@ export {
   splitSpeech,
   syllables,
   featureLabel,
+  featureUnit,
 } from "./style.js";
 export type { StyleFeatures, StyleMeasurement } from "./style.js";
 export * from "./style-baseline.js";

@@ -3,6 +3,7 @@ import {
   REFERENCE_WORKS,
   alikeBand,
   distanceNote,
+  featureUnit,
   howAlike,
   place,
   resemblance,
@@ -43,6 +44,20 @@ const ROWS: { key: string; label: string; low: string; high: string }[] = [
   { key: "tag.rate", label: "Speech tags", low: "few", high: "many" },
   { key: "tag.said", label: "“Said” among them", low: "varied verbs", high: "always “said”" },
 ];
+
+/**
+ * A figure with what it is counted in.
+ *
+ * The column mixes denominators — commas per sentence, dashes per thousand
+ * words, vocabulary as a proportion — and printed bare they read as though they
+ * shared one. "Dashes 1.57" beside "Commas 2.01" said a dash every sentence and
+ * a half, when what it meant was three dashes in two thousand words.
+ */
+function shown(key: string, value: number): string {
+  const { unit, percent } = featureUnit(key);
+  if (percent) return `${(value * 100).toFixed(value < 0.1 ? 1 : 0)}%`;
+  return value === 0 ? "0" : value >= 10 ? value.toFixed(0) : value.toFixed(2);
+}
 
 const fmt = (value: number): string =>
   value === 0 ? "0" : value >= 10 ? value.toFixed(0) : value.toFixed(2);
@@ -150,7 +165,7 @@ export function ProseProfile({
                       key={`${work.author}|${work.title}`}
                       className="pp-tick"
                       style={{ left: `${spot * 100}%` }}
-                      title={`${nameOf(work)} — ${fmt(theirs)}`}
+                      title={`${nameOf(work)} — ${shown(row.key, theirs)} ${featureUnit(row.key).unit}`}
                     />
                   );
                 })}
@@ -165,15 +180,18 @@ export function ProseProfile({
                       key={`${work.author}|${work.title}`}
                       className={`pp-them c${i}`}
                       style={{ left: `${spot * 100}%` }}
-                      title={`${nameOf(work)} — ${fmt(theirs)}`}
+                      title={`${nameOf(work)} — ${shown(row.key, theirs)} ${featureUnit(row.key).unit}`}
                     />
                   );
                 })}
 
-                <span className="pp-me" style={{ left: `${at * 100}%` }} title={`You — ${fmt(value)}`} />
+                <span className="pp-me" style={{ left: `${at * 100}%` }} title={`You — ${shown(row.key, value)} ${featureUnit(row.key).unit}`} />
               </span>
 
-              <span className="pp-value">{fmt(value)}</span>
+              <span className="pp-value">
+                {shown(row.key, value)}
+                <em>{featureUnit(row.key).unit}</em>
+              </span>
               {on ? (
                 <span className="pp-ends">
                   {row.low} → {row.high}

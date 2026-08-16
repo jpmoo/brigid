@@ -4,6 +4,7 @@ import {
   baselines,
   deviations,
   featureLabel,
+  featureUnit,
   leastCharacteristic,
   mostCharacteristic,
 } from "@brigid/shared";
@@ -74,12 +75,17 @@ function readable(baseline: Baseline, dialogueShare: number): string {
   for (const key of HEADLINE) {
     const norm = baseline.overall[key];
     if (!norm) continue;
-    const value = norm.mean;
-    const shown = value >= 10 ? value.toFixed(0) : value.toFixed(2);
+    // With the unit, always. Told "dashes: 5.63" and nothing else, a model has
+    // no way to know whether that is per sentence or per thousand words, and
+    // will happily pick the wrong one and state it to the writer as a finding.
+    const { unit, percent } = featureUnit(key);
+    const put = (v: number) =>
+      percent ? `${(v * 100).toFixed(v < 0.1 ? 1 : 0)}%` : v >= 10 ? v.toFixed(0) : v.toFixed(2);
     // The spread as well, because "usually 24 words, sometimes 40" is a
     // different writer from "always 24".
-    const spread = norm.sd >= 10 ? norm.sd.toFixed(0) : norm.sd.toFixed(2);
-    lines.push(`- ${featureLabel(key)}: ${shown} (varies by about ${spread} between sections)`);
+    lines.push(
+      `- ${featureLabel(key)}: ${put(norm.mean)} ${unit} (varies by about ${put(norm.sd)} between sections)`,
+    );
   }
   lines.push(`- share of words spoken aloud: ${(dialogueShare * 100).toFixed(0)}%`);
   return lines.join("\n");
@@ -92,8 +98,12 @@ function contrast(baseline: Baseline): string {
     const n = baseline.narration[key];
     const d = baseline.dialogue[key];
     if (!n || !d) continue;
-    const fmt = (v: number) => (v >= 10 ? v.toFixed(0) : v.toFixed(2));
-    lines.push(`- ${featureLabel(key)}: ${fmt(n.mean)} narrating, ${fmt(d.mean)} in speech`);
+    const { unit, percent } = featureUnit(key);
+    const fmt = (v: number) =>
+      percent ? `${(v * 100).toFixed(0)}%` : v >= 10 ? v.toFixed(0) : v.toFixed(2);
+    lines.push(
+      `- ${featureLabel(key)}: ${fmt(n.mean)} narrating, ${fmt(d.mean)} in speech (${unit})`,
+    );
   }
   return lines.join("\n");
 }

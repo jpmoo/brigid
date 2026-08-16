@@ -6089,7 +6089,7 @@ mark.hit.misspelled {
 
 .pp-row {
   display: grid;
-  grid-template-columns: 11em 1fr 3.5em;
+  grid-template-columns: 11em 1fr 7.5em;
   align-items: center;
   gap: 12px;
   padding: 5px 6px;
@@ -6162,10 +6162,23 @@ mark.hit.misspelled {
 .pp-them.c2, .pp-pick.c2 { --pp-c: #8a5390; }
 
 .pp-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.25;
   font-size: 11.5px;
-  color: var(--text-faint);
+  color: var(--text-muted);
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+/* The unit under the figure. Every row needs one because the rows do not share
+   a denominator — without it "dashes 1.57" reads as per sentence, which is the
+   only other number on screen it could plausibly be. */
+.pp-value em {
+  font-style: normal;
+  font-size: 9.5px;
+  color: var(--text-faint);
 }
 
 .pp-ends {

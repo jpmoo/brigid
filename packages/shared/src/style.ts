@@ -432,6 +432,74 @@ export function featureLabel(key: string): string {
   return FEATURE_LABELS[key] ?? key;
 }
 
+/**
+ * What a feature is counted in.
+ *
+ * Not decoration. These share a column and do not share a denominator: commas
+ * are per sentence, dashes are per thousand words, and a vocabulary range is a
+ * proportion. Shown side by side with no units, "commas 2.01" above "dashes
+ * 1.57" reads as though a writer used a dash one and a half times a sentence,
+ * which is not a small misreading — it is off by the length of a sentence.
+ *
+ * A percentage where the number is a share, because 0.03 of the words being
+ * Latinate is a fact most people would rather read as 3%.
+ */
+export function featureUnit(key: string): { unit: string; percent: boolean } {
+  if (key.startsWith("fw.")) return { unit: "per 1,000 words", percent: false };
+  return FEATURE_UNITS[key] ?? { unit: "", percent: false };
+}
+
+const PER_THOUSAND = { unit: "per 1,000 words", percent: false };
+const SHARE_OF_SENTENCES = { unit: "of sentences", percent: true };
+
+const FEATURE_UNITS: Record<string, { unit: string; percent: boolean }> = {
+  "sent.mean": { unit: "words", percent: false },
+  "sent.sd": { unit: "words either way", percent: false },
+  "sent.skew": { unit: "", percent: false },
+  "sent.short": SHARE_OF_SENTENCES,
+  "sent.long": SHARE_OF_SENTENCES,
+  "sent.fragment": SHARE_OF_SENTENCES,
+  "sent.per1k": PER_THOUSAND,
+  "punct.comma": { unit: "per sentence", percent: false },
+  "punct.semicolon": PER_THOUSAND,
+  "punct.colon": PER_THOUSAND,
+  "punct.dash": PER_THOUSAND,
+  "punct.paren": PER_THOUSAND,
+  "punct.ellipsis": PER_THOUSAND,
+  "punct.question": SHARE_OF_SENTENCES,
+  "punct.exclaim": SHARE_OF_SENTENCES,
+  "para.words": { unit: "words", percent: false },
+  "para.sentences": { unit: "sentences", percent: false },
+  "para.single": { unit: "of paragraphs", percent: true },
+  "lex.ttr": { unit: "distinct, in any 400 words", percent: true },
+  "lex.hapax": { unit: "of the vocabulary", percent: true },
+  "lex.wordlen": { unit: "letters", percent: false },
+  "lex.syllables": { unit: "syllables", percent: false },
+  "lex.polysyll": { unit: "of words", percent: true },
+  "lex.monosyll": { unit: "of words", percent: true },
+  "lex.latinate": { unit: "of words", percent: true },
+  "open.conjunction": SHARE_OF_SENTENCES,
+  "open.participle": SHARE_OF_SENTENCES,
+  "open.pronoun": SHARE_OF_SENTENCES,
+  "open.the": SHARE_OF_SENTENCES,
+  "open.repeat": { unit: "of consecutive pairs", percent: true },
+  "pov.first": PER_THOUSAND,
+  "pov.second": PER_THOUSAND,
+  "pov.third": PER_THOUSAND,
+  "pov.filtering": PER_THOUSAND,
+  "pov.past": { unit: "of tensed verbs", percent: true },
+  "mod.adverb": PER_THOUSAND,
+  "mod.intensifier": PER_THOUSAND,
+  "mod.hedge": PER_THOUSAND,
+  "mod.modal": PER_THOUSAND,
+  "mod.negation": PER_THOUSAND,
+  "rhythm.syllPerSent": { unit: "syllables per sentence", percent: false },
+  "rhythm.alliteration": PER_THOUSAND,
+  "tag.said": { unit: "of speech tags", percent: true },
+  "tag.rate": PER_THOUSAND,
+  "tag.adverb": PER_THOUSAND,
+};
+
 const FEATURE_LABELS: Record<string, string> = {
   "sent.mean": "sentence length",
   "sent.sd": "variety in sentence length",
