@@ -5939,7 +5939,13 @@ mark.hit.misspelled {
   opacity: 0.5;
 }
 
-.dna-voice {
+/* Two class names deep on purpose.
+   The form styles set `width: 100%` on `input[type="text"]`, which is
+   specificity (0,1,1) and beats a lone class — so this input filled the row,
+   squeezed the section's name out of existence and crushed the checkbox to a
+   sliver. A single class looked like enough and was not. */
+.dna-sections .dna-voice {
+  flex: 0 0 9em;
   width: 9em;
   font: inherit;
   font-size: 12px;
@@ -5948,6 +5954,12 @@ mark.hit.misspelled {
   border-radius: 4px;
   background: var(--bg);
   color: var(--text);
+}
+
+/* Never squeezed by whatever shares the row. */
+.dna-sections input[type="checkbox"] {
+  flex: none;
+  margin: 0;
 }
 
 .pane-lede {
