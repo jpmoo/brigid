@@ -42,6 +42,25 @@ export interface ChatContext {
     targets: { label: string; value: string }[];
     exemplars: { label: string; text: string }[];
   };
+  /**
+   * The writer's own marks on the manuscript.
+   *
+   * Not derived from anything and not the model's work: a bookmark is a place
+   * somebody deliberately flagged and a note they left themselves about it,
+   * which makes it the most direct statement of intent in the whole brief. It
+   * is also how a writer refers to a passage in conversation — "the bookmark
+   * halfway through 14.4" — so the position within the section matters as much
+   * as the name.
+   */
+  bookmarks?: {
+    name: string;
+    description: string | null;
+    /** Which section, and where in the book that section falls. */
+    section: string;
+    at: number;
+    /** Where in the section, when the mark names a line rather than the whole. */
+    line: { index: number; of: number; text: string } | null;
+  }[];
 }
 
 const SYSTEM = `You are discussing an unpublished manuscript with the writer who wrote it.
@@ -178,11 +197,37 @@ function passagesFor(context: ChatContext, room: number): string {
    * outline is what they will type — and bounded so a bare "4" cannot claim
    * every section whose label contains one.
    */
-  const named = context.sections.filter((section) => {
-    const label = (section.label ?? "").trim().toLowerCase();
-    if (label.length < 2) return false;
-    return new RegExp(`(^|[^\\w.])${label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w.]|$)`).test(asked);
-  });
+  const mentions = (label: string): boolean => {
+    const clean = label.trim().toLowerCase();
+    if (clean.length < 2) return false;
+    return new RegExp(`(^|[^\\w.])${clean.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}([^\\w.]|$)`).test(asked);
+  };
+
+  /**
+   * Sections the question names, whether by their own label or by a bookmark
+   * in them.
+   *
+   * "Revise the bit at the bookmark called Hinge" names a section as surely as
+   * "revise 14.4" does — the writer simply knows the place by what they called
+   * it rather than by its number. Matched on the bookmark's whole name, and on
+   * any distinctive word of it, since names are written to be recognized rather
+   * than typed exactly.
+   */
+  const byBookmark = new Set(
+    (context.bookmarks ?? [])
+      .filter((mark) => {
+        if (mentions(mark.name)) return true;
+        const words = mark.name.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 4);
+        return words.some((w) => asked.includes(w));
+      })
+      .map((mark) => mark.section.toLowerCase()),
+  );
+
+  const named = context.sections.filter(
+    (section) =>
+      mentions(section.label ?? "") ||
+      byBookmark.has((section.label ?? "").trim().toLowerCase()),
+  );
 
   const scored = context.sections.map((section) => {
     const text = prose.get(section.blockId) ?? "";
@@ -228,6 +273,46 @@ THE WRITER'S ACTUAL PROSE, VERBATIM. The only material here in their words, and 
 
 ${blocks.join("\n\n- - - - -\n\n")}
 === END OF MANUSCRIPT PASSAGES ===`;
+}
+
+/**
+ * The writer's bookmarks, listed so they can be referred to.
+ *
+ * Each carries the note left with it and the line it marks, so a question about
+ * "the one where I wondered about the timeline" can be answered from the note
+ * and the passage rather than from a guess about which place was meant.
+ *
+ * Position is given twice and in words: where the section falls in the book,
+ * and where the mark falls in the section. "Halfway through 14.4" is how a
+ * writer says it, and a paragraph number alone does not answer that.
+ */
+function bookmarksBrief(marks: NonNullable<ChatContext["bookmarks"]>): string {
+  if (marks.length === 0) return "";
+
+  const where = (line: { index: number; of: number }): string => {
+    if (line.of <= 1) return "the whole section";
+    const through = line.index / Math.max(1, line.of - 1);
+    if (through <= 0.12) return "at the start";
+    if (through <= 0.38) return "about a third in";
+    if (through <= 0.62) return "about halfway through";
+    if (through <= 0.88) return "about two thirds in";
+    return "near the end";
+  };
+
+  const lines = marks.map((mark) => {
+    const place = mark.line
+      ? `${mark.section}, ${where(mark.line)} (paragraph ${mark.line.index + 1} of ${mark.line.of})`
+      : mark.section;
+    const note = mark.description?.trim() ? `\n  note: ${mark.description.trim()}` : "";
+    const marked = mark.line?.text.trim() ? `\n  marks: "${mark.line.text.trim()}"` : "";
+    return `- "${mark.name}" — ${place} [${Math.round(mark.at * 100)}% of the book]${note}${marked}`;
+  });
+
+  return `=== BOOKMARKS (the writer's own marks and notes, not yours) ===
+Places this writer flagged, with whatever they wrote to themselves about each. These are their words, not a summary of anything. When they refer to a bookmark — by name, by what the note says, or by where it falls — this is what they mean.
+
+${lines.join("\n")}
+=== END OF BOOKMARKS ===`;
 }
 
 /**
@@ -291,6 +376,12 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
   // Before anything else: it is short, and a request to write in the writer's
   // voice is unanswerable without it while everything else degrades gracefully.
   if (context.dna) add(voiceBrief(context.dna));
+
+  // Short, and the most direct statement of intent in the brief: a place the
+  // writer flagged and what they said about it.
+  if (context.bookmarks && context.bookmarks.length > 0) {
+    add(bookmarksBrief(context.bookmarks));
+  }
 
   if (context.structure) add(shapeBrief(context.structure));
 

@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   analyses,
   blocks,
+  bookmarks,
   chatMessages,
   characterRuns,
   digestState,
@@ -16,7 +17,7 @@ import {
   excludedCharacters,
   styleProfiles,
 } from "@brigid/db";
-import { baselines, featureLabel } from "@brigid/shared";
+import { baselines, featureLabel, paragraphs } from "@brigid/shared";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -183,6 +184,54 @@ async function voiceFor(workId: string) {
         text: excerpt(r.text, 320),
       })),
   };
+}
+
+/**
+ * The bookmarks, placed against the sections they mark.
+ *
+ * The stored paragraph index says where in a section a mark sits, but not out
+ * of how many — and "paragraph 7" answers nothing without that, whereas
+ * "halfway through" is how a writer refers to the place. So the section's
+ * paragraphs are counted here and the position worked out from both.
+ */
+async function bookmarksFor(
+  workId: string,
+  sections: PlacedDigest[],
+  prose: Map<string, string>,
+) {
+  const rows = await db
+    .select()
+    .from(bookmarks)
+    .where(eq(bookmarks.workId, workId))
+    .orderBy(asc(bookmarks.sortKey));
+
+  const placed = new Map(sections.map((s) => [s.blockId, s]));
+
+  return rows
+    .map((mark) => {
+      const section = placed.get(mark.blockId);
+      if (!section) return null;
+
+      const of = paragraphs(prose.get(mark.blockId) ?? "").length;
+      return {
+        name: mark.name,
+        description: mark.description,
+        section: section.label ?? "a section",
+        at: section.start,
+        line:
+          mark.paragraphIndex !== null && of > 0
+            ? {
+                index: Math.min(mark.paragraphIndex, of - 1),
+                of,
+                text: (mark.paragraphText ?? "").slice(0, 220),
+              }
+            : null,
+      };
+    })
+    .filter((m): m is NonNullable<typeof m> => m !== null)
+    // A manuscript can carry a great many; the brief has a novel to fit beside
+    // them, and the first sixty in reading order is a list rather than a book.
+    .slice(0, 60);
 }
 
 async function workOr404(workId: string) {
@@ -563,10 +612,17 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
      */
     const dna = await voiceFor(workId);
 
+    /**
+     * The writer's own marks. Cheap, short, and the most direct statement of
+     * intent available — a place they flagged and what they wrote about it.
+     */
+    const marks = await bookmarksFor(workId, sections, prose);
+
     const brief = buildBrief(
       {
         title: work.title,
         ...(dna ? { dna } : {}),
+        ...(marks.length > 0 ? { bookmarks: marks } : {}),
         totalWords: sections.reduce((sum, s) => sum + s.words, 0),
         structure,
         profiles,

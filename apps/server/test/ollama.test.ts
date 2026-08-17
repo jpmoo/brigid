@@ -13,6 +13,8 @@ import { parseJson, thinksFrom } from "../src/ollama/client.js";
 import { buildRoster, foldName } from "../src/ollama/analysis.js";
 import { ground } from "../src/ollama/digest.js";
 import { excerpt } from "../src/ollama/excerpt.js";
+import { buildBrief } from "../src/ollama/chat.js";
+import type { PlacedDigest } from "@brigid/shared";
 import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
 
 let failures = 0;
@@ -322,6 +324,59 @@ const SCENE = [
   const long = excerpt("word ".repeat(400).trim(), 50);
   check("a single paragraph longer than the budget is cut inside it", long.split(/\s+/).length <= 55);
   check("and says so too", long.includes("…"));
+}
+
+console.log("\nthe writer's own marks on the manuscript");
+
+{
+  const long = Array.from({ length: 9 }, (_, i) => `Paragraph ${i + 1} of it.`).join("\n\n");
+  const sections = [
+    { blockId: "a", label: "14.4", start: 0.62, words: 900, summary: "", events: [], characters: [] },
+    { blockId: "b", label: "3.1", start: 0.14, words: 800, summary: "", events: [], characters: [] },
+  ] as unknown as PlacedDigest[];
+  const marks = [
+    {
+      name: "The hinge",
+      description: "Not sure this turn is earned yet.",
+      section: "14.4",
+      at: 0.62,
+      line: { index: 4, of: 9, text: "Paragraph 5 of it." },
+    },
+    { name: "Check the dog", description: null, section: "3.1", at: 0.14, line: { index: 0, of: 6, text: "The dog." } },
+  ];
+  const ask = (question: string) =>
+    buildBrief(
+      {
+        title: "T", totalWords: 60000, structure: null, profiles: [], sections,
+        prose: new Map([["a", long], ["b", "short"]]), question, bookmarks: marks,
+      },
+      32768,
+    );
+
+  const asked = ask("What did I mean by the bookmark halfway through 14.4?");
+  check("a bookmark is listed with the note left on it", asked.includes("Not sure this turn is earned yet."));
+  check("and the line it marks", asked.includes('marks: "Paragraph 5 of it."'));
+  /**
+   * "Paragraph 5" answers nothing on its own — five of how many? A writer says
+   * "halfway through", so the position is given that way and by the count.
+   */
+  check("and where in the section, in words", asked.includes("about halfway through (paragraph 5 of 9)"));
+  check("and where in the book", asked.includes("[62% of the book]"));
+
+  // Naming a bookmark names its section: "revise the bit at The hinge" is as
+  // much a request about 14.4 as naming the number would be.
+  const byName = ask("Revise the bit at The hinge in my voice");
+  check("naming a bookmark pulls its section in whole", byName.includes("14.4 — COMPLETE"));
+
+  const byWord = ask("what was I worried about at the hinge");
+  check("and a distinctive word of the name is enough", byWord.includes("14.4 — COMPLETE"));
+
+  const unrelated = ask("What is the shape of the book?");
+  check(
+    "a question naming none of them pulls no section in whole",
+    !unrelated.includes("— COMPLETE"),
+  );
+  check("but the marks are still listed", unrelated.includes("=== BOOKMARKS"));
 }
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
