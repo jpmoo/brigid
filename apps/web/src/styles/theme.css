@@ -4806,12 +4806,16 @@ mark.hit.misspelled {
 
 /* --- Talking about the manuscript ---------------------------------------- */
 
+/* Not a scroll container.
+ *
+ * It was a 55vh box with its own scrollbar sitting inside a page that also
+ * scrolled, so reading a long reply meant working out which of two scrollers
+ * the wheel was going to move, and a passage being written arrived in a slot
+ * about a third the height of the screen. The conversation is part of the page
+ * now and the page scrolls, once. */
 .chat-log {
   margin: 12px 0;
   padding: 0 14px;
-  max-height: 55vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface-sunk, var(--paper));

@@ -75,33 +75,58 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   }, [workId, ready]);
 
   /**
-   * Follow the answer only while the reader is at the bottom, and only ever
-   * inside the log.
+   * Whatever actually scrolls this pane, found rather than assumed.
+   *
+   * Twice now the following has moved the wrong thing, both times because the
+   * code named a scroller instead of looking for one. A component cannot know
+   * what encloses it — the page scrolls today, a future layout might hand it a
+   * scrolling column — so it walks up and asks, and falls back to the document.
+   */
+  const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
+    for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
+      const overflow = getComputedStyle(node).overflowY;
+      if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight) {
+        return node;
+      }
+    }
+    return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+  };
+
+  /**
+   * Follow the answer only while the reader is at the bottom.
    *
    * Scrolling up during a long reply means wanting to read what has already
-   * arrived, and yanking the view back down every time a token lands makes that
-   * impossible — the reader loses a fight with the machine. So the log is
-   * pinned to the bottom only if it was at the bottom to begin with, and
-   * scrolling away silently stops the following until you come back.
+   * arrived, and dragging the view back down every time a token lands makes
+   * that impossible — the reader loses a fight with the machine.
    *
-   * That guard was there and did not work, because it watched the wrong
-   * scrollbar. `scrollIntoView` moves every scrollable ancestor, the page
-   * included, and a reply shorter than the log's own height gives the log
-   * nothing to scroll — so no scroll event ever fires, `pinned` stays true
-   * whatever the reader does, and each arriving token drags the whole settings
-   * page back down. Measured: three tokens moved the page 465px while the log
-   * reported no scrolling at all.
+   * The guard has to watch the scroller the reader is actually using, which is
+   * what the two previous attempts got wrong. Listening on window in the
+   * capture phase catches scroll from anywhere in the pane: scroll does not
+   * bubble, but it does capture, so this sees the document scrolling and any
+   * nested scroller a later layout introduces without having to be told about
+   * either.
    *
-   * Setting scrollTop on the log cannot move anything but the log. If the reply
-   * is too short to overflow, there is nothing to follow and nothing happens,
-   * which is the correct amount of movement.
+   * The slack is generous. On a page-sized scroller "at the bottom" is a
+   * looser idea than it is in a small box — a reader who has nudged the wheel
+   * a line or two has not gone anywhere, and unpinning them for it would make
+   * the following feel broken rather than considerate.
    */
   const log = useRef<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(true);
 
   useEffect(() => {
+    const onScroll = () => {
+      const el = scrollerOf(log.current);
+      if (!el) return;
+      setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 120);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", onScroll, { capture: true });
+  }, []);
+
+  useEffect(() => {
     if (!pinned) return;
-    const el = log.current;
+    const el = scrollerOf(log.current);
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pinned]);
 
@@ -218,16 +243,7 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
         </div>
       ) : null}
 
-      <div
-        className="chat-log"
-        ref={log}
-        onScroll={() => {
-          const el = log.current;
-          if (!el) return;
-          // A little slack: "at the bottom" should survive a stray pixel.
-          setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 48);
-        }}
-      >
+      <div className="chat-log" ref={log}>
         {messages.length === 0 ? (
           <p className="chat-empty">
             Try: &ldquo;Where does the midpoint actually fall?&rdquo; &middot; &ldquo;Who
@@ -276,9 +292,8 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
           type="button"
           onClick={() => {
             setPinned(true);
-            // The log, not the page — asking for the latest is not asking to be
-            // moved somewhere else on the screen.
-            log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" });
+            const el = scrollerOf(log.current);
+            el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
           }}
         >
           Jump to the latest
