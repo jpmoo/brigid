@@ -1,8 +1,9 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, isNull } from "drizzle-orm";
 import { blocks, digestState, sectionDigests, settings, templates, works } from "@brigid/db";
 import type { DigestProgress, PlacedDigest } from "@brigid/shared";
 import { buildOutline } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
+import { detect } from "./detect.js";
 import type { Provider } from "./detect.js";
 import { syncSection } from "./cast.js";
 import { inspectModel } from "./client.js";
@@ -84,7 +85,21 @@ async function reader(): Promise<{
    * than require the writer to re-save the model to fix something they were
    * never told about, the walk asks once and remembers.
    */
-  if ((row.provider ?? "ollama") === "ollama" && (row.numCtx === null || row.thinks === null)) {
+  /**
+   * What it speaks, when nothing recorded it. Same repair the shared reader
+   * makes, and needed here too: this walk runs for an hour and would spend the
+   * whole of it talking the wrong protocol at a server that answers 404.
+   */
+  let provider = row.provider ?? null;
+  if (!provider) {
+    const found = await detect(row.url).catch(() => null);
+    provider = found?.provider ?? "ollama";
+    if (found) {
+      await db.update(settings).set({ aiProvider: found.provider }).where(isNull(settings.aiProvider));
+    }
+  }
+
+  if (provider === "ollama" && (row.numCtx === null || row.thinks === null)) {
     const seen = await inspectModel(row.url, row.model).catch(() => null);
     if (seen && (seen.numCtx !== null || seen.thinks !== null)) {
       await db
@@ -96,7 +111,7 @@ async function reader(): Promise<{
         model: row.model,
         numCtx: seen.numCtx,
         thinks: seen.thinks,
-        provider: row.provider ?? "ollama",
+        provider,
       };
     }
   }
@@ -106,7 +121,7 @@ async function reader(): Promise<{
     model: row.model,
     numCtx: row.numCtx,
     thinks: row.thinks,
-    provider: row.provider ?? "ollama",
+    provider,
   };
 }
 
