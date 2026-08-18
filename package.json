@@ -17,7 +17,8 @@
     "dev:server": "pnpm --filter @brigid/server dev",
     "dev:web": "pnpm --filter @brigid/web dev",
     "build:web": "pnpm --filter @brigid/web build",
-    "db:migrate": "pnpm --filter @brigid/db migrate"
+    "db:migrate": "pnpm --filter @brigid/db migrate",
+    "backfill:text": "pnpm --filter @brigid/server backfill:text"
   },
   "devDependencies": {
     "typescript": "^5.6.3"

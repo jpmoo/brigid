@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { paragraphs, measure } from "@brigid/shared";
-import { extractText } from "../src/blocks/routes.js";
+import { extractText } from "../src/blocks/text.js";
 
 /**
  * The plain text a block stores has to keep its paragraphs.
