@@ -123,6 +123,12 @@ function faultsIn(prose: string, dna: ProseDna): string[] {
     found.push("No dialogue is in quotation marks, and your prose uses them.");
   }
 
+  // A speech tag after a full stop inside the quote: "Wait." She said.
+  const tag = prose.match(/[.!?]["”]\s+(He|She|They|I|We|It)\s+(said|asked|replied|answered|shouted|whispered)\b/);
+  if (tag) {
+    found.push(`Speech tags are punctuated wrongly — ${tag[0].trim()} should take a comma and a lowercase tag.`);
+  }
+
   // Paragraphs marked by single breaks. The manuscript uses blank lines, and a
   // passage set this way measures as one enormous paragraph.
   const singles = prose.split(/\n/).filter((l) => l.trim()).length;
@@ -179,51 +185,42 @@ export function show(v: number, row: { round: number; percent: boolean }): strin
  * Naming what already matched, and saying to land on the numbers rather than
  * past them, is the difference between a correction and a swing.
  */
-export function retryNote(rows: Row[], faults: string[] = [], words = 0): string {
+export function retryNote(rows: Row[], faults: string[] = []): string {
   const missed = rows.filter((r) => r.off);
   const held = rows.filter((r) => !r.off);
 
-  const keep =
-    held.length > 0
-      ? ` Leave these alone — they already match me, and moving them would make it worse: ${held
-          .map((r) => `${r.label} at ${show(r.want, r)}`)
-          .join("; ")}.`
-      : "";
-
-  const wrong =
-    faults.length > 0
-      ? `First, these are simply wrong and must be fixed: ${faults.join(" ")}\n\n`
-      : "";
-
   /**
-   * Back to the source, not back to the last attempt.
+   * One thing to fix, not a list.
    *
-   * "Rewrite that passage" reads as "rewrite what you just wrote", and each
-   * attempt was a copy of a copy — the passage got shorter and further from the
-   * writer every time, because material the model had already dropped could
-   * never come back. Three rounds of that and the notes the writer actually
-   * supplied were nowhere in it.
+   * The note had grown to six competing demands — the faults, every measure
+   * that missed, every measure that matched and must not move, a warning about
+   * padding, a length floor and a lecture on rhythm — and the drafts got worse
+   * as it got longer. Told to be longer and to vary its sentences, the last one
+   * took the easier instruction and padded with more short sentences, which
+   * satisfied the floor and flattened the rhythm further.
    *
-   * So every attempt starts again from the original material and the original
-   * request, and the length is stated as a floor. A rewrite that comes back
-   * shorter has lost something, and shorter every round is the whole failure in
-   * one number.
+   * So it names the single largest departure and stops. A model that can act on
+   * one instruction will act on it; a model given six will pick the one it finds
+   * easiest, and that has been the wrong one every time.
    */
-  const floor =
-    words > 0
-      ? ` It should be at least ${Math.round(words * 0.95)} words — each attempt so far has come back shorter than the one before, dropping material every time, and that is the thing to stop.`
-      : "";
+  const worst = rows
+    .filter((r) => r.off)
+    .map((r) => ({ r, gap: Math.abs(r.got - r.want) / Math.max(Math.abs(r.want), 1e-6) }))
+    .sort((a, b) => b.gap - a.gap)[0]?.r;
 
-  return `Try that passage again, starting over from my original notes and my original request rather than from your last attempt — go back to the source material I gave you and write it fresh from that. Your previous attempts have been rewrites of each other and have been losing my material with every pass.${floor}
+  const wrong = faults.length > 0 ? `${faults.join(" ")}\n\n` : "";
 
-Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Dialogue goes in double quotation marks, a new speaker starts a new paragraph, and every paragraph is separated by a blank line.
+  const ask = worst
+    ? worst.feature === "sent.sd"
+      ? `The one thing to change is the range of sentence lengths. Mine vary by about ${show(worst.want, worst)} words either side; yours vary by ${show(worst.got, worst)}, which means everything is landing at the same length. Write some genuinely long sentences — thirty words and more, carrying subordinate clauses — and set them against the short ones. Do not add sentences to do it; make existing ones longer by joining what belongs together.`
+      : `The one thing to change is ${worst.label}: yours is ${show(worst.got, worst)} and mine is about ${show(worst.want, worst)}.`
+    : "";
 
-${wrong}
-Measured against my own sections it missed: ${missed
-    .map((r) => `${r.label} came out at ${show(r.got, r)} against my usual ${show(r.want, r)}`)
-    .join("; ")}.${keep}
+  return `Try that passage again, starting from my original notes and my original request rather than from your last attempt. Your attempts have been rewrites of each other and have been losing my material each time.
 
-These figures are a description of how I write, not a target to hit. Do not add words to move one. Do not pad a sentence with description it does not need, do not append a simile to lengthen a clause, and do not split a sentence in two to shorten an average. If the only way to reach a number is to write something I would not have written, write the better sentence and miss the number. A passage that measures right and reads worse is a failure, and the last attempt failed that way.
+${wrong}Keep the events, the order and the point of view. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.
 
-If the sentence-length range is among them, that is about variety rather than length: some genuinely long sentences carrying subordinate clauses, standing next to short ones, built from commas and clauses.`;
+${ask}
+
+Nothing else needs changing. Do not add description, similes or explanation to reach a number — a passage that measures right and reads worse has failed.`;
 }

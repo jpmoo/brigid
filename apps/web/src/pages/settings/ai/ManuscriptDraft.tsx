@@ -117,7 +117,7 @@ export function ManuscriptDraft({
                 Asking again is worth it when the passage reads wrong, not because
                 a figure does — a page of yours would often measure as a departure too.
               </p>
-              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows, check!.faults, check!.words))}>
+              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows, check!.faults))}>
                 <RefreshCw size={13} />
                 Ask again, closer to my rhythm
               </button>
