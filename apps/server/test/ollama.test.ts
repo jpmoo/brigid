@@ -16,6 +16,7 @@ import { excerpt } from "../src/ollama/excerpt.js";
 import { buildBrief } from "../src/ollama/chat.js";
 import type { PlacedDigest } from "@brigid/shared";
 import { asEndpointUrl } from "../src/ollama/routes.js";
+import { digestSection } from "../src/ollama/digest.js";
 import { detect } from "../src/ollama/detect.js";
 
 let failures = 0;
@@ -248,6 +249,60 @@ await serving(
 check("nor is one that isn't there", (await detect("http://127.0.0.1:1")) === null);
 
 
+
+console.log("\nreading a section on the server that was actually detected");
+
+/**
+ * The bug a writer hit. `DigestRequest` carries `provider` and `apiKey`
+ * fields, and the call inside `digestSection` that actually reaches the
+ * network forgot to read them — so every section was read as though talking to
+ * Ollama regardless of what detection had found, and a non-Ollama server 404ed
+ * on every single one. This is invisible to the type checker: the fields exist
+ * on the interface whether or not anything downstream looks at them.
+ *
+ * Stood up as an OpenAI-compatible server that would 404 on Ollama's
+ * /api/generate — the same shape the report was made against — so a passing
+ * run here means the field is actually being read, not merely accepted.
+ */
+await serving(
+  (url, res) => {
+    if (url === "/api/generate" || url === "/api/chat") {
+      res
+        .writeHead(404, { "content-type": "application/json" })
+        .end(JSON.stringify({ error: { message: "File Not Found", type: "not_found_error", code: 404 } }));
+      return;
+    }
+    if (url === "/v1/chat/completions") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          choices: [{ message: { content: "{}" }, finish_reason: "stop" }],
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  },
+  async (origin) => {
+    try {
+      const { digest } = await digestSection({
+        url: origin,
+        model: "test-model",
+        numCtx: 4096,
+        provider: "openai",
+        label: "1.3",
+        text: "A short section of prose, long enough to be worth reading.",
+      });
+      check("a section reads correctly against a server that isn't Ollama", true);
+      check("and comes back as a valid, if empty, digest", Array.isArray(digest.characters));
+    } catch (err) {
+      check(
+        "a section reads correctly against a server that isn't Ollama",
+        false,
+        (err as Error).message,
+      );
+    }
+  },
+);
 
 console.log("\ndigging the answer out");
 

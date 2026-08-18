@@ -249,6 +249,8 @@ export async function digestSection(
       url: req.url,
       model: req.model,
       numCtx: req.numCtx,
+      provider: req.provider ?? null,
+      apiKey: req.apiKey ?? null,
       thinks: req.thinks ?? null,
       system: SYSTEM,
       format: SCHEMA as unknown as Record<string, unknown>,
