@@ -94,6 +94,22 @@ export function AiModelPane() {
     }
   };
 
+  /** Remove the stored key, leaving the address and model as they are. */
+  const clearKey = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const settings = await api.saveAi({ apiKey: null });
+      setHasKey(settings.hasApiKey);
+      setApiKey("");
+      flash();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not clear the key");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const save = async () => {
     setSaving(true);
     setError(null);
@@ -201,12 +217,31 @@ export function AiModelPane() {
       {provider && !ollama ? (
         <label className="field">
           <span>API key</span>
-          <input
-            type="password"
-            value={apiKey}
-            placeholder={hasKey ? "•••••••• (stored)" : "only if your server requires one"}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
+          <div className="row-actions">
+            <input
+              type="password"
+              value={apiKey}
+              placeholder={hasKey ? "•••••••• (stored)" : "only if your server requires one"}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+            {/*
+              An empty field means "leave what is stored alone", so that saving
+              a model does not silently wipe a key the field was never shown.
+              Which left no way to remove one short of disconnecting entirely —
+              so removing it is its own button, and says so.
+            */}
+            {hasKey ? (
+              <button
+                className="btn ghost"
+                type="button"
+                disabled={saving}
+                title="Remove the stored key"
+                onClick={() => void clearKey()}
+              >
+                Clear
+              </button>
+            ) : null}
+          </div>
           <span className="field-note">
             llama.cpp needs none. vLLM started with <code>--api-key</code> does,
             and so does anything behind a proxy. Stored in your own database, in

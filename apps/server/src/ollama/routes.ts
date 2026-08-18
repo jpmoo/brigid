@@ -206,7 +206,10 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
       (patch.ollamaUrl as string | null | undefined) ??
       (await db.select({ url: settings.ollamaUrl }).from(settings).limit(1))[0]?.url ??
       null;
-    const model = (patch.inferenceModel as string | null | undefined) ?? null;
+    const model =
+      (patch.inferenceModel as string | null | undefined) ??
+      (await db.select({ model: settings.inferenceModel }).from(settings).limit(1))[0]?.model ??
+      null;
 
     /**
      * What is answering there, settled here rather than asked of the writer.
@@ -218,8 +221,14 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
      * figure stored. Nothing else exposes one per model: llama.cpp says what it
      * loaded with, and the rest say nothing, in which case none is sent and the
      * server's own configuration governs.
+     *
+     * Only when the address or the model is part of this write. Clearing an API
+     * key is neither, and re-probing on the way past would have re-chosen the
+     * model from whatever the server happened to list first — a change nobody
+     * asked for, on a request about something else.
      */
-    if (target && body.url !== null) {
+    const touchesConnection = body.url !== undefined || body.analysisModel !== undefined;
+    if (target && body.url !== null && touchesConnection) {
       const found = await detect(target);
       if (found) {
         patch.aiProvider = found.provider;
