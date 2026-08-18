@@ -75,60 +75,36 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   }, [workId, ready]);
 
   /**
-   * Whatever actually scrolls this pane, found rather than assumed.
+   * Nothing scrolls the page while a reply is arriving.
    *
-   * Twice now the following has moved the wrong thing, both times because the
-   * code named a scroller instead of looking for one. A component cannot know
-   * what encloses it — the page scrolls today, a future layout might hand it a
-   * scrolling column — so it walks up and asks, and falls back to the document.
-   */
-  const scrollerOf = (el: HTMLElement | null): HTMLElement | null => {
-    for (let node = el?.parentElement ?? null; node; node = node.parentElement) {
-      const overflow = getComputedStyle(node).overflowY;
-      if ((overflow === "auto" || overflow === "scroll") && node.scrollHeight > node.clientHeight) {
-        return node;
-      }
-    }
-    return (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
-  };
-
-  /**
-   * Follow the answer only while the reader is at the bottom.
+   * Three attempts to follow the answer politely all failed the same way, and
+   * each fix was a better guess about which element to watch and when to let
+   * go. The reader's complaint never changed: they could not read while it
+   * wrote. At some point the honest reading is that a page which moves itself
+   * while someone is reading it is the problem, and the cleverness was only
+   * ever damage control.
    *
-   * Scrolling up during a long reply means wanting to read what has already
-   * arrived, and dragging the view back down every time a token lands makes
-   * that impossible — the reader loses a fight with the machine.
+   * So the text arrives and the view stays exactly where it was put. A reply
+   * grows downward, which is what a reader who is at the bottom wants and what
+   * a reader who is not can ignore. Anyone wanting the end asks for it, and the
+   * button below appears while it is writing to make that one click.
    *
-   * The guard has to watch the scroller the reader is actually using, which is
-   * what the two previous attempts got wrong. Listening on window in the
-   * capture phase catches scroll from anywhere in the pane: scroll does not
-   * bubble, but it does capture, so this sees the document scrolling and any
-   * nested scroller a later layout introduces without having to be told about
-   * either.
-   *
-   * The slack is generous. On a page-sized scroller "at the bottom" is a
-   * looser idea than it is in a small box — a reader who has nudged the wheel
-   * a line or two has not gone anywhere, and unpinning them for it would make
-   * the following feel broken rather than considerate.
+   * This gives up something real: at the bottom of a finished conversation, a
+   * new answer no longer follows itself into view. That is a smaller cost than
+   * not being able to read.
    */
   const log = useRef<HTMLDivElement | null>(null);
-  const [pinned, setPinned] = useState(true);
+  const [atEnd, setAtEnd] = useState(true);
 
   useEffect(() => {
-    const onScroll = () => {
-      const el = scrollerOf(log.current);
-      if (!el) return;
-      setPinned(el.scrollHeight - el.scrollTop - el.clientHeight < 120);
+    const check = () => {
+      const el = (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+      setAtEnd(el.scrollHeight - el.scrollTop - el.clientHeight < 120);
     };
-    window.addEventListener("scroll", onScroll, { passive: true, capture: true });
-    return () => window.removeEventListener("scroll", onScroll, { capture: true });
+    check();
+    window.addEventListener("scroll", check, { passive: true, capture: true });
+    return () => window.removeEventListener("scroll", check, { capture: true });
   }, []);
-
-  useEffect(() => {
-    if (!pinned) return;
-    const el = scrollerOf(log.current);
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [messages, pinned]);
 
   async function send(text?: string) {
     const asked = (text ?? draft).trim();
@@ -285,14 +261,13 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
         ))}
       </div>
 
-      {!pinned && streaming ? (
+      {!atEnd && streaming ? (
         <button
           className="btn ghost chat-catchup"
           type="button"
           onClick={() => {
-            setPinned(true);
-            const el = scrollerOf(log.current);
-            el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+            const el = (document.scrollingElement as HTMLElement | null) ?? document.documentElement;
+            el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
           }}
         >
           Jump to the latest

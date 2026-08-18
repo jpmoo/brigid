@@ -179,7 +179,7 @@ export function show(v: number, row: { round: number; percent: boolean }): strin
  * Naming what already matched, and saying to land on the numbers rather than
  * past them, is the difference between a correction and a swing.
  */
-export function retryNote(rows: Row[], faults: string[] = []): string {
+export function retryNote(rows: Row[], faults: string[] = [], words = 0): string {
   const missed = rows.filter((r) => r.off);
   const held = rows.filter((r) => !r.off);
 
@@ -195,7 +195,28 @@ export function retryNote(rows: Row[], faults: string[] = []): string {
       ? `First, these are simply wrong and must be fixed: ${faults.join(" ")}\n\n`
       : "";
 
-  return `Rewrite that passage. Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Dialogue goes in double quotation marks, a new speaker starts a new paragraph, and every paragraph is separated by a blank line.
+  /**
+   * Back to the source, not back to the last attempt.
+   *
+   * "Rewrite that passage" reads as "rewrite what you just wrote", and each
+   * attempt was a copy of a copy — the passage got shorter and further from the
+   * writer every time, because material the model had already dropped could
+   * never come back. Three rounds of that and the notes the writer actually
+   * supplied were nowhere in it.
+   *
+   * So every attempt starts again from the original material and the original
+   * request, and the length is stated as a floor. A rewrite that comes back
+   * shorter has lost something, and shorter every round is the whole failure in
+   * one number.
+   */
+  const floor =
+    words > 0
+      ? ` It should be at least ${Math.round(words * 0.95)} words — each attempt so far has come back shorter than the one before, dropping material every time, and that is the thing to stop.`
+      : "";
+
+  return `Try that passage again, starting over from my original notes and my original request rather than from your last attempt — go back to the source material I gave you and write it fresh from that. Your previous attempts have been rewrites of each other and have been losing my material with every pass.${floor}
+
+Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Dialogue goes in double quotation marks, a new speaker starts a new paragraph, and every paragraph is separated by a blank line.
 
 ${wrong}
 Measured against my own sections it missed: ${missed
