@@ -84,9 +84,11 @@ export function ManuscriptDraft({
         ))}
       </div>
 
-      {check && check.rows.length > 0 ? (
+      {check && (check.rows.length > 0 || check.tooShort || check.faults.length > 0) ? (
         <div className="ms-draft-check">
-          <span className="ms-draft-tag">How close it landed</span>
+          <span className="ms-draft-tag">
+            {check.tooShort ? "This is not a passage" : "How close it landed"}
+          </span>
           <ul>
             {check.rows.map((row) => (
               <li key={row.label} className={row.off ? "off" : undefined}>
@@ -96,6 +98,13 @@ export function ManuscriptDraft({
               </li>
             ))}
           </ul>
+          {check.tooShort ? (
+            <p className="ms-draft-stub">
+              {check.words} words — too short to measure, and far shorter than a
+              passage. It has answered with the ending rather than the scene.
+            </p>
+          ) : null}
+
           {check.faults.length > 0 ? (
             <ul className="ms-draft-faults">
               {check.faults.map((f) => (
@@ -104,20 +113,27 @@ export function ManuscriptDraft({
             </ul>
           ) : null}
 
-          {(missed.length > 0 || check.faults.length > 0) && onRetry ? (
+          {(missed.length > 0 || check.faults.length > 0 || check.tooShort) && onRetry ? (
             <div className="ms-draft-miss">
               <p>
-                {missed.length === 0
+                {check.tooShort
+                  ? "Asking again is the right move here — this is not a draft to judge."
+                  : missed.length === 0
                   ? "Everything above sits inside your range."
                   : `${missed.length === 1 ? "One measure sits" : `${missed.length} measures sit`} outside the range your own sections cover${
                       missed.some((r) => r.feature === "sent.sd")
                         ? " — including the swing between long sentences and short, which is the one imitation usually flattens"
                         : ""
-                    }.`}{" "}
-                Asking again is worth it when the passage reads wrong, not because
-                a figure does — a page of yours would often measure as a departure too.
+                    }.`}
+                {check.tooShort ? null : (
+                  <>
+                    {" "}
+                    Asking again is worth it when the passage reads wrong, not because
+                    a figure does — a page of yours would often measure as a departure too.
+                  </>
+                )}
               </p>
-              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows, check!.faults))}>
+              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows, check!.faults, check!.tooShort, check!.words))}>
                 <RefreshCw size={13} />
                 Ask again, closer to my rhythm
               </button>

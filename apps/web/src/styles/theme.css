@@ -6311,3 +6311,11 @@ mark.hit.misspelled {
   line-height: 1.45;
   color: var(--warn-ink, var(--danger));
 }
+
+/* A stub, which is the loudest thing a draft can be. */
+.ms-draft-stub {
+  margin: 8px 0 0;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--warn-ink, var(--danger));
+}

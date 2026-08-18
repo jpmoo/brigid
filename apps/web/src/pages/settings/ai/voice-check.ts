@@ -140,13 +140,28 @@ function faultsIn(prose: string, dna: ProseDna): string[] {
   return found;
 }
 
-export function checkDraft(
-  prose: string,
-  dna: ProseDna | null,
-): { words: number; rows: Row[]; faults: string[] } | null {
+export interface Check {
+  words: number;
+  rows: Row[];
+  faults: string[];
+  /**
+   * Too short to measure, which is itself the news.
+   *
+   * The rates below this length are noise, so nothing was reported — and the
+   * panel went silent exactly when a section rewrite came back as thirty words
+   * and a full stop. Hiding the measurements was right; hiding the fact that
+   * there was nothing to measure was not, and it took the button to ask again
+   * with it. A stub is the loudest thing a draft can be.
+   */
+  tooShort: boolean;
+}
+
+export function checkDraft(prose: string, dna: ProseDna | null): Check | null {
   if (!dna) return null;
   const words = prose.trim().split(/\s+/).filter(Boolean).length;
-  if (words < MEASURABLE_WORDS) return null;
+  if (words < MEASURABLE_WORDS) {
+    return { words, rows: [], faults: faultsIn(prose, dna), tooShort: true };
+  }
 
   const mine = measure(paragraphsOf(prose).join("\n\n"));
   const rows = SHOWN.map(({ feature, label, round, percent }) => {
@@ -165,7 +180,7 @@ export function checkDraft(
     return row;
   }).filter((r): r is Row => r !== null);
 
-  return { words, rows, faults: faultsIn(prose, dna) };
+  return { words, rows, faults: faultsIn(prose, dna), tooShort: false };
 }
 
 /** A figure as the writer reads it, share or rate. */
@@ -185,7 +200,7 @@ export function show(v: number, row: { round: number; percent: boolean }): strin
  * Naming what already matched, and saying to land on the numbers rather than
  * past them, is the difference between a correction and a swing.
  */
-export function retryNote(rows: Row[], faults: string[] = []): string {
+export function retryNote(rows: Row[], faults: string[] = [], tooShort = false, words = 0): string {
   const missed = rows.filter((r) => r.off);
   const held = rows.filter((r) => !r.off);
 
@@ -203,6 +218,12 @@ export function retryNote(rows: Row[], faults: string[] = []): string {
    * one instruction will act on it; a model given six will pick the one it finds
    * easiest, and that has been the wrong one every time.
    */
+  if (tooShort) {
+    return `That came back as ${words} words. It should be the whole passage — every event from my notes, in order, start to finish — not a summary and not the closing lines.
+
+Try again, starting from my original notes and my original request. Write the complete scene. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.`;
+  }
+
   const worst = rows
     .filter((r) => r.off)
     .map((r) => ({ r, gap: Math.abs(r.got - r.want) / Math.max(Math.abs(r.want), 1e-6) }))
