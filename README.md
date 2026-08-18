@@ -209,20 +209,40 @@ putting it wherever your other important files go is enough.
 ## The AI features
 
 Optional, and off until you set them up. Brigid can read your manuscript and
-tell you about its shape and its characters. It uses
-[Ollama](https://ollama.com), which runs a language model on your own hardware,
-so the manuscript is never sent anywhere.
+tell you about its shape, its characters and the way you write. It talks to a
+language model running on your own hardware, so the manuscript is never sent
+anywhere.
 
 ### Setting it up
 
-1. Install Ollama on the machine with the best graphics card — the same one as
-   Brigid, or another on your network.
-2. Download a model: `ollama pull qwen2.5:14b`, or any model you prefer.
-3. In Brigid, open **Settings → Ollama**, enter the address (usually
-   `http://localhost:11434`), press Connect, and choose the model.
+Brigid talks to a language model you run yourself. It does not care which
+server you run it with — give it an address and it works out what is answering.
 
-Brigid works out how much that model can hold and uses all of it, rather than
-the much smaller default Ollama would otherwise serve.
+1. Install a model server on the machine with the best graphics card — the same
+   one as Brigid, or another on your network. [Ollama](https://ollama.com) is
+   the easiest starting point; [llama.cpp](https://github.com/ggml-org/llama.cpp),
+   LM Studio and vLLM all work too, as does anything else serving the OpenAI
+   shape.
+2. Give it a model to serve. With Ollama that is `ollama pull qwen2.5:14b`, or
+   any model you prefer; with the others it is usually an argument you start the
+   server with.
+3. In Brigid, open **Settings → AI Model**, enter the address, and press
+   Connect.
+
+What happens next depends on what answered. With Ollama you get a list of the
+models you have installed and pick one, and Brigid reads how large a window
+that model can hold and uses all of it — rather than the much smaller default
+Ollama would otherwise serve, which truncates every chapter silently. With
+anything else, whatever the server is already serving is what will answer,
+because that was settled when you started it.
+
+If your server wants an API key, there is a field for one. llama.cpp needs
+none; vLLM started with `--api-key` does. It is stored in your own database in
+the clear, next to the manuscript — which is fine for a box on your network and
+is not a secret store.
+
+Whatever address you give is where your manuscript goes when you use the AI
+features. On a machine you run, it does not leave your network.
 
 ### What it does
 

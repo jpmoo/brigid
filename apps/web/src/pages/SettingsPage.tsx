@@ -11,7 +11,7 @@ import { BackupPane } from "./settings/BackupPane.js";
 import { CompilePane } from "./settings/CompilePane.js";
 import { GoalsPane } from "./settings/GoalsPane.js";
 import { StatsPane } from "./settings/StatsPane.js";
-import { OllamaPane } from "./settings/OllamaPane.js";
+import { AiModelPane } from "./settings/AiModelPane.js";
 import { AiPane } from "./settings/AiPane.js";
 import { BrandHeading, BrandMark } from "../components/Brand.js";
 import { useAuth } from "../auth/AuthContext.js";
@@ -22,7 +22,7 @@ const TABS = [
   { key: "spelling", label: "Spelling" },
   { key: "backup", label: "Backup" },
   { key: "account", label: "Account" },
-  { key: "ollama", label: "Ollama" },
+  { key: "ollama", label: "AI Model" },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"] | "project";
@@ -89,13 +89,13 @@ export function SettingsPage() {
   /**
    * The AI tab appears only once there is something behind it — a host saved
    * and a model chosen. An empty tab that explains it can't do anything is
-   * worse than no tab, and the Ollama pane is where that is put right.
+   * worse than no tab, and the AI Model pane is where that is put right.
    */
   const [aiReady, setAiReady] = useState(false);
   useEffect(() => {
     let alive = true;
     void api
-      .getOllama()
+      .getAi()
       .then((s) => {
         if (alive) setAiReady(Boolean(s.url && s.analysisModel));
       })
@@ -230,7 +230,7 @@ export function SettingsPage() {
           ) : tab === "account" ? (
             <PasswordFields />
           ) : (
-            <OllamaPane />
+            <AiModelPane />
           )}
         </div>
       </main>

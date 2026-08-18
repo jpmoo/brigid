@@ -188,7 +188,7 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
    *
    * Everything above works without one. This is the part that turns two hundred
    * rates into something a person can act on, and it is the only part that
-   * needs Ollama connected.
+   * needs a model connected.
    */
   app.post("/works/:workId/style/describe", async (req) => {
     requireUser(req);

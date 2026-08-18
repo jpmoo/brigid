@@ -6,6 +6,7 @@ import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { badRequest } from "../lib/errors.js";
 import { inspectModel } from "./client.js";
+import { detect } from "./detect.js";
 import { placedDigests, progressOf } from "./worker.js";
 
 /**
@@ -39,26 +40,6 @@ export function asOllamaUrl(value: string): string {
   return `${url.protocol}//${url.host}`;
 }
 
-/** What Ollama says it has. Names only — the rest is its own bookkeeping. */
-export async function modelsAt(url: string): Promise<string[]> {
-  const answer = await fetch(`${url}/api/tags`, {
-    signal: AbortSignal.timeout(5000),
-  }).catch(() => {
-    throw badRequest(`nothing answered at ${url}`);
-  });
-
-  if (!answer.ok) throw badRequest(`${url} answered ${answer.status} — is that Ollama?`);
-
-  const body = (await answer.json().catch(() => null)) as { models?: unknown } | null;
-  if (!body || !Array.isArray(body.models)) {
-    throw badRequest(`${url} answered, but not like Ollama would`);
-  }
-
-  return body.models
-    .map((m) => (m as { name?: unknown }).name)
-    .filter((name): name is string => typeof name === "string")
-    .sort((a, b) => a.localeCompare(b));
-}
 
 /** The saved connection, in the one shape every route here returns. */
 async function current() {
@@ -68,6 +49,8 @@ async function current() {
       analysisModel: settings.inferenceModel,
       numCtx: settings.ollamaNumCtx,
       thinks: settings.ollamaThinks,
+      provider: settings.aiProvider,
+      apiKey: settings.aiApiKey,
     })
     .from(settings)
     .limit(1);
@@ -76,13 +59,18 @@ async function current() {
     analysisModel: row?.analysisModel ?? null,
     numCtx: row?.numCtx ?? null,
     thinks: row?.thinks ?? null,
+    // Null until an address has been probed. Ollama on rows written before
+    // there was anything else to be.
+    provider: row?.url ? (row.provider ?? "ollama") : null,
+    /** Whether one is set, never what it is. */
+    hasApiKey: Boolean(row?.apiKey),
   };
 }
 
 export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
-  app.get("/ollama", async (req) => {
+  app.get("/ai", async (req) => {
     requireUser(req);
     return current();
   });
@@ -94,7 +82,7 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
    * connecting and choosing a model is one action, and it would be a poor one
    * that made you save a URL you hadn't yet confirmed answers.
    */
-  app.get("/ollama/models", async (req) => {
+  app.get("/ai/detect", async (req) => {
     requireUser(req);
     const { url } = z.object({ url: z.string().optional() }).parse(req.query ?? {});
 
@@ -105,7 +93,13 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
       target = row.url;
     }
 
-    return { url: target, models: await modelsAt(target) };
+    const found = await detect(target);
+    if (!found) {
+      throw badRequest(
+        "nothing answered there — check the address and that the server is running",
+      );
+    }
+    return { url: target, ...found };
   });
 
   /**
@@ -180,12 +174,15 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     return { progress: await progressOf(workId) };
   });
 
-  app.patch("/ollama", async (req) => {
+  app.patch("/ai", async (req) => {
     requireUser(req);
     const body = z
       .object({
         url: z.string().nullable().optional(),
         analysisModel: z.string().max(200).nullable().optional(),
+        // Null clears it; absent leaves whatever is there alone, so saving a
+        // model does not wipe a key the screen was never shown.
+        apiKey: z.string().max(400).nullable().optional(),
       })
       .parse(req.body);
 
@@ -196,6 +193,7 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     // Null clears the connection; anything else has to be an address.
     if (body.url !== undefined) patch.ollamaUrl = body.url === null ? null : asOllamaUrl(body.url);
     if (body.analysisModel !== undefined) patch.inferenceModel = body.analysisModel;
+    if (body.apiKey !== undefined) patch.aiApiKey = body.apiKey?.trim() || null;
 
     /**
      * The window is settled here, when the model is chosen, rather than left to
@@ -209,13 +207,46 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
       (await db.select({ url: settings.ollamaUrl }).from(settings).limit(1))[0]?.url ??
       null;
     const model = (patch.inferenceModel as string | null | undefined) ?? null;
-    if (model && target) {
-      const seen = await inspectModel(target, model).catch(() => ({ numCtx: null, thinks: null }));
-      patch.ollamaNumCtx = seen.numCtx;
-      patch.ollamaThinks = seen.thinks;
-    } else if (body.analysisModel === null || body.url === null) {
+
+    /**
+     * What is answering there, settled here rather than asked of the writer.
+     *
+     * Also where the window comes from. Ollama serves a couple of thousand
+     * tokens by default however much the model can hold, and a reader of long
+     * prose given a small window does not fail — it answers confidently about
+     * the first fifth of the chapter. So the model is inspected and the real
+     * figure stored. Nothing else exposes one per model: llama.cpp says what it
+     * loaded with, and the rest say nothing, in which case none is sent and the
+     * server's own configuration governs.
+     */
+    if (target && body.url !== null) {
+      const found = await detect(target);
+      if (found) {
+        patch.aiProvider = found.provider;
+        if (found.provider === "ollama" && model) {
+          const seen = await inspectModel(target, model).catch(() => ({
+            numCtx: null,
+            thinks: null,
+          }));
+          patch.ollamaNumCtx = seen.numCtx;
+          patch.ollamaThinks = seen.thinks;
+        } else {
+          patch.ollamaNumCtx = found.numCtx;
+          patch.ollamaThinks = null;
+          // Whatever it is serving, when it serves exactly one and the writer
+          // was given nothing to choose.
+          if (!model && found.models.length > 0) patch.inferenceModel = found.models[0];
+        }
+      }
+    }
+
+    if (body.analysisModel === null || body.url === null) {
       patch.ollamaNumCtx = null;
       patch.ollamaThinks = null;
+      if (body.url === null) {
+        patch.aiProvider = null;
+        patch.aiApiKey = null;
+      }
     }
 
     await db.update(settings).set(patch).where(eq(settings.id, row.id));

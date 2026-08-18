@@ -34,8 +34,8 @@ export function StatsPane({
   /**
    * ProseDNA belongs here rather than under AI. Almost none of it needs a
    * model: it is arithmetic over the manuscript, which is what this pane is
-   * for. Only the paragraph describing what the numbers mean asks Ollama
-   * anything, and that reads as a footnote to the measuring rather than a
+   * for. Only the paragraph describing what the numbers mean asks the
+   * model anything, and that reads as a footnote to the measuring rather than a
    * reason to file the whole thing under the machine.
    */
   const [tab, setTab] = useState<"counts" | "dna">("counts");

@@ -240,6 +240,8 @@ async function drainStructure(workId: string, signal: AbortSignal): Promise<void
     const { result, ms } = await analyseStructure({
       url: config.url,
       model: config.model,
+      provider: config.provider,
+      apiKey: config.apiKey,
       numCtx: config.numCtx,
       thinks: config.thinks,
       title: work.title,
@@ -339,6 +341,8 @@ async function drainOne(workId: string, signal: AbortSignal): Promise<boolean> {
     const { result, ms } = await analyseCharacter({
       url: config.url,
       model: config.model,
+      provider: config.provider,
+      apiKey: config.apiKey,
       numCtx: config.numCtx,
       thinks: config.thinks,
       title: work.title,

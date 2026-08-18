@@ -48,12 +48,12 @@ try {
    */
   for (const path of [
     "cast", "commit", "chat", "identities", "not-a-character", "canvas",
-    "style", "sections", "describe",
+    "style", "sections", "describe", "detect",
   ]) {
     check(`the ${path} route is registered`, routes.includes(path));
   }
 
-  for (const part of ["works", "backups", "spelling", "preferences", "compile", "ollama", "analysis"]) {
+  for (const part of ["works", "backups", "spelling", "preferences", "compile", "ai", "analysis"]) {
     check(`the ${part} routes are mounted`, routes.includes(part));
   }
 

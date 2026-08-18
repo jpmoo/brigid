@@ -15,7 +15,7 @@ import { hashContent } from "../ollama/digest.js";
  * Unlike the digest this costs nothing worth budgeting — a section is a few
  * milliseconds of arithmetic — so it does not need a queue, a worker loop or a
  * progress bar. It runs when the manuscript is asked about, walks whatever has
- * changed, and returns. A book with Ollama switched off still has a
+ * changed, and returns. A book with no model connected still has a
  * fingerprint, which is the point of measuring rather than judging.
  */
 

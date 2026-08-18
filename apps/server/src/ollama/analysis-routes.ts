@@ -633,28 +633,50 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       config.numCtx,
     );
 
-    const answer = await fetch(`${config.url}/api/chat`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        model: config.model,
-        stream: true,
-        ...(config.thinks ? { think: false } : {}),
-        options: {
-          ...(config.numCtx ? { num_ctx: config.numCtx } : {}),
-          temperature: 0.4,
-        },
-        messages: [{ role: "system", content: `${CHAT_SYSTEM}\n\n${brief}` }, ...messages],
-      }),
-      signal: AbortSignal.timeout(15 * 60_000),
-    });
+    const openai = config.provider === "openai";
+    const conversation = [
+      { role: "system", content: `${CHAT_SYSTEM}\n\n${brief}` },
+      ...messages,
+    ];
+
+    const answer = await fetch(
+      openai ? `${config.url}/v1/chat/completions` : `${config.url}/api/chat`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(
+          openai
+            ? {
+                model: config.model,
+                stream: true,
+                temperature: 0.4,
+                messages: conversation,
+              }
+            : {
+                model: config.model,
+                stream: true,
+                ...(config.thinks ? { think: false } : {}),
+                options: {
+                  ...(config.numCtx ? { num_ctx: config.numCtx } : {}),
+                  temperature: 0.4,
+                },
+                messages: conversation,
+              },
+        ),
+        signal: AbortSignal.timeout(15 * 60_000),
+      },
+    );
 
     if (!answer.ok || !answer.body) throw badRequest(`the model answered ${answer.status}`);
 
     /**
-     * Forwarded as plain text rather than re-wrapped. Ollama sends one JSON
-     * object per line; the content is pulled out and written straight through,
-     * so the browser appends tokens instead of parsing a protocol.
+     * Forwarded as plain text rather than re-wrapped.
+     *
+     * The two protocols stream differently and neither is passed on as it
+     * arrives: Ollama sends one JSON object per line, the OpenAI shape sends
+     * server-sent events with a `data:` prefix and a `[DONE]` sentinel. The
+     * content is pulled out of whichever it is and written straight through, so
+     * the browser appends tokens and never learns which server answered.
      */
     reply.raw.writeHead(200, {
       "content-type": "text/plain; charset=utf-8",
@@ -671,13 +693,22 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
       const lines = held.split("\n");
       // The last piece may be half a line; keep it for the next chunk.
       held = lines.pop() ?? "";
-      for (const line of lines) {
-        if (!line.trim()) continue;
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (!line) continue;
+        // Server-sent events carry the object after a prefix, and close with a
+        // sentinel that is not JSON at all.
+        const payload = line.startsWith("data:") ? line.slice(5).trim() : line;
+        if (payload === "[DONE]") continue;
         try {
-          const parsed = JSON.parse(line) as { message?: { content?: string } };
-          if (parsed.message?.content) {
-            said += parsed.message.content;
-            reply.raw.write(parsed.message.content);
+          const parsed = JSON.parse(payload) as {
+            message?: { content?: string };
+            choices?: { delta?: { content?: string } }[];
+          };
+          const piece = parsed.message?.content ?? parsed.choices?.[0]?.delta?.content;
+          if (piece) {
+            said += piece;
+            reply.raw.write(piece);
           }
         } catch {
           // A line that isn't JSON is not worth killing the stream over.

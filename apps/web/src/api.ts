@@ -176,12 +176,26 @@ export interface CastRow {
   state: "pending" | "committed" | "dropped";
 }
 
-export interface OllamaSettings {
-  /** The model's full context window, as detected. */
+/** Which protocol an endpoint speaks, as detected when its address was saved. */
+export type AiProvider = "ollama" | "openai";
+
+export interface AiSettings {
+  /** The model's full context window, where the server will say. */
   numCtx?: number | null;
   /** Origin only — no path, no trailing slash. Null until a host is set. */
   url: string | null;
   analysisModel: string | null;
+  provider: AiProvider | null;
+  /** Whether a key is stored. Never the key itself. */
+  hasApiKey: boolean;
+}
+
+/** What answered at an address. */
+export interface AiDetected {
+  url: string;
+  provider: AiProvider;
+  models: string[];
+  numCtx: number | null;
 }
 
 export interface DictionaryWord {
@@ -675,14 +689,16 @@ export const api = {
       { method: "DELETE" },
     ),
 
-  getOllama: () => request<OllamaSettings>("/ollama"),
-  // The address is passed rather than read, so a host can be tried before it is kept.
-  listOllamaModels: (url?: string) =>
-    request<{ url: string; models: string[] }>(
-      url ? `/ollama/models?url=${encodeURIComponent(url)}` : "/ollama/models",
-    ),
-  saveOllama: (patch: Partial<OllamaSettings>) =>
-    request<OllamaSettings>("/ollama", { method: "PATCH", body: JSON.stringify(patch) }),
+  getAi: () => request<AiSettings>("/ai"),
+  // The address is passed rather than read, so a host can be tried before it is
+  // kept — and what protocol it speaks is discovered rather than asked for.
+  detectAi: (url?: string) =>
+    request<AiDetected>(url ? `/ai/detect?url=${encodeURIComponent(url)}` : "/ai/detect"),
+  saveAi: (patch: {
+    url?: string | null;
+    analysisModel?: string | null;
+    apiKey?: string | null;
+  }) => request<AiSettings>("/ai", { method: "PATCH", body: JSON.stringify(patch) }),
 
   detachBreak: (id: string) => post<{ block: Block }>(`/blocks/${id}/break/detach`),
   updateBreak: (id: string, body: TemplateBody) =>

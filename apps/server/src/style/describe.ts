@@ -21,7 +21,7 @@ import { signature } from "./routes.js";
  *
  * Everything the measuring side does works without a model. This is the part
  * that turns two hundred rates into something a person can act on, and it is
- * the only part that needs Ollama connected.
+ * the only part that needs a model connected.
  *
  * The model is never asked to judge whether the writing is good. It is asked
  * what the numbers describe — and given passages to check its description
@@ -189,6 +189,8 @@ Write two things.
   const answer = await generateJson<{ card?: string; commentary?: { heading: string; body: string }[] }>({
     url: config.url,
     model: config.model,
+    provider: config.provider,
+    apiKey: config.apiKey,
     numCtx: config.numCtx,
     thinks: config.thinks ?? null,
     system: SYSTEM,

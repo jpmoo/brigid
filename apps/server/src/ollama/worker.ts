@@ -3,6 +3,7 @@ import { blocks, digestState, sectionDigests, settings, templates, works } from 
 import type { DigestProgress, PlacedDigest } from "@brigid/shared";
 import { buildOutline } from "@brigid/shared";
 import { db, isDbReady } from "../db.js";
+import type { Provider } from "./detect.js";
 import { syncSection } from "./cast.js";
 import { inspectModel } from "./client.js";
 import { digestSection, hashContent } from "./digest.js";
@@ -62,6 +63,7 @@ async function reader(): Promise<{
   model: string;
   numCtx: number | null;
   thinks: boolean | null;
+  provider: Provider;
 } | null> {
   const [row] = await db
     .select({
@@ -69,6 +71,7 @@ async function reader(): Promise<{
       model: settings.inferenceModel,
       numCtx: settings.ollamaNumCtx,
       thinks: settings.ollamaThinks,
+      provider: settings.aiProvider,
     })
     .from(settings)
     .limit(1);
@@ -81,18 +84,30 @@ async function reader(): Promise<{
    * than require the writer to re-save the model to fix something they were
    * never told about, the walk asks once and remembers.
    */
-  if (row.numCtx === null || row.thinks === null) {
+  if ((row.provider ?? "ollama") === "ollama" && (row.numCtx === null || row.thinks === null)) {
     const seen = await inspectModel(row.url, row.model).catch(() => null);
     if (seen && (seen.numCtx !== null || seen.thinks !== null)) {
       await db
         .update(settings)
         .set({ ollamaNumCtx: seen.numCtx, ollamaThinks: seen.thinks, updatedAt: new Date() })
         .where(eq(settings.id, 1));
-      return { url: row.url, model: row.model, numCtx: seen.numCtx, thinks: seen.thinks };
+      return {
+        url: row.url,
+        model: row.model,
+        numCtx: seen.numCtx,
+        thinks: seen.thinks,
+        provider: row.provider ?? "ollama",
+      };
     }
   }
 
-  return { url: row.url, model: row.model, numCtx: row.numCtx, thinks: row.thinks };
+  return {
+    url: row.url,
+    model: row.model,
+    numCtx: row.numCtx,
+    thinks: row.thinks,
+    provider: row.provider ?? "ollama",
+  };
 }
 
 /**
@@ -241,6 +256,7 @@ async function walkWork(workId: string, signal: AbortSignal): Promise<boolean> {
         model: config.model,
         numCtx: config.numCtx,
         thinks: config.thinks,
+        provider: config.provider,
         known: [...known],
         label: section.label,
         text: section.text,

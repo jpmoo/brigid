@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { foldName } from "./analysis.js";
 import type { DigestCharacter, DigestEvent, SectionDigest } from "@brigid/shared";
 import { charBudget, generateJson } from "./client.js";
+import type { Provider } from "./detect.js";
 
 /**
  * Reading one section.
@@ -199,6 +200,8 @@ export interface DigestRequest {
   url: string;
   model: string;
   numCtx: number | null;
+  provider?: Provider | null;
+  apiKey?: string | null;
   /** Whether the model thinks, so the working can be switched off. */
   thinks?: boolean | null;
   /** What the outline calls this section, if anything. Context, not content. */

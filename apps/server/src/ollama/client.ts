@@ -1,3 +1,4 @@
+import type { Provider } from "./detect.js";
 /**
  * Talking to Ollama.
  *
@@ -99,6 +100,13 @@ export function charBudget(numCtx: number): number {
 export interface GenerateOptions {
   url: string;
   model: string;
+  /**
+   * Which protocol the endpoint speaks. Absent means Ollama, which is what
+   * every caller meant before there was anything else.
+   */
+  provider?: Provider | null;
+  /** Sent as a bearer token, for endpoints that ask for one. */
+  apiKey?: string | null;
   /** The model's full window. Sent as `num_ctx` — see the note at the top. */
   numCtx: number | null;
   system?: string;
@@ -172,18 +180,51 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
    * A whole-book dossier through a large model on modest hardware is slow in a
    * way that is not a fault — ten minutes was a guess, and profiling a
    * well-attested character in a 120,000-word manuscript went past it. The cap
-   * exists only so a wedged Ollama is eventually noticed, not to enforce a
+   * exists only so a wedged server is eventually noticed, not to enforce a
    * pace.
    */
   const timeout = AbortSignal.timeout(opts.timeoutMs ?? 45 * 60_000);
   const signal = opts.signal ? AbortSignal.any([opts.signal, timeout]) : timeout;
 
-  const answer = await fetch(`${opts.url}/api/generate`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  }).catch((err: unknown) => {
+  const openai = opts.provider === "openai";
+
+  /**
+   * The OpenAI shape, for everything that is not Ollama.
+   *
+   * A prompt and a system message become two messages; `num_ctx` has no
+   * equivalent and is not sent, because on those servers the window is settled
+   * when the server is started and is not the client's to ask for. The schema
+   * goes in `response_format`, which llama.cpp and vLLM honour and the rest
+   * ignore — the fallback ladder below covers the ones that ignore it.
+   */
+  const openaiBody: Record<string, unknown> = {
+    model: opts.model,
+    messages: [
+      ...(opts.system ? [{ role: "system", content: opts.system }] : []),
+      { role: "user", content: opts.prompt },
+    ],
+    temperature: 0,
+    stream: false,
+  };
+  if (opts.format) {
+    openaiBody.response_format = {
+      type: "json_schema",
+      json_schema: { name: "answer", schema: opts.format, strict: true },
+    };
+  }
+
+  const answer = await fetch(
+    openai ? `${opts.url}/v1/chat/completions` : `${opts.url}/api/generate`,
+    {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}),
+      },
+      body: JSON.stringify(openai ? openaiBody : body),
+      signal,
+    },
+  ).catch((err: unknown) => {
     // A timeout arrives as an opaque DOMException; say what actually expired.
     if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) {
       const mins = Math.round((opts.timeoutMs ?? 45 * 60_000) / 60_000);
@@ -196,7 +237,28 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
 
   if (!answer.ok) {
     const detail = await answer.text().catch(() => "");
-    throw new Error(`Ollama answered ${answer.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`);
+    throw new Error(
+      `the model server answered ${answer.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
+    );
+  }
+
+  if (openai) {
+    const parsed = (await answer.json()) as {
+      choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[];
+      usage?: { prompt_tokens?: number; completion_tokens?: number };
+    };
+    const choice = parsed.choices?.[0];
+    return {
+      text: choice?.message?.content ?? "",
+      // Some servers put a reasoning model's working here; the same problem
+      // Ollama's `thinking` field solves, under a different name.
+      thinking: choice?.message?.reasoning_content ?? "",
+      ms: Date.now() - started,
+      promptTokens: typeof parsed.usage?.prompt_tokens === "number" ? parsed.usage.prompt_tokens : null,
+      evalCount:
+        typeof parsed.usage?.completion_tokens === "number" ? parsed.usage.completion_tokens : null,
+      doneReason: choice?.finish_reason ?? null,
+    };
   }
 
   const parsed = (await answer.json()) as {

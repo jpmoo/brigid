@@ -59,6 +59,18 @@ export const sessions = pgTable(
 export const settings = pgTable("settings", {
   id: integer("id").primaryKey().default(1),
   ollamaUrl: text("ollama_url"),
+  /**
+   * Which protocol the endpoint speaks, detected when the address was saved.
+   * Null means Ollama — every row predating this column had nothing else it
+   * could have been.
+   */
+  aiProvider: text("ai_provider").$type<"ollama" | "openai">(),
+  /**
+   * For endpoints that require one. Optional, stored in the clear, and never
+   * returned to the browser — the settings screen is told whether one exists,
+   * not what it is.
+   */
+  aiApiKey: text("ai_api_key"),
   inferenceModel: text("inference_model"),
   summarizationModel: text("summarization_model"),
   /**

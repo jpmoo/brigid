@@ -10,7 +10,7 @@ import { Markdown } from "./Markdown.js";
  *
  * What the writing measures out to, what that says, and which sections count
  * towards it. The measuring needs no model and neither does most of this pane —
- * only the description does, so everything else is shown whether or not Ollama
+ * only the description does, so everything else is shown whether or not a model
  * is connected.
  */
 

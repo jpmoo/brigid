@@ -15,7 +15,8 @@ import { ground } from "../src/ollama/digest.js";
 import { excerpt } from "../src/ollama/excerpt.js";
 import { buildBrief } from "../src/ollama/chat.js";
 import type { PlacedDigest } from "@brigid/shared";
-import { asOllamaUrl, modelsAt } from "../src/ollama/routes.js";
+import { asOllamaUrl } from "../src/ollama/routes.js";
+import { detect } from "../src/ollama/detect.js";
 
 let failures = 0;
 
@@ -88,25 +89,58 @@ await serving(
     );
   },
   async (origin) => {
-    const models = await modelsAt(origin);
-    check("the names come back", models.includes("llama3.1:8b") && models.includes("qwen2.5:14b"));
-    check("sorted, so the menu doesn't reshuffle", models[0] === "llama3.1:8b");
-    check("an entry with no name is left out", models.length === 2);
+    const found = await detect(origin);
+    check("Ollama is recognized by its own listing", found?.provider === "ollama");
+    check(
+      "and the names come back",
+      Boolean(found?.models.includes("llama3.1:8b") && found.models.includes("qwen2.5:14b")),
+    );
+    check("an entry with no name is left out", found?.models.length === 2);
   },
 );
 
-// Something is listening, but it isn't Ollama — a router's admin page, say.
+/**
+ * An OpenAI-compatible server, which is anything that is not Ollama: llama.cpp,
+ * LM Studio, vLLM. It is recognized by the listing it serves rather than by
+ * being asked, so a writer never has to know which kind they are running.
+ */
+await serving(
+  (url, res) => {
+    if (url === "/api/tags") {
+      res.writeHead(404).end();
+      return;
+    }
+    if (url === "/v1/models") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ data: [{ id: "local-model" }] }));
+      return;
+    }
+    if (url === "/props") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ default_generation_settings: { n_ctx: 16384 } }));
+      return;
+    }
+    res.writeHead(404).end();
+  },
+  async (origin) => {
+    const found = await detect(origin);
+    check("an OpenAI-compatible server is recognized", found?.provider === "openai");
+    check("and says what it is serving", found?.models[0] === "local-model");
+    // llama.cpp reports the window it was started with; most do not, and a
+    // number invented here would be worse than none.
+    check("and its window, when it reports one", found?.numCtx === 16384);
+  },
+);
+
+// Something is listening, but it is neither — a router's admin page, say.
 await serving(
   (_url, res) => {
     res.writeHead(200, { "content-type": "text/html" }).end("<html>hello</html>");
   },
   async (origin) => {
-    try {
-      await modelsAt(origin);
-      check("a host that isn't Ollama is refused", false, "it was accepted");
-    } catch (err) {
-      check("a host that isn't Ollama is refused", /not like Ollama/.test((err as Error).message));
-    }
+    check("a host serving neither protocol is not claimed", (await detect(origin)) === null);
   },
 );
 
@@ -115,22 +149,12 @@ await serving(
     res.writeHead(500).end();
   },
   async (origin) => {
-    try {
-      await modelsAt(origin);
-      check("a host that errors is refused", false, "it was accepted");
-    } catch (err) {
-      check("a host that errors is refused", /500/.test((err as Error).message));
-    }
+    check("nor is one that errors", (await detect(origin)) === null);
   },
 );
 
 // Nothing at all — port 1 on loopback, where nothing listens.
-try {
-  await modelsAt("http://127.0.0.1:1");
-  check("a host that isn't there is refused", false, "it was accepted");
-} catch (err) {
-  check("a host that isn't there is refused", /nothing answered/.test((err as Error).message));
-}
+check("nor is one that isn't there", (await detect("http://127.0.0.1:1")) === null);
 
 
 

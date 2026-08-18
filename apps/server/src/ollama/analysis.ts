@@ -6,6 +6,7 @@ import type {
   StructureAnalysis,
 } from "@brigid/shared";
 import { generateJson } from "./client.js";
+import type { Provider } from "./detect.js";
 import {
   AXES,
   AXES_PRINCIPLES,
@@ -226,6 +227,8 @@ export async function analyseStructure(opts: {
   url: string;
   model: string;
   numCtx: number | null;
+  provider?: Provider | null;
+  apiKey?: string | null;
   thinks?: boolean | null;
   title: string;
   totalWords: number;
@@ -250,6 +253,8 @@ Then name the single best-fitting model in "bestFit" using one of those keys —
     url: opts.url,
     model: opts.model,
     numCtx: opts.numCtx,
+    provider: opts.provider ?? null,
+    apiKey: opts.apiKey ?? null,
     thinks: opts.thinks ?? null,
     system: STRUCTURE_PRINCIPLES,
     format: STRUCTURE_SCHEMA as unknown as Record<string, unknown>,
@@ -316,6 +321,8 @@ export async function analyseCharacter(opts: {
   url: string;
   model: string;
   numCtx: number | null;
+  provider?: Provider | null;
+  apiKey?: string | null;
   thinks?: boolean | null;
   title: string;
   name: string;
@@ -358,6 +365,8 @@ A flat or near-zero profile is a valid result. Do not inflate.`;
     url: opts.url,
     model: opts.model,
     numCtx: opts.numCtx,
+    provider: opts.provider ?? null,
+    apiKey: opts.apiKey ?? null,
     thinks: opts.thinks ?? null,
     system: AXES_PRINCIPLES,
     format: CHARACTER_SCHEMA as unknown as Record<string, unknown>,
@@ -473,6 +482,8 @@ export async function proposeIdentities(opts: {
   url: string;
   model: string;
   numCtx: number | null;
+  provider?: Provider | null;
+  apiKey?: string | null;
   thinks?: boolean | null;
   title: string;
   roster: RosterEntry[];
@@ -520,6 +531,8 @@ Use names exactly as spelled above. Do not introduce a name that is not in the l
     url: opts.url,
     model: opts.model,
     numCtx: opts.numCtx,
+    provider: opts.provider ?? null,
+    apiKey: opts.apiKey ?? null,
     thinks: opts.thinks ?? null,
     system:
       "You reconcile a cast list read piecemeal. You join names only on evidence, and you say when there is none.",
