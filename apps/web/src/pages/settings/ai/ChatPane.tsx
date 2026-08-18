@@ -21,6 +21,8 @@ import { ManuscriptDraft } from "./ManuscriptDraft.js";
 interface Message {
   role: "user" | "assistant";
   content: string;
+  /** Written by the measurement rather than typed, and prunable because of it. */
+  retry?: boolean;
 }
 
 export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) {
@@ -106,11 +108,42 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
     return () => window.removeEventListener("scroll", check, { capture: true });
   }, []);
 
-  async function send(text?: string) {
+  /**
+   * A second attempt should not be able to see the first.
+   *
+   * Every failed draft stayed in the conversation, so by the fifth attempt the
+   * dominant pattern in the model's context was its own failures, and the
+   * writer's original notes were the oldest and least prominent thing in it.
+   * The last one stopped rewriting altogether and copied the notes back with
+   * extra full stops — and the quotation marks came off again, which is what
+   * losing the formatting rules off the top of a full context window looks
+   * like.
+   *
+   * The note it is sent says "go back to my original notes", into a context
+   * arranged so those are the hardest thing to find. Asking again now rewinds
+   * to the writer's own request and sends that: the source, the brief, and the
+   * instruction, with none of the attempts in between. No draft is ever asked
+   * to improve on a draft.
+   *
+   * Which also gives the context window back. Five attempts at six hundred
+   * words each is a chapter of dead prose sitting where the exemplars should be.
+   */
+  function freshHistory(): Message[] {
+    let last = -1;
+    for (let i = 0; i < messages.length; i += 1) {
+      if (messages[i]!.role === "user" && !messages[i]!.retry) last = i;
+    }
+    return last === -1 ? [] : messages.slice(0, last + 1);
+  }
+
+  async function send(text?: string, retry = false) {
     const asked = (text ?? draft).trim();
     if (!asked || streaming) return;
 
-    const history: Message[] = [...messages, { role: "user", content: asked }];
+    const history: Message[] = [
+      ...(retry ? freshHistory() : messages),
+      { role: "user", content: asked, ...(retry ? { retry: true } : {}) },
+    ];
     setMessages([...history, { role: "assistant", content: "" }]);
     setDraft("");
     setError(null);
@@ -246,7 +279,7 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
                         prose={prose}
                         dna={dna}
                         streaming={streaming}
-                        onRetry={streaming ? undefined : (note) => void send(note)}
+                        onRetry={streaming ? undefined : (note) => void send(note, true)}
                       />
                     )}
                   />

@@ -201,47 +201,39 @@ export function show(v: number, row: { round: number; percent: boolean }): strin
  * past them, is the difference between a correction and a swing.
  */
 export function retryNote(rows: Row[], faults: string[] = [], tooShort = false, words = 0): string {
+  /**
+   * Everything that missed, and everything that must not move.
+   *
+   * This was cut to a single instruction after a draft obeyed the easiest of
+   * six demands and ignored the rest. That was the wrong lesson: the fuller
+   * note produced real prose, and the short one produced a thirty-word stub and
+   * then a copy of the writer's own notes. The competing-instructions theory was
+   * measuring the wrong thing — what actually degraded was the context, filling
+   * up with failed attempts, and shortening the note only removed what little
+   * was still steering.
+   *
+   * So the list is back, and the attempts it used to argue with are gone from
+   * the conversation instead.
+   */
+  const wrong = faults.length > 0 ? `${faults.join(" ")}\n\n` : "";
+  const fmt = (r: Row) => `${r.label} came out at ${show(r.got, r)} against my usual ${show(r.want, r)}`;
   const missed = rows.filter((r) => r.off);
   const held = rows.filter((r) => !r.off);
 
-  /**
-   * One thing to fix, not a list.
-   *
-   * The note had grown to six competing demands — the faults, every measure
-   * that missed, every measure that matched and must not move, a warning about
-   * padding, a length floor and a lecture on rhythm — and the drafts got worse
-   * as it got longer. Told to be longer and to vary its sentences, the last one
-   * took the easier instruction and padded with more short sentences, which
-   * satisfied the floor and flattened the rhythm further.
-   *
-   * So it names the single largest departure and stops. A model that can act on
-   * one instruction will act on it; a model given six will pick the one it finds
-   * easiest, and that has been the wrong one every time.
-   */
-  if (tooShort) {
-    return `That came back as ${words} words. It should be the whole passage — every event from my notes, in order, start to finish — not a summary and not the closing lines.
+  const keep =
+    held.length > 0
+      ? `\n\nLeave these alone — they already match me: ${held.map((r) => `${r.label} at ${show(r.want, r)}`).join("; ")}.`
+      : "";
 
-Try again, starting from my original notes and my original request. Write the complete scene. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.`;
-  }
-
-  const worst = rows
-    .filter((r) => r.off)
-    .map((r) => ({ r, gap: Math.abs(r.got - r.want) / Math.max(Math.abs(r.want), 1e-6) }))
-    .sort((a, b) => b.gap - a.gap)[0]?.r;
-
-  const wrong = faults.length > 0 ? `${faults.join(" ")}\n\n` : "";
-
-  const ask = worst
-    ? worst.feature === "sent.sd"
-      ? `The one thing to change is the range of sentence lengths. Mine vary by about ${show(worst.want, worst)} words either side; yours vary by ${show(worst.got, worst)}, which means everything is landing at the same length. Write some genuinely long sentences — thirty words and more, carrying subordinate clauses — and set them against the short ones. Do not add sentences to do it; make existing ones longer by joining what belongs together.`
-      : `The one thing to change is ${worst.label}: yours is ${show(worst.got, worst)} and mine is about ${show(worst.want, worst)}.`
+  const varies = missed.some((r) => r.feature === "sent.sd")
+    ? " The range matters more than the average: write some sentences of thirty words and more, carrying subordinate clauses, and set them against the short ones. Make existing sentences longer by joining what belongs together rather than adding new ones."
     : "";
 
-  return `Try that passage again, starting from my original notes and my original request rather than from your last attempt. Your attempts have been rewrites of each other and have been losing my material each time.
+  return `Try that passage again, working from my notes and my request above. Write the whole scene — every event in my notes, in order, start to finish. Not a summary, not the closing lines.
 
 ${wrong}Keep the events, the order and the point of view. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.
 
-${ask}
+Measured against my own sections, the last attempt missed: ${missed.map(fmt).join("; ")}.${keep}${varies}
 
-Nothing else needs changing. Do not add description, similes or explanation to reach a number — a passage that measures right and reads worse has failed.`;
+These figures describe how I write; they are not targets to hit. Do not pad a sentence with description it does not need or append a simile to lengthen a clause. If the only way to reach a number is to write something I would not have written, write the better sentence and miss the number.`;
 }
