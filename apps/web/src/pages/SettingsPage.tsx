@@ -181,13 +181,6 @@ export function SettingsPage() {
           ) : tab === "project" ? (
             workId ? (
               <>
-                <p className="card-subtitle">
-                  {work
-                    ? `Settings and tools for “${work.title}”.`
-                    : "Settings and tools for this manuscript."}{" "}
-                  These belong to the manuscript, not to Brigid.
-                </p>
-
                 <nav className="subtabs" role="tablist">
                   {projectTabs.map((t) => (
                     <button
