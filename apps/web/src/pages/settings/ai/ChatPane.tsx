@@ -105,8 +105,8 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pinned]);
 
-  async function send() {
-    const asked = draft.trim();
+  async function send(text?: string) {
+    const asked = (text ?? draft).trim();
     if (!asked || streaming) return;
 
     const history: Message[] = [...messages, { role: "user", content: asked }];
@@ -249,7 +249,14 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
                   <Markdown
                     text={message.content}
                     onManuscript={(prose, key) => (
-                      <ManuscriptDraft key={key} prose={prose} dna={dna} />
+                      <ManuscriptDraft
+                        key={key}
+                        prose={prose}
+                        dna={dna}
+                        /* Only on the finished passage: measuring prose that is
+                           still arriving would report a half-written draft. */
+                        onRetry={streaming ? undefined : (note) => void send(note)}
+                      />
                     )}
                   />
                 ) : (

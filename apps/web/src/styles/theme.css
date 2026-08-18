@@ -6276,3 +6276,25 @@ mark.hit.misspelled {
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
 }
+
+
+/* A measure the passage missed, and the offer to ask again. */
+.ms-draft-check li.off strong {
+  color: var(--warn-ink, var(--danger));
+}
+.ms-draft-check li.off {
+  font-weight: 500;
+}
+.ms-draft-miss {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn-ink, var(--danger));
+  border-radius: var(--radius);
+  background: var(--surface-sunk, var(--paper));
+}
+.ms-draft-miss p {
+  margin: 0 0 8px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+}

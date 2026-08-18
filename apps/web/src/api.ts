@@ -752,6 +752,8 @@ export interface ProseDna {
    * nothing.
    */
   features: Record<string, number>;
+  /** How far each figure moves between the writer's own sections. */
+  spread: Record<string, number>;
   dialogueShare: number;
   /** The same figures per tagged voice, once one has enough behind it. */
   voices: {

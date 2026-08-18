@@ -17,7 +17,7 @@ import {
   excludedCharacters,
   styleProfiles,
 } from "@brigid/db";
-import { baselines, featureLabel, paragraphs } from "@brigid/shared";
+import { baselines, featureLabel, featureUnit, paragraphs } from "@brigid/shared";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -150,11 +150,31 @@ async function voiceFor(workId: string) {
     samples.filter((s) => s.included).reduce((sum, s) => sum + s.measurement.words * s.measurement.dialogueShare, 0) /
     Math.max(1, book.words);
 
-  const round = (v: number) => (v >= 10 ? v.toFixed(0) : v.toFixed(2));
+  /**
+   * With units, and with the measures a generated passage actually misses.
+   *
+   * These went out as bare numbers — "variety in sentence length: 6.60", six
+   * point six of what — which is the same defect that once told the writer they
+   * used dashes 1.57 times per sentence. It was fixed where a person reads the
+   * figures and not here, where a model does.
+   *
+   * The additions are the two the drift is visible in. A model imitating a
+   * writer who mixes four-word sentences with fifty-word ones reliably returns
+   * the average and drops the range: every sentence lands near the mean, no
+   * long ones survive, and subordination disappears with them. The mean alone
+   * cannot express that, so sd and the long-sentence share are stated too, and
+   * the fragment rate with them — for a writer who uses fragments heavily they
+   * only read as fragments against full sentences to lean on.
+   */
   const targets: { label: string; value: string }[] = [];
-  for (const key of ["sent.mean", "sent.sd", "punct.comma", "para.words", "mod.adverb", "pov.filtering", "tag.rate", "tag.said"]) {
+  for (const key of ["sent.mean", "sent.sd", "sent.long", "sent.fragment", "punct.comma", "para.words", "mod.adverb", "pov.filtering", "tag.rate", "tag.said"]) {
     const norm = book.overall[key];
-    if (norm) targets.push({ label: featureLabel(key), value: round(norm.mean) });
+    if (!norm) continue;
+    const { unit, percent } = featureUnit(key);
+    const value = percent
+      ? `${Math.round(norm.mean * 100)}% ${unit}`
+      : `${norm.mean >= 10 ? norm.mean.toFixed(0) : norm.mean.toFixed(2)} ${unit}`;
+    targets.push({ label: featureLabel(key), value });
   }
   targets.push({ label: "share of words spoken aloud", value: `${Math.round(spoken * 100)}%` });
 

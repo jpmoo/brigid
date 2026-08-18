@@ -115,6 +115,19 @@ export async function styleRoutes(app: FastifyInstance): Promise<void> {
           ([, value]) => value !== 0 || book?.overall,
         ),
       ),
+      /**
+       * How much each figure moves between the writer's own sections.
+       *
+       * The means alone cannot say whether a passage has departed. "13.5 words
+       * a sentence" is a fact; whether 6.0 is a departure from it depends
+       * entirely on whether this writer's sections normally range from 12 to 15
+       * or from 4 to 30. Sent so anything judging a passage against this
+       * fingerprint judges it against the writer's own variation rather than a
+       * percentage someone picked.
+       */
+      spread: Object.fromEntries(
+        COMPARABLE.map((key) => [key, book?.overall[key]?.sd ?? 0]),
+      ),
       dialogueShare: spokenShare(samples.filter((s) => s.included)),
       /**
        * The same figures again, per tagged voice.
