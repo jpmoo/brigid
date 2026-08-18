@@ -109,40 +109,43 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   }, []);
 
   /**
-   * A second attempt should not be able to see the first.
+   * One previous attempt, and only one.
    *
-   * Every failed draft stayed in the conversation, so by the fifth attempt the
-   * dominant pattern in the model's context was its own failures, and the
-   * writer's original notes were the oldest and least prominent thing in it.
-   * The last one stopped rewriting altogether and copied the notes back with
-   * extra full stops — and the quotation marks came off again, which is what
-   * losing the formatting rules off the top of a full context window looks
-   * like.
+   * Both extremes fail, and this went through each of them. Keeping every
+   * attempt poisoned the context: by the fifth, the dominant pattern was the
+   * model's own failures, the writer's notes were the oldest thing in the
+   * window, and it answered by copying those notes back with extra full stops.
+   * Dropping all of them broke it differently — the note says "your last
+   * attempt came out at 6.0 words a sentence", which is not an instruction at
+   * all if the attempt it describes is nowhere in the conversation. That is a
+   * critique with its subject removed, and starting over from scratch each
+   * time is a lottery rather than a revision.
    *
-   * The note it is sent says "go back to my original notes", into a context
-   * arranged so those are the hardest thing to find. Asking again now rewinds
-   * to the writer's own request and sends that: the source, the brief, and the
-   * instruction, with none of the attempts in between. No draft is ever asked
-   * to improve on a draft.
+   * So a retry carries the writer's own request, the one draft being revised,
+   * and the measurements of it. Enough to improve on, bounded so it cannot
+   * accumulate: the third attempt sees the second, not the first and second
+   * both, and the window holds one draft however many times it is asked.
    *
-   * Which also gives the context window back. Five attempts at six hundred
-   * words each is a chapter of dead prose sitting where the exemplars should be.
+   * The attempt is passed in rather than taken from the end of the
+   * conversation, because the button belongs to a particular passage and the
+   * writer may well be asking again about an earlier one.
    */
-  function freshHistory(): Message[] {
+  function historyFor(previous: string): Message[] {
     let last = -1;
     for (let i = 0; i < messages.length; i += 1) {
       if (messages[i]!.role === "user" && !messages[i]!.retry) last = i;
     }
-    return last === -1 ? [] : messages.slice(0, last + 1);
+    const upTo = last === -1 ? [] : messages.slice(0, last + 1);
+    return [...upTo, { role: "assistant", content: "```manuscript\n" + previous + "\n```" }];
   }
 
-  async function send(text?: string, retry = false) {
+  async function send(text?: string, previous?: string) {
     const asked = (text ?? draft).trim();
     if (!asked || streaming) return;
 
     const history: Message[] = [
-      ...(retry ? freshHistory() : messages),
-      { role: "user", content: asked, ...(retry ? { retry: true } : {}) },
+      ...(previous ? historyFor(previous) : messages),
+      { role: "user", content: asked, ...(previous ? { retry: true } : {}) },
     ];
     setMessages([...history, { role: "assistant", content: "" }]);
     setDraft("");
@@ -279,7 +282,7 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
                         prose={prose}
                         dna={dna}
                         streaming={streaming}
-                        onRetry={streaming ? undefined : (note) => void send(note, true)}
+                        onRetry={streaming ? undefined : (note) => void send(note, prose)}
                       />
                     )}
                   />

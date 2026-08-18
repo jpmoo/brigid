@@ -229,7 +229,7 @@ export function retryNote(rows: Row[], faults: string[] = [], tooShort = false, 
     ? " The range matters more than the average: write some sentences of thirty words and more, carrying subordinate clauses, and set them against the short ones. Make existing sentences longer by joining what belongs together rather than adding new ones."
     : "";
 
-  return `Try that passage again, working from my notes and my request above. Write the whole scene — every event in my notes, in order, start to finish. Not a summary, not the closing lines.
+  return `The passage above is your previous attempt, and the figures below describe it. Revise it, working from my notes and my request further up. Write the whole scene — every event in my notes, in order, start to finish. Not a summary, not the closing lines.
 
 ${wrong}Keep the events, the order and the point of view. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.
 
