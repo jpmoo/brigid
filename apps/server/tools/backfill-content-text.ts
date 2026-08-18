@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { config } from "dotenv";
 import postgres from "postgres";
 import { extractText } from "../src/blocks/text.js";
+import { hashContent, hashProse } from "../src/ollama/digest.js";
 
 /**
  * Re-derive every block's stored plain text from the document it came from.
@@ -61,6 +62,7 @@ try {
 
   let changed = 0;
   let paragraphsGained = 0;
+  let carried = 0;
 
   for (const row of rows) {
     const next = extractText(row.content);
@@ -69,20 +71,42 @@ try {
     const before = row.content_text.split(/\n[ \t]*\n/).filter((p) => p.trim()).length;
     const after = next.split(/\n[ \t]*\n/).filter((p) => p.trim()).length;
     paragraphsGained += Math.max(0, after - before);
-    if (!dry) {
-      await sql`UPDATE blocks SET content_text = ${next} WHERE id = ${row.id}`;
-    }
+    if (dry) continue;
+
+    await sql`UPDATE blocks SET content_text = ${next} WHERE id = ${row.id}`;
+
+    /**
+     * Carry a current digest across rather than making the walk earn it again.
+     *
+     * The prose is the same prose — only the whitespace between its paragraphs
+     * moved — so a digest that was current for the old text is still an
+     * accurate account of what happens in the new one. Re-pointing its hash
+     * saves re-reading the whole manuscript to arrive back where we started.
+     *
+     * Only where the digest was actually current. One that had already fallen
+     * behind stays behind, because that is a real edit this cannot speak for.
+     */
+    const done = await sql`
+      UPDATE section_digests
+      SET content_hash = ${hashProse(next)}
+      WHERE block_id = ${row.id} AND content_hash = ${hashContent(row.content_text)}`;
+    carried += done.count;
   }
 
   console.log(
     `${rows.length} blocks read, ${changed} ${dry ? "would change" : "rewritten"}, ` +
-      `${paragraphsGained.toLocaleString()} paragraphs recovered`,
+      `${paragraphsGained.toLocaleString()} paragraphs recovered` +
+      (dry ? "" : `, ${carried} digests carried over`),
   );
   if (changed > 0 && !dry) {
     console.log(
-      "\nThe next reading walk will re-read what changed — the digests were built\n" +
-        "from text with its paragraph structure removed. ProseDNA re-measures on its\n" +
-        "own the next time it is opened; nothing there needs re-running.",
+      "\nProseDNA re-measures on its own the next time it is opened — nothing there\n" +
+        "needs re-running, and the paragraph figures will be right.\n\n" +
+        "The reading is left alone. Those digests describe the same prose and are\n" +
+        "still accurate, so chat and the analyses keep working. They were written\n" +
+        "from text with its paragraph breaks removed, though, so a fresh reading\n" +
+        "would be a better one — 'Start over' under the reading state, when an hour\n" +
+        "of the machine is convenient.",
     );
   }
 } finally {

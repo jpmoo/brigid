@@ -119,6 +119,23 @@ export function hashContent(text: string): string {
 }
 
 /**
+ * Has the prose changed in a way that changes what happens in it?
+ *
+ * Not the same question as whether it changed at all, and the reading walk is
+ * only ever asking this one. A digest says who is present, what they do and
+ * what it costs; none of that turns on where the paragraphs fall, so whitespace
+ * is normalized away and reflowing a section does not spend an hour of a
+ * machine's time re-learning a scene it already knows.
+ *
+ * The style measurements deliberately do not use this. Where the paragraphs
+ * fall is exactly what they are measuring, so they keep the exact hash — the
+ * two questions want different answers and had been sharing one.
+ */
+export function hashProse(text: string): string {
+  return hashContent(text.replace(/\s+/g, " ").trim());
+}
+
+/**
  * Split only when the prose genuinely won't fit.
  *
  * With a real context window this almost never fires, which is the point of

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { paragraphs, measure } from "@brigid/shared";
 import { extractText } from "../src/blocks/text.js";
+import { hashContent, hashProse } from "../src/ollama/digest.js";
 
 /**
  * The plain text a block stores has to keep its paragraphs.
@@ -77,6 +78,25 @@ check("paragraphs inside a blockquote are still paragraphs", () => {
     ],
   };
   assert.equal(paragraphs(extractText(doc)).length, 4);
+});
+
+console.log("\ntwo questions, two hashes");
+
+check("reflowing paragraphs does not make the reading stale", () => {
+  // The same prose, before and after the paragraphs were put back.
+  const flat = "He remembered his name. Martin lay on the ground.";
+  const broken = "He remembered his name.\n\nMartin lay on the ground.";
+  // What happens in the scene did not change, so the walk has nothing to redo.
+  assert.equal(hashProse(flat), hashProse(broken));
+  // Where the paragraphs fall did change, and that is what style measures.
+  assert.notEqual(hashContent(flat), hashContent(broken));
+});
+
+check("real edits still count as changes", () => {
+  assert.notEqual(
+    hashProse("Martin lay on the ground."),
+    hashProse("Martin lay on the stones."),
+  );
 });
 
 console.log(`\n${passed} passed`);

@@ -7,7 +7,7 @@ import { detect } from "./detect.js";
 import type { Provider } from "./detect.js";
 import { syncSection } from "./cast.js";
 import { inspectModel } from "./client.js";
-import { digestSection, hashContent } from "./digest.js";
+import { digestSection, hashProse } from "./digest.js";
 
 /**
  * The walker.
@@ -54,7 +54,7 @@ async function sectionsOf(workId: string) {
       label: r.label,
       text: r.text,
       updatedAt: r.updatedAt,
-      hash: hashContent(r.text),
+      hash: hashProse(r.text),
     }));
 }
 
