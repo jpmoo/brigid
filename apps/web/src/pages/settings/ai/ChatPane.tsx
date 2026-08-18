@@ -29,7 +29,6 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
-  const foot = useRef<HTMLDivElement | null>(null);
   const [clearing, setClearing] = useState(false);
   /**
    * The writer's own measurements, so a passage the model writes can be held
@@ -76,19 +75,34 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
   }, [workId, ready]);
 
   /**
-   * Follow the answer only while the reader is at the bottom.
+   * Follow the answer only while the reader is at the bottom, and only ever
+   * inside the log.
    *
    * Scrolling up during a long reply means wanting to read what has already
    * arrived, and yanking the view back down every time a token lands makes that
    * impossible — the reader loses a fight with the machine. So the log is
    * pinned to the bottom only if it was at the bottom to begin with, and
    * scrolling away silently stops the following until you come back.
+   *
+   * That guard was there and did not work, because it watched the wrong
+   * scrollbar. `scrollIntoView` moves every scrollable ancestor, the page
+   * included, and a reply shorter than the log's own height gives the log
+   * nothing to scroll — so no scroll event ever fires, `pinned` stays true
+   * whatever the reader does, and each arriving token drags the whole settings
+   * page back down. Measured: three tokens moved the page 465px while the log
+   * reported no scrolling at all.
+   *
+   * Setting scrollTop on the log cannot move anything but the log. If the reply
+   * is too short to overflow, there is nothing to follow and nothing happens,
+   * which is the correct amount of movement.
    */
   const log = useRef<HTMLDivElement | null>(null);
   const [pinned, setPinned] = useState(true);
 
   useEffect(() => {
-    if (pinned) foot.current?.scrollIntoView({ block: "end" });
+    if (!pinned) return;
+    const el = log.current;
+    if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pinned]);
 
   async function send() {
@@ -247,7 +261,6 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
             </div>
           </div>
         ))}
-        <div ref={foot} />
       </div>
 
       {!pinned && streaming ? (
@@ -256,7 +269,9 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
           type="button"
           onClick={() => {
             setPinned(true);
-            foot.current?.scrollIntoView({ block: "end", behavior: "smooth" });
+            // The log, not the page — asking for the latest is not asking to be
+            // moved somewhere else on the screen.
+            log.current?.scrollTo({ top: log.current.scrollHeight, behavior: "smooth" });
           }}
         >
           Jump to the latest
