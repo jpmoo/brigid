@@ -88,20 +88,27 @@ async function serving(
 
 await serving(
   (url, res) => {
-    if (url !== "/api/tags") {
-      res.writeHead(404).end();
+    if (url === "/api/tags") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          models: [
+            { name: "qwen2.5:14b", size: 9 },
+            { name: "llama3.1:8b", size: 4 },
+            { digest: "no name here" },
+          ],
+        }),
+      );
       return;
     }
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(
-      JSON.stringify({
-        models: [
-          { name: "qwen2.5:14b", size: 9 },
-          { name: "llama3.1:8b", size: 4 },
-          { digest: "no name here" },
-        ],
-      }),
-    );
+    // The verification step: real Ollama answers this too, which is what
+    // tells it apart from a server that only shims the listing.
+    if (url === "/api/show") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ capabilities: ["completion"] }));
+      return;
+    }
+    res.writeHead(404).end();
   },
   async (origin) => {
     const found = await detect(origin);
@@ -146,6 +153,75 @@ await serving(
     // llama.cpp reports the window it was started with; most do not, and a
     // number invented here would be worse than none.
     check("and its window, when it reports one", found?.numCtx === 16384);
+  },
+);
+
+/**
+ * llama.cpp shims Ollama's listing for tool compatibility without implementing
+ * generation behind it. Answering /api/tags is what fooled detection into
+ * calling this server Ollama and sending every request to /api/generate, which
+ * 404s forever — the bug a writer actually hit.
+ */
+await serving(
+  (url, res) => {
+    if (url === "/api/tags") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ models: [{ name: "qwen3.6-35b" }] }));
+      return;
+    }
+    if (url === "/api/show") {
+      // The part a listing-only shim has no reason to have implemented.
+      res.writeHead(404, { "content-type": "application/json" }).end(
+        JSON.stringify({ error: { message: "File Not Found", type: "not_found_error", code: 404 } }),
+      );
+      return;
+    }
+    if (url === "/v1/models") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          data: [{ id: "/home/user/models/qwen3.6-35b.gguf" }],
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  },
+  async (origin) => {
+    const found = await detect(origin);
+    check(
+      "a listing-only Ollama shim is not mistaken for Ollama",
+      found?.provider === "openai",
+      found?.provider,
+    );
+    check("and falls through to what it actually serves", Boolean(found?.models[0]?.includes("qwen3.6-35b")));
+  },
+);
+
+/** Real Ollama, where /api/show answers, is still called Ollama. */
+await serving(
+  (url, res) => {
+    if (url === "/api/tags") {
+      res
+        .writeHead(200, { "content-type": "application/json" })
+        .end(JSON.stringify({ models: [{ name: "llama3.1:8b" }] }));
+      return;
+    }
+    if (url === "/api/show") {
+      res.writeHead(200, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          model_info: { "llama.context_length": 131072 },
+          capabilities: ["completion"],
+        }),
+      );
+      return;
+    }
+    res.writeHead(404).end();
+  },
+  async (origin) => {
+    const found = await detect(origin);
+    check("a server that can show what it listed is still Ollama", found?.provider === "ollama");
+    check("with the window /api/show reported", found?.numCtx === 131072);
   },
 );
 
