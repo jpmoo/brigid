@@ -205,6 +205,28 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
     ],
     temperature: 0,
     stream: false,
+    /**
+     * Thinking, switched off, the same way it is for Ollama and for the same
+     * reason: reading a chapter is not a creative act, and the same prose
+     * should digest the same way twice.
+     *
+     * Ollama's `think: false` is a real, capability-checked field. Nothing
+     * equivalent exists in the OpenAI shape itself, but `chat_template_kwargs`
+     * does — a widely supported extension in llama.cpp and vLLM that is handed
+     * straight to the model's chat template, and `enable_thinking` is exactly
+     * the flag Qwen3's own template checks. Sent unconditionally rather than
+     * gated on a detected capability, because there is no way to detect this
+     * one from outside, and a template that does not look for the key simply
+     * ignores it — there is nothing to lose by asking.
+     *
+     * The alternative was silence: a hybrid-thinking model reasoning at length
+     * before a single token of the actual answer arrives, on a call that does
+     * not stream and returns nothing until the whole response — reasoning
+     * included — is finished. That reads as the walker being stuck when it is
+     * only slow, and it was the likely cause of a read sitting at 0 of 83 with
+     * no error and no visible progress.
+     */
+    chat_template_kwargs: { enable_thinking: false },
   };
   if (opts.format) {
     openaiBody.response_format = {
@@ -214,6 +236,25 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
   }
 
   const endpoint = openai ? `${opts.url}/v1/chat/completions` : `${opts.url}/api/generate`;
+
+  /**
+   * Say what is being asked of the model, on the way out.
+   *
+   * Nothing did, and it cost a long evening. `journalctl -u brigid -f` showed a
+   * browser polling every five seconds and not one word about the calls that
+   * were actually failing — so "nothing in the log" looked like "nothing is
+   * happening" when the truth was "everything is happening invisibly". A read
+   * that sits at 0 of 83 should be distinguishable from a read that has
+   * stopped, from the log alone.
+   *
+   * Sizes, never text. The prose is the manuscript, and a log is a file that
+   * gets copied into bug reports.
+   */
+  console.log(
+    `[model] → ${endpoint} (${openai ? "openai" : "ollama"}, ${opts.prompt.length} chars${
+      opts.numCtx ? `, num_ctx ${opts.numCtx}` : ""
+    })`,
+  );
 
   const answer = await fetch(
     endpoint,
@@ -265,6 +306,10 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
       usage?: { prompt_tokens?: number; completion_tokens?: number };
     };
     const choice = parsed.choices?.[0];
+    console.log(
+      `[model] ← ${Date.now() - started}ms, ${(choice?.message?.content ?? "").length} chars` +
+        `${choice?.finish_reason ? `, ${choice.finish_reason}` : ""}`,
+    );
     return {
       text: choice?.message?.content ?? "",
       // Some servers put a reasoning model's working here; the same problem
@@ -285,6 +330,10 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
     eval_count?: number;
     done_reason?: string;
   };
+  console.log(
+    `[model] ← ${Date.now() - started}ms, ${(parsed.response ?? "").length} chars` +
+      `${parsed.done_reason ? `, ${parsed.done_reason}` : ""}`,
+  );
   return {
     text: parsed.response ?? "",
     thinking: parsed.thinking ?? "",

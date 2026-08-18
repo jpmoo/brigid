@@ -17,6 +17,7 @@ import { buildBrief } from "../src/ollama/chat.js";
 import type { PlacedDigest } from "@brigid/shared";
 import { asEndpointUrl } from "../src/ollama/routes.js";
 import { digestSection } from "../src/ollama/digest.js";
+import { generate } from "../src/ollama/client.js";
 import { detect } from "../src/ollama/detect.js";
 
 let failures = 0;
@@ -74,10 +75,17 @@ console.log("\nwhat the host answers");
 
 /** Stands in for Ollama, and for the things that aren't it. */
 async function serving(
-  handler: (url: string, res: import("node:http").ServerResponse) => void,
+  handler: (url: string, res: import("node:http").ServerResponse, body: string) => void,
   run: (origin: string) => Promise<void>,
 ): Promise<void> {
-  const server = createServer((req, res) => handler(req.url ?? "", res));
+  const server = createServer((req, res) => {
+    // Read fully before dispatching, so a handler that wants to inspect what
+    // was actually sent — not just where it was sent — can do so synchronously
+    // rather than every caller wiring up its own stream.
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => handler(req.url ?? "", res, Buffer.concat(chunks).toString("utf8")));
+  });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
   try {
@@ -301,6 +309,42 @@ await serving(
         (err as Error).message,
       );
     }
+  },
+);
+
+console.log("\nswitching thinking off on a hybrid-reasoning model");
+
+/**
+ * Ollama's think:false is a real, checked capability. Nothing equivalent
+ * exists in the OpenAI shape itself, so the hint goes in chat_template_kwargs
+ * instead — the extension llama.cpp and vLLM both pass straight to the chat
+ * template, and enable_thinking is what Qwen3's own template checks for it.
+ * Sent unconditionally, since there is no way to detect the capability from
+ * outside and a template that never looks for the key just ignores it.
+ *
+ * Without this, a hybrid-thinking model reasons at length before a single
+ * token of the real answer arrives, on a call that does not stream and
+ * returns nothing until the whole response is finished — which reads as the
+ * walker being stuck when it is only slow.
+ */
+await serving(
+  (url, res, body) => {
+    if (url !== "/v1/chat/completions") {
+      res.writeHead(404).end();
+      return;
+    }
+    const sent = JSON.parse(body || "{}") as { chat_template_kwargs?: { enable_thinking?: boolean } };
+    check(
+      "the request asks the chat template to switch thinking off",
+      sent.chat_template_kwargs?.enable_thinking === false,
+      JSON.stringify(sent.chat_template_kwargs),
+    );
+    res
+      .writeHead(200, { "content-type": "application/json" })
+      .end(JSON.stringify({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+  },
+  async (origin) => {
+    await generate({ url: origin, model: "test", numCtx: null, provider: "openai", prompt: "hi" });
   },
 );
 
