@@ -213,8 +213,10 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
     };
   }
 
+  const endpoint = openai ? `${opts.url}/v1/chat/completions` : `${opts.url}/api/generate`;
+
   const answer = await fetch(
-    openai ? `${opts.url}/v1/chat/completions` : `${opts.url}/api/generate`,
+    endpoint,
     {
       method: "POST",
       headers: {
@@ -237,8 +239,23 @@ export async function generate(opts: GenerateOptions): Promise<GenerateResult> {
 
   if (!answer.ok) {
     const detail = await answer.text().catch(() => "");
+
+    /**
+     * Which address was asked, not only what came back.
+     *
+     * "The model server answered 404" is unactionable: it does not say whether
+     * the address is wrong, the path prefix is missing, or the wrong protocol
+     * is being spoken at the right server. Naming the URL answers all three at
+     * a glance, and a 404 in particular is nearly always one of them.
+     */
+    const hint =
+      answer.status === 404
+        ? ` — nothing is served at that path. Check the address in Settings → AI Model${
+            openai ? "" : "; this is being spoken to as Ollama, which it may not be"
+          }.`
+        : "";
     throw new Error(
-      `the model server answered ${answer.status}${detail ? `: ${detail.slice(0, 300)}` : ""}`,
+      `${endpoint} answered ${answer.status}${detail ? `: ${detail.slice(0, 300)}` : ""}${hint}`,
     );
   }
 

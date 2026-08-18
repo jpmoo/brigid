@@ -25,7 +25,7 @@ import { placedDigests, progressOf } from "./worker.js";
  * who could point a browser anywhere themselves; the check is here so a saved
  * setting can't quietly become a stranger request the server makes on a timer.
  */
-export function asOllamaUrl(value: string): string {
+export function asEndpointUrl(value: string): string {
   let url: URL;
   try {
     url = new URL(value.trim());
@@ -36,8 +36,22 @@ export function asOllamaUrl(value: string): string {
     throw badRequest("the address has to be http or https");
   }
   if (url.username || url.password) throw badRequest("leave credentials out of the address");
-  // Trailing slashes make every join below a guessing game.
-  return `${url.protocol}//${url.host}`;
+
+  /**
+   * The path is kept, which it was not.
+   *
+   * Ollama always answers at the origin, so throwing the path away was right
+   * for as long as Ollama was the only thing this talked to. It is wrong now: a
+   * server behind a proxy lives under a prefix, and the address for one is the
+   * prefix. Discarded, every request went to the root of the host and came back
+   * 404 from something that had never heard of it.
+   *
+   * A trailing `/v1` is the exception, and is dropped. It is the base people
+   * paste because it is what other applications ask for — and this one appends
+   * `/v1/...` itself, so keeping it would ask for `/v1/v1/chat/completions`.
+   */
+  const path = url.pathname.replace(/\/+$/, "").replace(/\/v1$/, "");
+  return `${url.protocol}//${url.host}${path}`;
 }
 
 
@@ -86,7 +100,7 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     requireUser(req);
     const { url } = z.object({ url: z.string().optional() }).parse(req.query ?? {});
 
-    let target = url ? asOllamaUrl(url) : null;
+    let target = url ? asEndpointUrl(url) : null;
     if (!target) {
       const [row] = await db.select({ url: settings.ollamaUrl }).from(settings).limit(1);
       if (!row?.url) throw badRequest("no address set yet");
@@ -191,7 +205,7 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
 
     const patch: Record<string, unknown> = { updatedAt: new Date() };
     // Null clears the connection; anything else has to be an address.
-    if (body.url !== undefined) patch.ollamaUrl = body.url === null ? null : asOllamaUrl(body.url);
+    if (body.url !== undefined) patch.ollamaUrl = body.url === null ? null : asEndpointUrl(body.url);
     if (body.analysisModel !== undefined) patch.inferenceModel = body.analysisModel;
     if (body.apiKey !== undefined) patch.aiApiKey = body.apiKey?.trim() || null;
 
@@ -230,7 +244,23 @@ export async function ollamaRoutes(app: FastifyInstance): Promise<void> {
     const touchesConnection = body.url !== undefined || body.analysisModel !== undefined;
     if (target && body.url !== null && touchesConnection) {
       const found = await detect(target);
-      if (found) {
+
+      /**
+       * A connection that cannot be characterized is not saved.
+       *
+       * It used to be: the address went in, the protocol did not, and every
+       * later request defaulted to Ollama's. Against an OpenAI-compatible
+       * server that is a 404 on every read, for ever, with nothing in the
+       * settings screen to suggest why. Better to refuse now, while the writer
+       * is looking at the field they just typed into.
+       */
+      if (!found) {
+        throw badRequest(
+          `nothing at ${target} answered as a model server — check the address, including any path your proxy needs, and that the server is running`,
+        );
+      }
+
+      {
         patch.aiProvider = found.provider;
         if (found.provider === "ollama" && model) {
           const seen = await inspectModel(target, model).catch(() => ({

@@ -15,7 +15,7 @@ import { ground } from "../src/ollama/digest.js";
 import { excerpt } from "../src/ollama/excerpt.js";
 import { buildBrief } from "../src/ollama/chat.js";
 import type { PlacedDigest } from "@brigid/shared";
-import { asOllamaUrl } from "../src/ollama/routes.js";
+import { asEndpointUrl } from "../src/ollama/routes.js";
 import { detect } from "../src/ollama/detect.js";
 
 let failures = 0;
@@ -30,7 +30,7 @@ function check(label: string, ok: boolean, detail?: string): void {
 
 async function refuses(label: string, value: string): Promise<void> {
   try {
-    asOllamaUrl(value);
+    asEndpointUrl(value);
     check(label, false, "it was accepted");
   } catch {
     check(label, true);
@@ -39,15 +39,30 @@ async function refuses(label: string, value: string): Promise<void> {
 
 console.log("\nthe address");
 
-check("a plain host and port is kept", asOllamaUrl("http://localhost:11434") === "http://localhost:11434");
-check("https is allowed", asOllamaUrl("https://ollama.lan") === "https://ollama.lan");
-check("surrounding space is ignored", asOllamaUrl("  http://box:11434  ") === "http://box:11434");
+check("a plain host and port is kept", asEndpointUrl("http://localhost:11434") === "http://localhost:11434");
+check("https is allowed", asEndpointUrl("https://ollama.lan") === "https://ollama.lan");
+check("surrounding space is ignored", asEndpointUrl("  http://box:11434  ") === "http://box:11434");
 
-// A path would be joined onto `/api/tags` and make a nonsense request; a
-// trailing slash would make a double one. Both are cut back to the origin.
-check("a path is dropped", asOllamaUrl("http://box:11434/api/") === "http://box:11434");
-check("a trailing slash is dropped", asOllamaUrl("http://box:11434/") === "http://box:11434");
-check("a query is dropped", asOllamaUrl("http://box:11434/?x=1") === "http://box:11434");
+/**
+ * A path is how a proxied endpoint is reached, so it is kept — dropping it sent
+ * every request to the root of the host, which answered 404 from something that
+ * had never heard of the model server. A trailing slash would double the join,
+ * and a trailing `/v1` would be asked for twice, since `/v1/...` is appended.
+ */
+check(
+  "a path is kept, because a proxied endpoint is reached by one",
+  asEndpointUrl("http://box/gateway/openai") === "http://box/gateway/openai",
+);
+check(
+  "a trailing /v1 is dropped, since one is appended",
+  asEndpointUrl("http://box:8080/v1") === "http://box:8080",
+);
+check(
+  "and dropped from under a prefix too",
+  asEndpointUrl("http://box/gateway/openai/v1") === "http://box/gateway/openai",
+);
+check("a trailing slash is dropped", asEndpointUrl("http://box:11434/") === "http://box:11434");
+check("a query is dropped", asEndpointUrl("http://box:11434/?x=1") === "http://box:11434");
 
 await refuses("file: is refused", "file:///etc/passwd");
 await refuses("a bare word is refused", "localhost:11434");
