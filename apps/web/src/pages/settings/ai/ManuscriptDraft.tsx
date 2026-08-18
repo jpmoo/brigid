@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, RefreshCw } from "lucide-react";
-import { measure } from "@brigid/shared";
 import type { ProseDna } from "../../../api.js";
+import { checkDraft, retryNote, show } from "./voice-check.js";
 
 /**
  * Prose the model wrote, measured against the writer's own.
@@ -20,50 +20,6 @@ import type { ProseDna } from "../../../api.js";
  * from a habit, and a writer's own best page would often measure as a
  * departure too.
  */
-
-/**
- * The handful worth reporting: enough to see the shape, few enough to read.
- *
- * Each names the strand the graph draws and the feature it is measured from,
- * in one place — two lists would eventually disagree about which is which.
- */
-const SHOWN = [
-  { feature: "sent.mean", label: "words per sentence", round: 1, percent: false },
-  /**
-   * The range, not just the average — and the one most worth watching.
-   *
-   * A model asked to write like someone who mixes four-word sentences with
-   * fifty-word ones returns the average and loses the swing: everything lands
-   * near the mean, the long sentences vanish, and the subordination that filled
-   * them goes with them. Every figure below can match while the passage reads
-   * nothing like the writer, because sameness is what was added and no average
-   * can show it.
-   */
-  { feature: "sent.sd", label: "how much that varies", round: 1, percent: false },
-  { feature: "sent.long", label: "long sentences", round: 0, percent: true },
-  { feature: "punct.comma", label: "commas per sentence", round: 2, percent: false },
-  { feature: "para.words", label: "words per paragraph", round: 0, percent: false },
-  { feature: "mod.adverb", label: "-ly adverbs per 1,000", round: 1, percent: false },
-] as const;
-
-/**
- * Far enough from the writer to be worth saying so.
- *
- * Against their own variation between sections, not a percentage picked from
- * the air: a writer whose sections run from 12 to 15 words a sentence and one
- * whose sections run from 4 to 30 have not both departed when a passage comes
- * back at 6. Two of their own standard deviations is a passage outside the
- * range the book itself covers.
- *
- * The floor matters as much as the multiplier. A figure that barely moves
- * between sections has a spread near zero, and without a floor every draft
- * would be flagged for missing it by a rounding error.
- */
-const OFF = 2;
-function departed(got: number, want: number, spread: number): boolean {
-  const room = Math.max(spread, Math.abs(want) * 0.15, 1e-6);
-  return Math.abs(got - want) / room > OFF;
-}
 
 /**
  * The passage as paragraphs.
@@ -86,34 +42,17 @@ function paragraphsOf(prose: string): string[] {
     .filter(Boolean);
 }
 
-/** A figure as the writer reads it, share or rate. */
-function show(v: number, row: { round: number; percent: boolean }): string {
-  return row.percent ? `${Math.round(v * 100)}%` : v.toFixed(row.round);
-}
-
-/**
- * What to tell the model it missed.
- *
- * Named and numbered, because "write it more like me" is what was asked the
- * first time and is what produced this. A second attempt is only worth the wait
- * if it is told the thing the measurements caught and the first prompt did not
- * convey.
- */
-function retryNote(missed: { label: string; got: number; want: number; round: number; percent: boolean }[]): string {
-  const misses = missed
-    .map((r) => `${r.label} came out at ${show(r.got, r)} against my usual ${show(r.want, r)}`)
-    .join("; ");
-  return `Rewrite that passage. Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Measured against my own sections it missed: ${misses}. Fix those specifically. If the sentence-length range is among them, that means varying the lengths far more: some genuinely long sentences carrying subordinate clauses, set against the short ones, rather than every sentence landing near the same length.`;
-}
-
 export function ManuscriptDraft({
   prose,
   dna,
+  streaming,
   onRetry,
 }: {
   prose: string;
   /** Null while the fingerprint is still loading, or if none has been taken. */
   dna: ProseDna | null;
+  /** Still arriving. Nothing is measured or shown until it has stopped. */
+  streaming: boolean;
   /**
    * Ask again, naming what the passage missed. Absent while a reply streams.
    *
@@ -128,25 +67,18 @@ export function ManuscriptDraft({
 }) {
   const [copied, setCopied] = useState(false);
 
-  const check = useMemo(() => {
-    if (!dna) return null;
-    const words = prose.trim().split(/\s+/).filter(Boolean).length;
-    // Below this the measurements are noise, and a comparison would be worse
-    // than none — the same threshold a short section is spared by.
-    if (words < 120) return null;
-
-    const mine = measure(prose);
-
-    const rows = SHOWN.map(({ feature, label, round, percent }) => {
-      const want = dna.features[feature];
-      const got = mine.overall[feature];
-      if (want === undefined || got === undefined) return null;
-      const spread = dna.spread?.[feature] ?? 0;
-      return { feature, label, got, want, round, percent, off: departed(got, want, spread) };
-    }).filter((r): r is NonNullable<typeof r> => r !== null);
-
-    return { words, rows, missed: rows.filter((r) => r.off) };
-  }, [prose, dna]);
+  /**
+   * Measured once the passage has stopped arriving.
+   *
+   * Not while it streams. The figures are recomputed from whatever prose exists
+   * at that instant, so a half-written passage produces figures about a
+   * half-written passage — wrong, and changing on every token. Worse than
+   * wrong: the block grows and reflows under the reader as each number changes
+   * width, which moves the text they are trying to read. A draft is a thing to
+   * measure when it is finished.
+   */
+  const check = useMemo(() => (streaming ? null : checkDraft(prose, dna)), [prose, dna, streaming]);
+  const missed = check?.rows.filter((r) => r.off) ?? [];
 
   return (
     <div className="ms-draft">
@@ -185,17 +117,17 @@ export function ManuscriptDraft({
               </li>
             ))}
           </ul>
-          {check.missed.length > 0 && onRetry ? (
+          {missed.length > 0 && onRetry ? (
             <div className="ms-draft-miss">
               <p>
-                {check.missed.length === 1 ? "One measure sits" : `${check.missed.length} measures sit`}{" "}
+                {missed.length === 1 ? "One measure sits" : `${missed.length} measures sit`}{" "}
                 outside the range your own sections cover
-                {check.missed.some((r) => r.feature === "sent.sd")
+                {missed.some((r) => r.feature === "sent.sd")
                   ? " — including the swing between long sentences and short, which is the one imitation usually flattens"
                   : ""}
                 .
               </p>
-              <button className="btn" type="button" onClick={() => onRetry(retryNote(check.missed))}>
+              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows))}>
                 <RefreshCw size={13} />
                 Ask again, closer to my rhythm
               </button>
