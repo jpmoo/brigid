@@ -1,5 +1,21 @@
-import { REFERENCE_WORKS } from "./reference-data.js";
+import { REFERENCE_WORKS as PUBLIC_DOMAIN } from "./reference-data.js";
 import type { ReferenceWork } from "./reference-data.js";
+import { LOCAL_WORKS } from "./reference-local.js";
+
+/**
+ * Everything a manuscript can be set beside, wherever it was measured from.
+ *
+ * The public-domain set leads, so the features it carries stay the ones that
+ * define what is comparable — a locally measured book carrying a feature the
+ * others lack would otherwise widen the comparison to a question most of the
+ * set could not answer.
+ *
+ * Locally measured books count toward the spread as well as sitting in the
+ * list. They are novels, measured by the same extractor, and holding them out
+ * of the normalization would make the baseline mean something different from
+ * what it says it means.
+ */
+const REFERENCE_WORKS: ReferenceWork[] = [...PUBLIC_DOMAIN, ...LOCAL_WORKS];
 import { featureLabel } from "./style.js";
 import type { StyleFeatures } from "./style.js";
 
