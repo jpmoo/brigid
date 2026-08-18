@@ -60,6 +60,35 @@ try {
   const rows = await sql<{ id: string; content: unknown; content_text: string }[]>`
     SELECT id, content, content_text FROM blocks WHERE content IS NOT NULL`;
 
+  /**
+   * Heal any digest whose hash is current under either rule.
+   *
+   * Run before the server was restarted, this tool re-points hashes that the
+   * still-running old build then overwrites in its own style as it re-reads —
+   * so the walk comes back up seeing nothing it recognizes and starts from
+   * zero. The same thing happens to anything read between the two commands.
+   *
+   * Both spellings mean the same fact: a digest whose stored hash matches the
+   * current text under the exact rule, or under the whitespace-insensitive one,
+   * was written from this prose and is an accurate account of it. Either is
+   * repointed to the rule the walk now uses. A hash matching neither is genuinely
+   * behind — real editing this cannot vouch for — and is left alone.
+   *
+   * Which makes running this twice, or in the wrong order, a repair rather than
+   * a problem.
+   */
+  const heal = async (id: string, text: string): Promise<number> => {
+    const exact = hashContent(text);
+    const loose = hashProse(text);
+    const done = await sql`
+      UPDATE section_digests
+      SET content_hash = ${loose}
+      WHERE block_id = ${id}
+        AND content_hash <> ${loose}
+        AND content_hash IN (${exact}, ${loose})`;
+    return done.count;
+  };
+
   let changed = 0;
   let paragraphsGained = 0;
   let carried = 0;
@@ -86,6 +115,7 @@ try {
      * Only where the digest was actually current. One that had already fallen
      * behind stays behind, because that is a real edit this cannot speak for.
      */
+    // Against the text as it stood, for a digest the old build wrote.
     const done = await sql`
       UPDATE section_digests
       SET content_hash = ${hashProse(next)}
@@ -93,12 +123,44 @@ try {
     carried += done.count;
   }
 
+  // And again over everything, against the text as it now stands — which
+  // catches whatever was read between the rewrite and the restart.
+  if (!dry) {
+    for (const row of rows) {
+      carried += await heal(row.id, extractText(row.content));
+    }
+  }
+
+  /**
+   * What the walk will make of it, before anyone waits on a progress bar.
+   *
+   * A digest counts as current only if its model matches the one now
+   * configured as well as its hash, so a manuscript can read as entirely
+   * unread for a reason that has nothing to do with this tool.
+   */
+  const [state] = await sql<{ current: number; total: number; models: string[] }[]>`
+    SELECT
+      count(*) FILTER (WHERE d.content_hash IS NOT NULL) AS current,
+      (SELECT count(*) FROM blocks WHERE content IS NOT NULL) AS total,
+      coalesce(array_agg(DISTINCT d.model), '{}') AS models
+    FROM section_digests d`;
+  const [settings] = await sql<{ model: string | null }[]>`
+    SELECT inference_model AS model FROM settings LIMIT 1`;
+  const stale = state && settings?.model && !state.models.includes(settings.model);
+
   console.log(
     `${rows.length} blocks read, ${changed} ${dry ? "would change" : "rewritten"}, ` +
       `${paragraphsGained.toLocaleString()} paragraphs recovered` +
       (dry ? "" : `, ${carried} digests carried over`),
   );
-  if (changed > 0 && !dry) {
+  if (!dry && stale) {
+    console.log(
+      `\nThe reading will still start from zero, and not because of this. The\n` +
+        `digests were written by ${state.models.join(", ") || "no model"} and the\n` +
+        `connected model is now ${settings?.model}. A digest is only current for the\n` +
+        `model that wrote it, so changing models re-reads the manuscript.`,
+    );
+  } else if (changed > 0 && !dry) {
     console.log(
       "\nProseDNA re-measures on its own the next time it is opened — nothing there\n" +
         "needs re-running, and the paragraph figures will be right.\n\n" +
