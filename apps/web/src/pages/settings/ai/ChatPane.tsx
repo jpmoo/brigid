@@ -5,7 +5,6 @@ import { ApiError, api } from "../../../api.js";
 import type { ProseDna } from "../../../api.js";
 import { Markdown } from "./Markdown.js";
 import { ManuscriptDraft } from "./ManuscriptDraft.js";
-import { checkDraft, retryNote } from "./voice-check.js";
 
 /**
  * Talking about the manuscript, once both analyses are in.
@@ -22,8 +21,6 @@ import { checkDraft, retryNote } from "./voice-check.js";
 interface Message {
   role: "user" | "assistant";
   content: string;
-  /** Asked by the measurement rather than typed, and labelled as such. */
-  auto?: boolean;
 }
 
 export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) {
@@ -133,48 +130,11 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, pinned]);
 
-  /**
-   * Ask again, once, when the finished passage missed.
-   *
-   * Telling a model to write with a given range of sentence lengths is
-   * open-loop: it has no way to measure what it is producing while it produces
-   * it, so the figures in the brief are a nudge and not a target. Measuring the
-   * result and feeding the miss back is the part that actually works — which
-   * makes it strange to have asked the writer to press the button themselves.
-   * They already said what they wanted; the machine is the one that missed.
-   *
-   * Once, and only on the finished passage. Twice risks chasing its own tail,
-   * and the writer is left with a button for a second opinion if the automatic
-   * one did not land. A question they type clears the count, because that is a
-   * new exchange rather than another go at this one.
-   */
-  const checked = useRef(false);
-
-  useEffect(() => {
-    if (streaming || !dna || checked.current) return;
-    const last = messages[messages.length - 1];
-    if (!last || last.role !== "assistant") return;
-
-    for (const [, prose] of last.content.matchAll(/```manuscript\n([\s\S]*?)```/g)) {
-      const check = checkDraft(prose ?? "", dna);
-      if (check?.rows.some((r) => r.off)) {
-        checked.current = true;
-        void send(retryNote(check.rows), true);
-        return;
-      }
-    }
-    // Nothing missed: do not spend the re-ask on the next passage in this turn.
-    checked.current = true;
-  }, [streaming, messages, dna]);
-
-  async function send(text?: string, auto = false) {
+  async function send(text?: string) {
     const asked = (text ?? draft).trim();
     if (!asked || streaming) return;
-    // A question the writer typed starts a fresh exchange, so the one automatic
-    // re-ask is available again.
-    if (!auto) checked.current = false;
 
-    const history: Message[] = [...messages, { role: "user", content: asked, ...(auto ? { auto: true } : {}) }];
+    const history: Message[] = [...messages, { role: "user", content: asked }];
     setMessages([...history, { role: "assistant", content: "" }]);
     setDraft("");
     setError(null);
@@ -295,9 +255,7 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
 
         {messages.map((message, i) => (
           <div className={`chat-turn ${message.role}`} key={i}>
-            <span className="chat-who">
-              {message.role === "assistant" ? "Brigid" : message.auto ? "Asked again automatically" : "You"}
-            </span>
+            <span className="chat-who">{message.role === "user" ? "You" : "Brigid"}</span>
             <div className="chat-body">
               {message.content ? (
                 // The writer's own words are shown as typed; the model's are

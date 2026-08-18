@@ -81,12 +81,68 @@ function departed(got: number, want: number, spread: number): boolean {
 /** Below this the measurements are noise, and a comparison is worse than none. */
 export const MEASURABLE_WORDS = 120;
 
-export function checkDraft(prose: string, dna: ProseDna | null): { words: number; rows: Row[] } | null {
+/**
+ * The passage as paragraphs, by the same rule the reader's copy is drawn with.
+ *
+ * A blank line is what separates paragraphs in the manuscript and what the
+ * model is told to use. A model that forgets and puts single breaks between
+ * them has still written paragraphs, and the panel draws them as such — but the
+ * measurement split on blank lines only, so it saw one paragraph where the
+ * reader saw forty-eight. It reported 385 words a paragraph for a passage of
+ * eight-word paragraphs, the re-ask passed that figure on as a fault to fix,
+ * and the next draft was written to correct something that was never there.
+ *
+ * Displayed and measured the same way now. A number about the passage has to
+ * be a number about the passage the writer is looking at.
+ */
+export function paragraphsOf(prose: string): string[] {
+  const blank = prose.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  if (blank.length > 1) return blank;
+  return prose.split(/\n/).map((p) => p.trim()).filter(Boolean);
+}
+
+/**
+ * Things that are simply wrong, as opposed to unlike the writer.
+ *
+ * The measurements answer "how near is this to how you write", and every one of
+ * them is arguable — a writer's best page often measures as a departure. These
+ * do not answer that. Dialogue without quotation marks is not a stylistic
+ * choice the model made, and a scene whose paragraphs are separated by single
+ * line breaks is not a paragraphing decision; both are the model losing hold of
+ * instructions it was given plainly, and both were happening while the panel
+ * reported only that some averages were a little off.
+ *
+ * Kept apart from the rows for that reason. A fault is a fact, and it should
+ * not have to compete for attention with a number that might be fine.
+ */
+function faultsIn(prose: string, dna: ProseDna): string[] {
+  const found: string[] = [];
+
+  // The writer speaks on the page but this passage never opens a quotation.
+  if (dna.dialogueShare > 0.02 && !/["“]/.test(prose)) {
+    found.push("No dialogue is in quotation marks, and your prose uses them.");
+  }
+
+  // Paragraphs marked by single breaks. The manuscript uses blank lines, and a
+  // passage set this way measures as one enormous paragraph.
+  const singles = prose.split(/\n/).filter((l) => l.trim()).length;
+  const blanks = prose.split(/\n\s*\n/).filter((p) => p.trim()).length;
+  if (singles > 2 && blanks < singles / 2) {
+    found.push("Paragraphs are separated by single line breaks rather than blank lines.");
+  }
+
+  return found;
+}
+
+export function checkDraft(
+  prose: string,
+  dna: ProseDna | null,
+): { words: number; rows: Row[]; faults: string[] } | null {
   if (!dna) return null;
   const words = prose.trim().split(/\s+/).filter(Boolean).length;
   if (words < MEASURABLE_WORDS) return null;
 
-  const mine = measure(prose);
+  const mine = measure(paragraphsOf(prose).join("\n\n"));
   const rows = SHOWN.map(({ feature, label, round, percent }) => {
     const want = dna.features[feature];
     const got = mine.overall[feature];
@@ -103,7 +159,7 @@ export function checkDraft(prose: string, dna: ProseDna | null): { words: number
     return row;
   }).filter((r): r is Row => r !== null);
 
-  return { words, rows };
+  return { words, rows, faults: faultsIn(prose, dna) };
 }
 
 /** A figure as the writer reads it, share or rate. */
@@ -123,7 +179,7 @@ export function show(v: number, row: { round: number; percent: boolean }): strin
  * Naming what already matched, and saying to land on the numbers rather than
  * past them, is the difference between a correction and a swing.
  */
-export function retryNote(rows: Row[]): string {
+export function retryNote(rows: Row[], faults: string[] = []): string {
   const missed = rows.filter((r) => r.off);
   const held = rows.filter((r) => !r.off);
 
@@ -134,7 +190,19 @@ export function retryNote(rows: Row[]): string {
           .join("; ")}.`
       : "";
 
-  return `Rewrite that passage. Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Measured against my own sections it missed: ${missed
+  const wrong =
+    faults.length > 0
+      ? `First, these are simply wrong and must be fixed: ${faults.join(" ")}\n\n`
+      : "";
+
+  return `Rewrite that passage. Keep the events, the order and the point of view exactly as they are — the problem is the prose, not the content. Dialogue goes in double quotation marks, a new speaker starts a new paragraph, and every paragraph is separated by a blank line.
+
+${wrong}
+Measured against my own sections it missed: ${missed
     .map((r) => `${r.label} came out at ${show(r.got, r)} against my usual ${show(r.want, r)}`)
-    .join("; ")}. Fix those specifically, and land on those figures rather than past them.${keep} If the sentence-length range is among them, vary the lengths far more — genuinely long sentences carrying subordinate clauses, set against short ones — but build them from commas and clauses, not from punctuation I do not otherwise use.`;
+    .join("; ")}.${keep}
+
+These figures are a description of how I write, not a target to hit. Do not add words to move one. Do not pad a sentence with description it does not need, do not append a simile to lengthen a clause, and do not split a sentence in two to shorten an average. If the only way to reach a number is to write something I would not have written, write the better sentence and miss the number. A passage that measures right and reads worse is a failure, and the last attempt failed that way.
+
+If the sentence-length range is among them, that is about variety rather than length: some genuinely long sentences carrying subordinate clauses, standing next to short ones, built from commas and clauses.`;
 }

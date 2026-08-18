@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Check, Copy, RefreshCw } from "lucide-react";
 import type { ProseDna } from "../../../api.js";
-import { checkDraft, retryNote, show } from "./voice-check.js";
+import { checkDraft, paragraphsOf, retryNote, show } from "./voice-check.js";
 
 /**
  * Prose the model wrote, measured against the writer's own.
@@ -20,27 +20,6 @@ import { checkDraft, retryNote, show } from "./voice-check.js";
  * from a habit, and a writer's own best page would often measure as a
  * departure too.
  */
-
-/**
- * The passage as paragraphs.
- *
- * A blank line is what separates them in the manuscript and what the model is
- * told to use. But a model that forgets and puts single line breaks between
- * paragraphs has still written paragraphs, and rendering the lot as one wall
- * would misreport what it did — so a single break counts when there are no
- * blank ones to be found.
- */
-function paragraphsOf(prose: string): string[] {
-  const blank = prose
-    .split(/\n\s*\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-  if (blank.length > 1) return blank;
-  return prose
-    .split(/\n/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-}
 
 export function ManuscriptDraft({
   prose,
@@ -117,17 +96,28 @@ export function ManuscriptDraft({
               </li>
             ))}
           </ul>
-          {missed.length > 0 && onRetry ? (
+          {check.faults.length > 0 ? (
+            <ul className="ms-draft-faults">
+              {check.faults.map((f) => (
+                <li key={f}>{f}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          {(missed.length > 0 || check.faults.length > 0) && onRetry ? (
             <div className="ms-draft-miss">
               <p>
-                {missed.length === 1 ? "One measure sits" : `${missed.length} measures sit`}{" "}
-                outside the range your own sections cover
-                {missed.some((r) => r.feature === "sent.sd")
-                  ? " — including the swing between long sentences and short, which is the one imitation usually flattens"
-                  : ""}
-                .
+                {missed.length === 0
+                  ? "Everything above sits inside your range."
+                  : `${missed.length === 1 ? "One measure sits" : `${missed.length} measures sit`} outside the range your own sections cover${
+                      missed.some((r) => r.feature === "sent.sd")
+                        ? " — including the swing between long sentences and short, which is the one imitation usually flattens"
+                        : ""
+                    }.`}{" "}
+                Asking again is worth it when the passage reads wrong, not because
+                a figure does — a page of yours would often measure as a departure too.
               </p>
-              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows))}>
+              <button className="btn" type="button" onClick={() => onRetry(retryNote(check!.rows, check!.faults))}>
                 <RefreshCw size={13} />
                 Ask again, closer to my rhythm
               </button>

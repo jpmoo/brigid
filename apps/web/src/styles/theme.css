@@ -6302,3 +6302,12 @@ mark.hit.misspelled {
   font-size: 0.86rem;
   line-height: 1.45;
 }
+
+/* Not a matter of degree: the model lost hold of an instruction. */
+.ms-draft-faults {
+  margin: 10px 0 0;
+  padding: 0 0 0 18px;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  color: var(--warn-ink, var(--danger));
+}
