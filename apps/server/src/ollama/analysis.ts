@@ -148,7 +148,23 @@ function decideJudgeable(entry: RosterEntry): RosterEntry {
 }
 
 /** The book as the judging model sees it: events, in order, with positions. */
-export function timelineFor(sections: PlacedDigest[]): string {
+export function timelineFor(
+  sections: PlacedDigest[],
+  opts: { attribute?: boolean } = {},
+): string {
+  /**
+   * Whether each event names who was in it.
+   *
+   * Those names come from the reading and are never revised, so once the writer
+   * has moved an action to somebody else or thrown it out, the timeline still
+   * says what the model first thought. That is fine where the timeline is what
+   * happened in the book — the structure models and chat both want it — and
+   * wrong where it sits beside a character's settled record, because then one
+   * prompt carries two answers to the same question and the looser instruction
+   * wins. The epithet is the loosest instruction there is, which is where it
+   * showed.
+   */
+  const attribute = opts.attribute ?? true;
   const lines: string[] = [];
   for (const section of sections) {
     const at = `${Math.round(section.start * 100)}–${Math.round(section.end * 100)}%`;
@@ -157,7 +173,7 @@ export function timelineFor(sections: PlacedDigest[]): string {
     if (section.summary) lines.push(`  ${section.summary}`);
     for (const event of section.events) {
       const kind = event.kind ? ` (${event.kind}${event.weight ? `, ${event.weight}` : ""})` : "";
-      const who = event.who?.length ? ` — ${event.who.join(", ")}` : "";
+      const who = attribute && event.who?.length ? ` — ${event.who.join(", ")}` : "";
       lines.push(`  • ${event.what}${kind}${who}`);
     }
   }
@@ -343,7 +359,7 @@ The focal perspective for this evaluation is ${opts.focal}. Score ${opts.name} r
 Here is everything the manuscript records ${opts.name} doing, in order, each marked with its position as a percentage of the book:
 ${opts.dossier ?? dossierFor(opts.sections, opts.name)}
 
-For wider context, the book's event timeline:${timelineFor(opts.sections)}
+For wider context, what happens in the book and where. This is the shape of the story, not a record of who did what — the record above is the only account of ${opts.name} to score against, and where the two seem to disagree the record above is right:${timelineFor(opts.sections, { attribute: false })}
 
 Score ${opts.name} on all ten axes, using these exact keys: ${AXIS_KEYS.join(", ")}.
 
@@ -351,7 +367,7 @@ For every axis give:
 - "aligned": the actions from the record above that MOST support this score — the citable events the rubric demands. For a score of 2 or higher this must not be empty; if you cannot name the events, lower the score.
 - "contradictory": the actions that cut AGAINST this reading, or complicate it — what a careful reader would raise as an objection. If the character's behavior is consistent on this axis, return an empty list rather than inventing an objection.
 
-Then: "epithet", ONE short line for this character's card — at most twelve words. Either a wry description of what they are in this story, or a line of their own dialogue that captures them. It must come from THIS manuscript: quote or paraphrase what is actually on the page, never what you may know of a character with this name from elsewhere. Dry and specific beats grand and vague — "would rather be right than liked" over "a complex and compelling figure". No quotation marks unless it is their speech.${
+Then: "epithet", ONE short line for this character's card — at most twelve words. Either a wry description of what they are in this story, or a line of their own dialogue that captures them. It must come from the record above: quote or paraphrase what that record actually says, never what you may know of a character with this name from elsewhere, and never an action the record does not contain. Dry and specific beats grand and vague — "would rather be right than liked" over "a complex and compelling figure". No quotation marks unless it is their speech.${
     opts.taken?.length
       ? `\nThese lines are ALREADY IN USE for other characters in this same book. Yours must be different in wording AND in idea — do not write a variation on one of them, and do not reach for the same observation about a different person:\n${opts.taken.map((t) => `  - ${t}`).join("\n")}`
       : ""
