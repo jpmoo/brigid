@@ -20,9 +20,7 @@ const settledAbout = (
   name: string,
 ) => {
   const wanted = foldName(name);
-  return rows.filter(
-    (r) => foldName(r.characterName) === wanted || foldName(r.originName) === wanted,
-  );
+  return rows.filter((r) => foldName(r.characterName) === wanted);
 };
 
 const rows = [
@@ -43,13 +41,20 @@ check("takes rows stored under a different spelling", () => {
 });
 
 check("is not case-sensitive", () => {
-  assert.equal(settledAbout(rows, "boudicca").length, 2);
+  assert.deepEqual(settledAbout(rows, "boudicca"), settledAbout(rows, "Boudicca"));
+  assert.equal(settledAbout(rows, "boudicca").length, 1);
 });
 
-check("takes back lines that were moved away", () => {
+/**
+ * The one that bit. Clearing the character a line was first read as must not
+ * reach into the character the writer moved it to — that empties someone else's
+ * record as a side effect of tidying this one.
+ */
+check("leaves lines the writer moved to someone else", () => {
   const got = settledAbout(rows, "Boudicca");
-  assert.equal(got.length, 2);
-  assert.ok(got.some((r) => r.characterName === "Stephen"), "the reassigned line comes back");
+  assert.equal(got.length, 1);
+  assert.equal(got[0]!.characterName, "Boudicca");
+  assert.ok(!got.some((r) => r.characterName === "Stephen"), "the reassigned line stays put");
 });
 
 check("leaves other characters alone", () => {
@@ -57,10 +62,9 @@ check("leaves other characters alone", () => {
   assert.equal(got.some((r) => r.characterName === "Stephen" && r.originName === "Stephen"), false);
 });
 
-check("an exact match would have missed most of it", () => {
-  const naive = rows.filter((r) => r.characterName === "Boudicca");
-  assert.equal(naive.length, 1);
-  assert.equal(settledAbout(rows, "Boudicca").length, 2);
+check("an exact match would still have missed the spelling variants", () => {
+  assert.equal(rows.filter((r) => r.characterName === "Colonel").length, 1);
+  assert.equal(settledAbout(rows, "Colonel").length, 2);
 });
 
 console.log(`\n${passed} passed`);
