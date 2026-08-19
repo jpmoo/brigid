@@ -289,11 +289,6 @@ export interface IdentitySuspect {
   why: string;
 }
 
-/** What a reconciliation pass proposes doing to the cast. */
-export interface IdentityProposal {
-  groups: IdentityGroup[];
-  suspects: IdentitySuspect[];
-}
 
 /**
  * Words that only ever count or point, and never identify.

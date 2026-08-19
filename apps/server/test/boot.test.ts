@@ -47,7 +47,7 @@ try {
    * quietly fails to register now fails here instead.
    */
   for (const path of [
-    "cast", "commit", "chat", "identities", "not-a-character", "canvas",
+    "cast", "commit", "chat", "not-a-character", "canvas",
     "style", "sections", "describe", "detect",
   ]) {
     check(`the ${path} route is registered`, routes.includes(path));

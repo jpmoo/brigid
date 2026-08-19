@@ -1,6 +1,5 @@
 import type {
   CharacterAnalysis,
-  IdentityProposal,
   PlacedDigest,
   RosterEntry,
   StructureAnalysis,
@@ -464,101 +463,6 @@ const IDENTITY_SCHEMA = {
   required: ["groups", "suspects"],
 } as const;
 
-/**
- * Who in this cast is the same person, and who is secretly two.
- *
- * The reading is done section by section, so it cannot answer this: the section
- * that wrote "the housekeeper" had no way of knowing a later one would write
- * "Mrs Reynolds". String folding catches the mechanical cases — counting words,
- * an unambiguous title — but "the housekeeper" and "Mrs Reynolds" share no
- * letters, and only something that has read the book can join them.
- *
- * So this runs once, over the whole cast at once, and proposes. It never
- * writes: a wrong merge silently fuses two people's profiles into a character
- * who does not exist, which is far worse than the duplicate it was fixing, so
- * the writer settles every one.
- */
-export async function proposeIdentities(opts: {
-  url: string;
-  model: string;
-  numCtx: number | null;
-  provider?: Provider | null;
-  apiKey?: string | null;
-  thinks?: boolean | null;
-  title: string;
-  roster: RosterEntry[];
-  sections: PlacedDigest[];
-  signal?: AbortSignal;
-  timeoutMs?: number;
-}): Promise<{ result: IdentityProposal; ms: number }> {
-  /** A few actions each — enough to tell people apart, not the whole record. */
-  const sketch = opts.roster
-    .map((entry) => {
-      const actions: string[] = [];
-      for (const section of opts.sections) {
-        for (const character of section.characters) {
-          if (foldName(character.name) !== foldName(entry.name)) continue;
-          for (const action of character.actions) {
-            if (actions.length < 4) actions.push(action);
-          }
-        }
-      }
-      const aka = entry.aliases.length ? ` (also called ${entry.aliases.join(", ")})` : "";
-      const at = `${Math.round(entry.span.first * 100)}–${Math.round(entry.span.last * 100)}%`;
-      return `${entry.name}${aka} — appears ${at}, ${entry.actions} recorded actions\n${actions
-        .map((a) => `    · ${a}`)
-        .join("\n")}`;
-    })
-    .join("\n\n");
-
-  const prompt = `MANUSCRIPT: "${opts.title}"
-
-This book was read one section at a time, so the same person may have been recorded under more than one name — a section that wrote "the housekeeper" had no way of knowing a later one would write her name. The cast as recorded, with a few of each one's actions:
-
-${sketch}
-
-Two questions.
-
-1. "groups": which of these names refer to the SAME PERSON? Return one group per person recorded under more than one name. "canonical" is the name to keep — prefer the one the book itself uses most, and a proper name over a description. "names" lists every recorded name in the group, canonical included. "why" is the evidence: what in the actions above shows they are one person.
-
-Be strict. Two characters with the same surname are usually two people. Two characters who never appear in the same section are NOT thereby the same person. If the actions do not actually show it, leave them separate — merging two people into one is far worse than leaving a duplicate, because it invents a character who is not in the book. Return an empty list if nothing is clearly the same.
-
-2. "suspects": any single name whose recorded actions read like MORE THAN ONE person — a name the reading has been applying to two different characters. Give the name and what makes you think so. Empty list if none.
-
-Use names exactly as spelled above. Do not introduce a name that is not in the list.`;
-
-  const answer = await generateJson<Partial<IdentityProposal>>({
-    url: opts.url,
-    model: opts.model,
-    numCtx: opts.numCtx,
-    provider: opts.provider ?? null,
-    apiKey: opts.apiKey ?? null,
-    thinks: opts.thinks ?? null,
-    system:
-      "You reconcile a cast list read piecemeal. You join names only on evidence, and you say when there is none.",
-    format: IDENTITY_SCHEMA as unknown as Record<string, unknown>,
-    prompt,
-    ...(opts.timeoutMs ? { timeoutMs: opts.timeoutMs } : {}),
-    ...(opts.signal ? { signal: opts.signal } : {}),
-  });
-
-  /** Only names actually in the cast, and only groups that still merge. */
-  const known = new Map(opts.roster.map((r) => [foldName(r.name), r.name]));
-  const groups = (answer.value.groups ?? [])
-    .map((group) => {
-      const names = [...new Set((group.names ?? []).map((n) => known.get(foldName(n))).filter(Boolean))] as string[];
-      const canonical = known.get(foldName(group.canonical ?? "")) ?? names[0];
-      if (!canonical || names.length < 2) return null;
-      return { canonical, names, why: group.why ?? "" };
-    })
-    .filter((g): g is NonNullable<typeof g> => g !== null);
-
-  const suspects = (answer.value.suspects ?? [])
-    .map((s) => ({ name: known.get(foldName(s.name ?? "")) ?? "", why: s.why ?? "" }))
-    .filter((s) => s.name);
-
-  return { result: { groups, suspects }, ms: answer.ms };
-}
 
 
 /**

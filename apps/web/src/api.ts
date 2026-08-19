@@ -12,7 +12,6 @@ import type {
   BlockOptions,
   PlacedDigest,
   CanvasNode,
-  IdentityProposal,
   RosterEntry,
   StructureAnalysis,
   TemplateBody,
@@ -673,15 +672,6 @@ export const api = {
     post<{ ok: true; affected: string[]; pending: number }>(`/works/${workId}/cast/commit`, {
       decisions,
     }),
-  /** Who in this cast is the same person. A proposal; nothing is written. */
-  proposeIdentities: (workId: string) =>
-    post<{ proposal: IdentityProposal; ms: number }>(`/works/${workId}/analysis/identities`),
-  /** Fold the approved groups together in the reading itself. */
-  applyIdentities: (workId: string, groups: { canonical: string; names: string[] }[]) =>
-    post<{ ok: true; reprofiling: string[] }>(`/works/${workId}/analysis/identities/apply`, {
-      groups,
-    }),
-  /** Rule that an entry is not a character. Survives re-reads of its section. */
   notACharacter: (workId: string, name: string) =>
     post<{ ok: true }>(`/works/${workId}/analysis/not-a-character`, { name }),
   /** One character's profile. The reading stays, so a re-run is one call. */

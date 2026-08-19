@@ -41,7 +41,6 @@ import {
   buildRoster,
   foldName,
   rosterFromCast,
-  proposeIdentities,
 } from "./analysis.js";
 import {
   cancelCharacterRun,
@@ -577,85 +576,6 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
    * goes with it, since a profile of a crowd is not worth keeping.
    */
   /** Who in this cast is the same person. A proposal; nothing is written. */
-  app.post("/works/:workId/analysis/identities", async (req) => {
-    requireUser(req);
-    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const work = await workOr404(workId);
-    const config = await reader();
-    const sections = await readyDigest(workId);
-    const roster = rosterFromCast(
-      await castFor(workId),
-      new Map(sections.map((s) => [s.blockId, s.start])),
-      await exclusionsFor(workId),
-    );
-
-    const { result, ms } = await proposeIdentities({
-      ...config,
-      title: work.title,
-      roster,
-      sections,
-    });
-    return { proposal: result, ms };
-  });
-
-  /**
-   * Fold the approved groups together, on the settled cast.
-   *
-   * Not on the reading: the sync that keeps the queue current identifies a row
-   * by what the reading said and deletes rows that no longer match, so
-   * rewriting the digest would throw away every settled decision in each
-   * section a merge touched. Only `character_name` moves.
-   */
-  app.post("/works/:workId/analysis/identities/apply", async (req) => {
-    requireUser(req);
-    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
-    const { groups } = z
-      .object({
-        groups: z.array(
-          z.object({ canonical: z.string().min(1), names: z.array(z.string().min(1)).min(2) }),
-        ),
-      })
-      .parse(req.body);
-    await workOr404(workId);
-    if (groups.length === 0) return { ok: true as const, reprofiling: [] };
-
-    await db.transaction(async (tx) => {
-      for (const group of groups) {
-        for (const name of group.names) {
-          if (foldName(name) !== foldName(group.canonical)) {
-            await tx
-              .update(castActions)
-              .set({ characterName: group.canonical, updatedAt: new Date() })
-              .where(and(eq(castActions.workId, workId), eq(castActions.characterName, name)));
-          }
-          await tx
-            .delete(analyses)
-            .where(
-              and(
-                eq(analyses.workId, workId),
-                eq(analyses.kind, "character"),
-                eq(analyses.subject, name),
-              ),
-            );
-        }
-      }
-    });
-
-    const canonical = [...new Set(groups.map((g) => g.canonical))];
-    const sections = await placedDigests(workId);
-    await queueCharacterRun(workId, canonical, fingerprint(sections), canonical[0]!);
-    return { ok: true as const, reprofiling: canonical };
-  });
-
-  /**
-   * Talking about the manuscript, streamed.
-   *
-   * Streamed because an answer of any length outlasts what the proxy in front
-   * will hold a silent request open for, and because watching a reply arrive is
-   * the difference between a conversation and a form submission. The brief is
-   * assembled from findings already made rather than from the prose: they carry
-   * positions and judgments that could not be recomputed per question.
-   */
   app.post("/works/:workId/chat", async (req, reply) => {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);

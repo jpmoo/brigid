@@ -8,7 +8,6 @@ import {
   Maximize2,
   Play,
   Square,
-  Users,
   X,
   RefreshCw,
 } from "lucide-react";
@@ -25,7 +24,6 @@ import { ApiError, api } from "../../api.js";
 import type { AnalysisBundle } from "../../api.js";
 import { FitGauge } from "./ai/FitGauge.js";
 import { SpiderGraph } from "./ai/SpiderGraph.js";
-import { IdentityDialog } from "./ai/IdentityDialog.js";
 import { ReconcilePane } from "./ai/ReconcilePane.js";
 import { ChatPane } from "./ai/ChatPane.js";
 import { HoldToConfirm } from "../../components/HoldToConfirm.js";
@@ -107,7 +105,6 @@ export function AiPane({ workId }: { workId: string }) {
     }
   }
 
-  const [reconciling, setReconciling] = useState(false);
 
   async function cancel() {
     try {
@@ -178,7 +175,6 @@ export function AiPane({ workId }: { workId: string }) {
               busy={busy === "characters"}
               onRun={(names) => void start("characters", names)}
               onCancel={() => void cancel()}
-              onReconcile={() => setReconciling(true)}
               workId={workId}
               pending={bundle.pendingActions}
               onCommitted={() => void reload()}
@@ -189,16 +185,6 @@ export function AiPane({ workId }: { workId: string }) {
             <RawPane workId={workId} />
           )}
 
-          {reconciling ? (
-            <IdentityDialog
-              workId={workId}
-              onClose={() => setReconciling(false)}
-              onApplied={() => {
-                setReconciling(false);
-                void reload();
-              }}
-            />
-          ) : null}
 
           {/* Scoped to the screen it sits on: clearing from the cast means the
               cast, and the reading — the expensive part — survives. */}
@@ -666,7 +652,6 @@ function CharactersPane({
   busy,
   onRun,
   onCancel,
-  onReconcile,
   workId,
   pending,
   onCommitted,
@@ -677,7 +662,6 @@ function CharactersPane({
   busy: boolean;
   onRun: (names?: string[]) => void;
   onCancel: () => void;
-  onReconcile: () => void;
   workId: string;
   pending: number;
   onCommitted: (affected: string[]) => void;
@@ -783,13 +767,7 @@ function CharactersPane({
             Stop
           </button>
         ) : null}
-        {/* Only worth asking once there is a cast to compare. */}
-        {!working && bundle.roster.length > 1 ? (
-          <button className="btn secondary" type="button" onClick={onReconcile}>
-            <Users size={14} />
-            Reconcile the cast
-          </button>
-        ) : null}
+
       </div>
 
       {working ? <RunProgress run={run!} /> : null}
