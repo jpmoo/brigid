@@ -50,7 +50,7 @@ import {
   queueStructureRun,
   structureProgressOf,
 } from "./profile-worker.js";
-import { AXIS_BLURBS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
+import { AXIS_BLURBS, AXIS_KEYS, AXIS_LABELS, MODEL_BLURBS, MODEL_LABELS } from "./frameworks.js";
 import { placedDigests, progressOf } from "./worker.js";
 import { backfill, castFor, commitCast, pendingCount, resetCharacter } from "./cast.js";
 import { CHAT_SYSTEM, buildBrief } from "./chat.js";
@@ -358,6 +358,31 @@ async function store(
   });
 }
 
+/**
+ * A character report with its axes in the current chart order.
+ *
+ * The scores are stored as an array, in whatever order the axes were listed
+ * when the profile was written — so changing that order would have left every
+ * existing profile drawn the old way and every new one drawn the new way, with
+ * nothing on screen to say which was which. Two characters would have been
+ * uncomparable at a glance, which is the one thing the chart is for.
+ *
+ * Sorted on the way out instead. An axis the list no longer knows about keeps
+ * its place at the end rather than disappearing, since a profile is evidence
+ * and this is only a way of showing it.
+ */
+function inChartOrder(result: unknown): unknown {
+  if (!result || typeof result !== "object") return result;
+  const held = result as { axes?: { axis?: string }[] };
+  if (!Array.isArray(held.axes)) return result;
+
+  const place = (axis: string | undefined) => {
+    const at = AXIS_KEYS.indexOf(axis as (typeof AXIS_KEYS)[number]);
+    return at === -1 ? AXIS_KEYS.length : at;
+  };
+  return { ...held, axes: [...held.axes].sort((a, b) => place(a.axis) - place(b.axis)) };
+}
+
 /** The folded names this manuscript's writer has ruled are not characters. */
 async function exclusionsFor(workId: string): Promise<string[]> {
   const rows = await db
@@ -420,7 +445,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         kind: row.kind,
         subject: row.subject,
         model: row.model,
-        result: row.result,
+        result: inChartOrder(row.result),
         createdAt: row.createdAt,
         /** False once the manuscript has moved on since this was judged. */
         current: row.digestFingerprint === mark,

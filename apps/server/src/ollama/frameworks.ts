@@ -141,18 +141,53 @@ Do NOT score up for: romantic interest with no plot-orienting force (caps at 2).
 Do NOT score up for: body-count deaths with no exchange and no aftermath (0–1); losses the character imposes on others; survivable hardship absorbed as ordinary heroic risk.
 vs. Hero: the Hero may sacrifice and transform (score both); pure Sacrifice figures are spent FOR someone else's arc. A mentor-death is a classic Mentor + Sacrifice dual score.`;
 
-/** The axis keys, in chart order. */
+/**
+ * The axis keys, in chart order.
+ *
+ * The order is a design decision, not a list. On a radar chart the shape is an
+ * artifact of where the spokes were put: two high scores side by side read as a
+ * broad lobe, and the same two scores with a low one between them read as a
+ * notch. Neither is in the data. So the arrangement has to earn itself.
+ *
+ * Two rules, as far as ten spokes allow. Functions that commonly co-occur sit
+ * next to each other, so a real pattern draws as one shape rather than as
+ * separate spikes. Functions the rubric treats as each other's alternative sit
+ * opposite, five apart, so a character who is one and not the other reads as a
+ * lean rather than as noise:
+ *
+ *   Hero ↔ Shadow          the arc against what negates it
+ *   Ally ↔ Rival           accompanies the arc against competes for the prize
+ *   Mentor ↔ Trickster     steadies and equips against destabilises
+ *   Sacrifice ↔ Shapeshifter   spent openly against never quite shown
+ *   Beloved ↔ Guardian     draws the hero on against stands in the way
+ *
+ * The adjacencies come from the rubric's own tiebreakers. Mentor and Sacrifice
+ * are neighbours because a mentor-death is the classic dual score, and in the
+ * previous order — Vogler's list, never a chart decision — they sat at opposite
+ * ends with Hero between them, so the commonest pairing in the whole rubric was
+ * guaranteed to render as a deep V. Trickster and Shapeshifter are neighbours
+ * because the rubric separates them by a single distinction, situations against
+ * selves.
+ *
+ * One seam is unavoidable on a circle: Beloved beside Shadow, which is the
+ * weakest join here and still defensible — what is at stake sits next to what
+ * threatens it.
+ *
+ * What this cannot do is flatten real contrast. A character genuinely strong on
+ * two unrelated functions will show a notch wherever the spokes go, and should.
+ * The aim is only to stop the layout inventing notches the scores do not imply.
+ */
 export const AXIS_KEYS = [
   "hero",
-  "mentor",
-  "shadow",
-  "shapeshifter",
-  "trickster",
   "ally",
-  "guardian",
-  "rival",
-  "beloved",
+  "mentor",
   "sacrifice",
+  "beloved",
+  "shadow",
+  "rival",
+  "trickster",
+  "shapeshifter",
+  "guardian",
 ] as const;
 
 export const AXIS_LABELS: Record<(typeof AXIS_KEYS)[number], string> = {
