@@ -6435,16 +6435,25 @@ mark.hit.misspelled {
   align-items: center;
   gap: 7px;
   width: 100%;
-  margin-top: 18px;
-  padding: 4px 0;
   border: 0;
   background: none;
   color: inherit;
   cursor: pointer;
   text-align: left;
 }
+/* The rule and the space belong to the whole row, not to the words in it. The
+   heading carries its own border-top and padding, which inside a flex row drew
+   a line that started after the chevron and stopped before the count, and
+   pushed the heading down out of line with both. */
+.rec-bin-head {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-top: 20px;
+}
 .rec-bin-head .cast-axes-head {
   margin: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 .rec-bin-count {
   font-size: 11px;
