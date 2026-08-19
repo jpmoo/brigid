@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Check,
+  ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -56,6 +57,18 @@ export function ReconcilePane({
   /** A name whose removal from the cast is waiting on its confirmation. */
   const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * Shut by default.
+   *
+   * The bin only grows, and it is the answer to a question already settled —
+   * it exists so a line thrown out by mistake can come back, not so the writer
+   * reads it. Sitting open underneath the queue it pushes the work off the
+   * screen and reads like a second list of things to deal with.
+   */
+  const [binOpen, setBinOpen] = useState(false);
+  /** The row whose menu is currently asking for a name that does not exist yet. */
+  const [naming, setNaming] = useState<string | null>(null);
+  const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -162,6 +175,15 @@ export function ReconcilePane({
   };
 
   /** Every name currently in play, for the "move to" menus. */
+  /**
+   * The menu entry that is not a character.
+   *
+   * A control character, so it cannot collide with anything a writer might
+   * actually call someone. "New" is a plausible name for a person; this is not
+   * a plausible anything.
+   */
+  const NEW = "\u0000new";
+
   const names = useMemo(
     () => [...new Set(groups.map((g) => g.name))].sort((a, b) => a.localeCompare(b)),
     [groups],
@@ -608,17 +630,56 @@ export function ReconcilePane({
                       </td>
                       <td className="rec-cell-to">
                         <div className="rec-to-inner">
-                        <select
-                          value={d.characterName}
-                          disabled={busy}
-                          onChange={(e) => void assign(row.id, e.target.value)}
-                        >
-                          {[...new Set([d.characterName, ...names])].map((name) => (
-                            <option key={name} value={name}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
+                        {naming === row.id ? (
+                          /* A character the reading never found. The model
+                             names who it saw; a writer moving a line to someone
+                             it missed, or to a name they use and it did not,
+                             had no way to say so without leaving the queue. */
+                          <input
+                            className="rec-newname"
+                            autoFocus
+                            placeholder="New character…"
+                            value={newName}
+                            disabled={busy}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && newName.trim()) {
+                                void assign(row.id, newName.trim());
+                                setNaming(null);
+                                setNewName("");
+                              }
+                              if (e.key === "Escape") {
+                                setNaming(null);
+                                setNewName("");
+                              }
+                            }}
+                            onBlur={() => {
+                              if (newName.trim()) void assign(row.id, newName.trim());
+                              setNaming(null);
+                              setNewName("");
+                            }}
+                          />
+                        ) : (
+                          <select
+                            value={d.characterName}
+                            disabled={busy}
+                            onChange={(e) => {
+                              if (e.target.value === NEW) {
+                                setNewName("");
+                                setNaming(row.id);
+                                return;
+                              }
+                              void assign(row.id, e.target.value);
+                            }}
+                          >
+                            {[...new Set([d.characterName, ...names])].map((name) => (
+                              <option key={name} value={name}>
+                                {name}
+                              </option>
+                            ))}
+                            <option value={NEW}>New character…</option>
+                          </select>
+                        )}
                         <button
                           type="button"
                           className="rec-drop"
@@ -674,7 +735,19 @@ export function ReconcilePane({
 
       {binned.length > 0 ? (
         <>
-          <h6 className="cast-axes-head">Thrown out</h6>
+          <button
+            type="button"
+            className="rec-bin-head"
+            aria-expanded={binOpen}
+            onClick={() => setBinOpen((open) => !open)}
+          >
+            {binOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            <h6 className="cast-axes-head">Thrown out</h6>
+            <span className="rec-bin-count">{binned.length}</span>
+          </button>
+
+          {binOpen ? (
+            <>
           <p className="tpl-note">
             Kept rather than deleted, so a line thrown out in a batch of forty can come
             back without re-reading the section. Restoring one puts it back in the queue
@@ -688,16 +761,52 @@ export function ReconcilePane({
                     thrown out because it was filed under the wrong person, so
                     reviving it without saying who did it invites the same
                     decision a second time. */}
-                <select
-                  value={revive[row.id] ?? row.characterName}
-                  onChange={(e) => setRevive({ ...revive, [row.id]: e.target.value })}
-                >
-                  {[...new Set([row.characterName, ...names])].map((name) => (
-                    <option key={name} value={name}>
-                      {name}
-                    </option>
-                  ))}
-                </select>
+                {naming === row.id ? (
+                  <input
+                    className="rec-newname"
+                    autoFocus
+                    placeholder="New character…"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    /* Put back straight away rather than staged into `revive`.
+                       Staging it meant the restore button's own handler had
+                       already closed over the previous value by the time the
+                       field's blur updated it, so the line came back under the
+                       old name — the exact mistake this is here to correct. */
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && newName.trim()) {
+                        void restore(row.id, newName.trim());
+                      }
+                      if (e.key === "Enter" || e.key === "Escape") {
+                        setNaming(null);
+                        setNewName("");
+                      }
+                    }}
+                    onBlur={() => {
+                      setNaming(null);
+                      setNewName("");
+                    }}
+                  />
+                ) : (
+                  <select
+                    value={revive[row.id] ?? row.characterName}
+                    onChange={(e) => {
+                      if (e.target.value === NEW) {
+                        setNewName("");
+                        setNaming(row.id);
+                        return;
+                      }
+                      setRevive({ ...revive, [row.id]: e.target.value });
+                    }}
+                  >
+                    {[...new Set([revive[row.id] ?? row.characterName, ...names])].map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                    <option value={NEW}>New character…</option>
+                  </select>
+                )}
                 <button
                   type="button"
                   className="rec-restore"
@@ -711,6 +820,8 @@ export function ReconcilePane({
               </li>
             ))}
           </ul>
+            </>
+          ) : null}
         </>
       ) : null}
 

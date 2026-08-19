@@ -6428,3 +6428,40 @@ mark.hit.misspelled {
   font-size: 12px;
   color: var(--text-faint);
 }
+
+/* The bin, shut until asked for. */
+.rec-bin-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  margin-top: 18px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.rec-bin-head .cast-axes-head {
+  margin: 0;
+}
+.rec-bin-count {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 0 6px;
+  line-height: 16px;
+}
+.rec-bin-head:hover .cast-axes-head {
+  color: var(--text);
+}
+
+/* Naming someone the reading never found. Sized like the menu it replaces so
+   the row does not jump when it appears. */
+.rec-newname {
+  min-width: 9rem;
+  max-width: 12rem;
+}
