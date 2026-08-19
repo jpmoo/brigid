@@ -197,21 +197,48 @@ export function ReconcilePane({
    * dispose of each one before they can profile anybody would be busywork.
    */
   const thin = useMemo(() => {
-    const tally = new Map<string, { name: string; actions: number; sections: Set<string> }>();
+    const tally = new Map<
+      string,
+      { name: string; actions: number; rows: number; sections: Set<string> }
+    >();
     for (const row of rows ?? []) {
       if (row.state === "dropped") continue;
       const settled = draft[row.id];
       if (settled?.drop) continue;
       const name = (settled?.characterName ?? row.characterName).trim();
       const key = foldName(name);
-      const held = tally.get(key) ?? { name, actions: 0, sections: new Set<string>() };
+      const held = tally.get(key) ?? { name, actions: 0, rows: 0, sections: new Set<string>() };
+      held.rows += 1;
       if ((settled?.action ?? row.action).trim()) held.actions += 1;
       held.sections.add(row.blockId);
       tally.set(key, held);
     }
-    return [...tally.values()].filter(
-      (t) => t.actions < MIN_ACTIONS || t.sections.size < MIN_SECTIONS,
-    );
+    /**
+     * Which bar was missed, per character.
+     *
+     * The panel said "not enough actions" and printed a count, for two
+     * different failures — and one of them is not about the count at all. A
+     * character with eleven actions in a single section was told they did not
+     * have enough actions, which is both wrong and unactionable: the writer
+     * reads it, looks at eleven items, and has nowhere to go.
+     *
+     * Rows recorded as present with nothing done are the other half of it. They
+     * are items on the screen and they are not actions, so a character can show
+     * eleven lines and count four. Nothing said so.
+     */
+    return [...tally.values()]
+      .filter((t) => t.actions < MIN_ACTIONS || t.sections.size < MIN_SECTIONS)
+      .map((t) => {
+        const idle = t.rows - t.actions;
+        const why =
+          t.sections.size < MIN_SECTIONS
+            ? `in only ${t.sections.size === 1 ? "one section" : `${t.sections.size} sections`}, and ${MIN_SECTIONS} are needed`
+            : `${t.actions} of ${MIN_ACTIONS} actions` +
+              (idle > 0
+                ? ` — ${idle} more ${idle === 1 ? "line is" : "lines are"} present with nothing done, which cannot be scored`
+                : "");
+        return { ...t, why };
+      });
   }, [rows, draft]);
 
   /** Put a thrown-out line back. Takes effect at once — it only re-queues it. */
@@ -357,16 +384,20 @@ export function ReconcilePane({
             Not enough yet to profile
           </h6>
           <p className="tpl-note">
-            Some characters don&rsquo;t have enough actions to be committed. They stay on
-            the list but you won&rsquo;t be able to profile them until you move actions to
-            them, or they receive actions from edits in the manuscript.
+            A profile needs {MIN_ACTIONS} actions across at least {MIN_SECTIONS} sections.
+            A line recorded as present with nothing done is not an action and counts
+            toward neither. These stay on the list either way &mdash; a walk-on with two
+            lines is a correct finding about the book, not something to fix.
           </p>
-          <p className="rec-thin">
+          <ul className="rec-thin">
             {thin
               .sort((a, b) => b.actions - a.actions)
-              .map((t) => `${t.name} (${t.actions})`)
-              .join(", ")}
-          </p>
+              .map((t) => (
+                <li key={t.name}>
+                  <strong>{t.name}</strong> &mdash; {t.why}
+                </li>
+              ))}
+          </ul>
         </div>
       ) : null}
 

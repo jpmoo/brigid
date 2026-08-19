@@ -6465,3 +6465,16 @@ mark.hit.misspelled {
   min-width: 9rem;
   max-width: 12rem;
 }
+
+/* One line per character, saying which bar was missed. */
+ul.rec-thin {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+ul.rec-thin strong {
+  color: var(--text);
+  font-weight: 600;
+}
