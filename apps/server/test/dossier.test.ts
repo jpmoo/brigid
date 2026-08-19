@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { dossierFromCast, timelineFor } from "../src/ollama/analysis.js";
-import type { PlacedDigest } from "../src/ollama/analysis.js";
+import type { PlacedDigest } from "@brigid/shared";
 
 let passed = 0;
 const check = (name: string, run: () => void) => {
