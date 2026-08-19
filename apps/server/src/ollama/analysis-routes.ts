@@ -876,6 +876,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
             drop: z.boolean().optional(),
             restore: z.boolean().optional(),
             assign: z.boolean().optional(),
+            edit: z.boolean().optional(),
           }),
         ),
       })

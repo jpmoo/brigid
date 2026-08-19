@@ -6487,3 +6487,12 @@ ul.rec-thin strong {
   color: var(--text);
   font-weight: 600;
 }
+
+/* Quiet, and out of the way of the words being typed. */
+.rec-saving {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-faint);
+}

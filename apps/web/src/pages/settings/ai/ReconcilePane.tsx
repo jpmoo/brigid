@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   ChevronDown,
@@ -68,6 +68,47 @@ export function ReconcilePane({
   const [binOpen, setBinOpen] = useState(false);
   /** The row whose menu is currently asking for a name that does not exist yet. */
   const [naming, setNaming] = useState<string | null>(null);
+  /**
+   * Wording saved as it is typed, a beat behind the keystroke.
+   *
+   * Edits used to sit in `draft` until the queue was settled, so a writer who
+   * corrected a line and then navigated away — or settled a different
+   * character, or reloaded — lost the correction with no sign it had gone. The
+   * text is the writer's own words about their own book; it should not be
+   * waiting on a button.
+   *
+   * Saved with `edit`, which leaves the line pending. Fixing the phrasing of a
+   * queued action is not agreeing to it, and without that flag tidying the
+   * spelling of forty lines would have committed all forty.
+   *
+   * Nothing is reloaded afterwards. Re-reading the cast mid-sentence would
+   * replace the value under the cursor and take the focus with it.
+   */
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const [savingText, setSavingText] = useState<Record<string, boolean>>({});
+
+  const saveText = useCallback(
+    (id: string, action: string) => {
+      clearTimeout(timers.current[id]);
+      timers.current[id] = setTimeout(() => {
+        setSavingText((held) => ({ ...held, [id]: true }));
+        void api
+          .commitCast(workId, [{ id, action, edit: true }])
+          .catch(() => setError("could not save that wording"))
+          .finally(() => setSavingText((held) => ({ ...held, [id]: false })));
+      }, 700);
+    },
+    [workId],
+  );
+
+  // A correction typed and immediately navigated away from is still a
+  // correction. Anything still waiting on its timer goes now.
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of Object.values(pending)) clearTimeout(timer);
+    };
+  }, []);
   const [newName, setNewName] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -643,15 +684,32 @@ export function ReconcilePane({
                       <td className="rec-cell-at">{labels.get(row.blockId) ?? "section"}</td>
                       <td className="rec-cell-action">
                       {row.action ? (
+                        <>
                         <textarea
                           className="rec-action"
                           rows={2}
                           value={d.action}
                           disabled={d.drop}
-                          onChange={(e) =>
-                            setDraft({ ...draft, [row.id]: { ...d, action: e.target.value } })
-                          }
+                          onChange={(e) => {
+                            setDraft({ ...draft, [row.id]: { ...d, action: e.target.value } });
+                            saveText(row.id, e.target.value);
+                          }}
+                          onBlur={(e) => {
+                            // Leaving the field is a full stop; do not make it
+                            // wait out the rest of the delay. Nothing to send if
+                            // the words are the ones already stored — clicking
+                            // through a queue should not write forty rows.
+                            clearTimeout(timers.current[row.id]);
+                            if (e.target.value === row.action) return;
+                            void api
+                              .commitCast(workId, [
+                                { id: row.id, action: e.target.value, edit: true },
+                              ])
+                              .catch(() => setError("could not save that wording"));
+                          }}
                         />
+                        {savingText[row.id] ? <span className="rec-saving">Saving…</span> : null}
+                        </>
                       ) : (
                         <span className="rec-empty">
                           Recorded as present, with nothing done.

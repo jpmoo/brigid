@@ -663,6 +663,8 @@ export const api = {
       drop?: boolean;
       restore?: boolean;
       assign?: boolean;
+      /** Save the wording without settling the line. */
+      edit?: boolean;
     }[],
   ) =>
     post<{ ok: true; affected: string[]; pending: number }>(`/works/${workId}/cast/commit`, {
