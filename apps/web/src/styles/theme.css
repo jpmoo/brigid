@@ -6319,3 +6319,10 @@ mark.hit.misspelled {
   line-height: 1.45;
   color: var(--warn-ink, var(--danger));
 }
+
+/* A re-ask, shown as the act rather than the two hundred words it sent. */
+.chat-reask {
+  font-size: 0.86rem;
+  font-style: italic;
+  color: var(--text-faint);
+}

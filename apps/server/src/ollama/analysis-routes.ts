@@ -17,7 +17,15 @@ import {
   excludedCharacters,
   styleProfiles,
 } from "@brigid/db";
-import { baselines, featureLabel, featureUnit, paragraphs } from "@brigid/shared";
+import {
+  baselines,
+  deviations,
+  featureLabel,
+  featureUnit,
+  leastCharacteristic,
+  mostCharacteristic,
+  paragraphs,
+} from "@brigid/shared";
 import type {
   AnalysisDrift,
   CharacterAnalysis,
@@ -142,7 +150,8 @@ async function voiceFor(workId: string) {
     .limit(1);
 
   const samples = await refresh(workId);
-  const book = baselines(samples).get(null);
+  const built = baselines(samples);
+  const book = built.get(null);
   if (!book || book.sections === 0) return null;
   if (!profile?.card.trim() && book.words === 0) return null;
 
@@ -182,20 +191,53 @@ async function voiceFor(workId: string) {
    * Two, not five. The brief has a novel's worth of findings to fit beside
    * these, and a third exemplar buys less than the timeline it would cost.
    */
-  const ids = (profile?.exemplars ?? []).slice(0, 2);
+  /**
+   * Chosen here rather than read back from the stored profile.
+   *
+   * They were whatever was closest to the middle of the book when the
+   * description was last generated, and they stayed that way — so excluding a
+   * section of raw dictation from the fingerprint corrected every number while
+   * the passages held up to the model as "your own prose, imitate this" could
+   * still be the dictation. Working them out from the current sample means the
+   * exclusions land everywhere at once.
+   */
+  const found = deviations(samples, built);
+  const ids = mostCharacteristic(found, samples, 2);
+  /**
+   * And one from the far end, because a model shown only what to sound like has
+   * nothing to measure that against.
+   *
+   * Not offered as bad writing. It is the section furthest from the writer's
+   * usual, which may be perfectly deliberate — a letter, a dream, a different
+   * narrator — and the prompt says so. What it is useful for is showing where
+   * the edge of the voice is, which one sample from the middle cannot.
+   */
+  const [odd] = leastCharacteristic(found, samples, 1);
+  const wanted = [...ids, ...(odd ? [odd.blockId] : [])];
   const rows =
-    ids.length > 0
+    wanted.length > 0
       ? await db
           .select({ id: blocks.id, label: blocks.label, text: blocks.contentText })
           .from(blocks)
-          .where(inArray(blocks.id, ids))
+          .where(inArray(blocks.id, wanted))
       : [];
+  const byId = new Map(rows.filter((r) => r.text.trim()).map((r) => [r.id, r]));
+  const unlike = odd ? byId.get(odd.blockId) : undefined;
 
   return {
     card: profile?.card ?? "",
     targets,
-    exemplars: rows
-      .filter((r) => r.text.trim())
+    unlike: unlike
+      ? {
+          label: unlike.label || "Untitled",
+          // Shorter than the exemplars. It is there for contrast, and the brief
+          // has a novel to fit beside it.
+          text: excerpt(unlike.text, 200),
+        }
+      : null,
+    exemplars: ids
+      .map((id) => byId.get(id))
+      .filter((r): r is NonNullable<typeof r> => r !== undefined)
       .map((r) => ({
         label: r.label || "Untitled",
         // Enough to hear the cadence without crowding out the rest of the

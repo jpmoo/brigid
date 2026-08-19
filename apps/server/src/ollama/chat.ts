@@ -40,6 +40,8 @@ export interface ChatContext {
   dna?: {
     card: string;
     targets: { label: string; value: string }[];
+    /** The section furthest from their usual, as contrast. */
+    unlike?: { label: string; text: string } | null;
     exemplars: { label: string; text: string }[];
   };
   /**
@@ -340,12 +342,29 @@ function voiceBrief(dna: NonNullable<ChatContext["dna"]>): string {
   }
   if (dna.exemplars.length > 0) {
     parts.push(
-      `PASSAGES MOST TYPICAL OF THEM — their own prose, verbatim. This is what "in my voice" means. Imitate the cadence, the punctuation, the distance; do not borrow the content.\n\n${dna.exemplars
+      `WRITE LIKE THIS — their own prose, verbatim, from the sections closest to the middle of everything they have written. This is what "in my voice" means. Imitate the cadence, the punctuation, the distance; do not borrow the content.\n\n${dna.exemplars
         .map((e) => `--- ${e.label} ---\n${e.text}`)
         .join("\n\n")}`,
     );
   }
   parts.push("=== END OF YOUR VOICE ===");
+  /**
+   * The far end of the same book.
+   *
+   * A model shown only what to sound like has nothing to measure that against,
+   * and every sample it is given reads as equally central. This one is the
+   * furthest from their usual — which is a fact about distance, not about
+   * quality, and the wording has to keep those apart. A writer's oddest section
+   * is often their best one, or a letter, or a different narrator on purpose,
+   * and telling a model it is bad prose to be avoided would teach it to flatten
+   * exactly the range it is meant to be reproducing.
+   */
+  if (dna.unlike) {
+    parts.push(
+      `LESS LIKE THIS — also their own prose, from the section that sits furthest from their usual. It is not worse writing, and it may be deliberate; it is simply the least representative thing they have written. Use it to see where the edge of the voice is. When writing as them, sound nearer the passages above than this one.\n\n--- ${dna.unlike.label} ---\n${dna.unlike.text}`,
+    );
+  }
+
   return parts.join("\n\n");
 }
 

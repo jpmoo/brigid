@@ -210,6 +210,20 @@ export function checkDraft(prose: string, dna: ProseDna | null): Check | null {
   return { words, rows, faults: faultsIn(prose, dna, mine.dialogueShare), tooShort: false };
 }
 
+/**
+ * How a re-ask is recognized after the fact.
+ *
+ * Both forms of the note open with this, and it is the only marker available:
+ * the transcript stores a role and a string, so a flag set in the browser is
+ * gone by the next reload. Matching the opening is enough to keep a machine's
+ * question from being displayed as though the writer had typed it.
+ */
+export const RETRY_OPENING = "The passage above is your previous attempt";
+
+export function isRetryNote(content: string): boolean {
+  return content.startsWith(RETRY_OPENING);
+}
+
 /** A figure as the writer reads it, share or rate. */
 export function show(v: number, row: { round: number; percent: boolean }): string {
   return row.percent ? `${Math.round(v * 100)}%` : v.toFixed(row.round);

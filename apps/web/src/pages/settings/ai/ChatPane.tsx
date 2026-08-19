@@ -5,6 +5,7 @@ import { ApiError, api } from "../../../api.js";
 import type { ProseDna } from "../../../api.js";
 import { Markdown } from "./Markdown.js";
 import { ManuscriptDraft } from "./ManuscriptDraft.js";
+import { isRetryNote } from "./voice-check.js";
 
 /**
  * Talking about the manuscript, once both analyses are in.
@@ -65,7 +66,8 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
     void api
       .getChatHistory(workId)
       .then(({ messages: held }) => {
-        if (alive) setMessages(held);
+        // The flag does not survive the transcript, so it is read back off the text.
+        if (alive) setMessages(held.map((m) => (m.role === "user" && isRetryNote(m.content) ? { ...m, retry: true } : m)));
       })
       .catch(() => {
         // An empty transcript is indistinguishable from a failed read here, and
@@ -269,7 +271,12 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
           <div className={`chat-turn ${message.role}`} key={i}>
             <span className="chat-who">{message.role === "user" ? "You" : "Brigid"}</span>
             <div className="chat-body">
-              {message.content ? (
+              {message.retry ? (
+                /* The note runs to a couple of hundred words of measurements and
+                   instructions. It is written for the model and reads as noise
+                   in a transcript of a conversation between two people. */
+                <span className="chat-reask">Asked again, with the measurements.</span>
+              ) : message.content ? (
                 // The writer's own words are shown as typed; the model's are
                 // rendered, because it writes Markdown whether or not anyone
                 // asked and asterisks are not emphasis.
