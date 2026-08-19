@@ -484,7 +484,19 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     requireUser(req);
     const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
     const body = z
-      .object({ name: z.string().min(1).max(200).optional(), focal: z.string().max(200).optional() })
+      .object({
+        name: z.string().min(1).max(200).optional(),
+        /**
+         * A few, rather than one or all.
+         *
+         * Settling the queue deletes the profiles of whoever changed, and a
+         * cast is an hour of model time — so re-profiling everybody to replace
+         * the two that moved is most of an hour spent rewriting answers that
+         * were already right.
+         */
+        names: z.array(z.string().min(1).max(200)).min(1).max(200).optional(),
+        focal: z.string().max(200).optional(),
+      })
       .parse(req.body ?? {});
 
     const work = await workOr404(workId);
@@ -506,16 +518,17 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     // Unstated, the focal perspective is whoever the book attends to most.
     const focal = body.focal ?? judgeable[0]!.name;
 
-    const wanted = body.name
-      ? judgeable.filter((r) => r.name.toLowerCase() === body.name!.toLowerCase())
-      : judgeable;
+    const asked = body.names ?? (body.name ? [body.name] : null);
+    const lowered = new Set((asked ?? []).map((n) => n.toLowerCase()));
+    const wanted = asked ? judgeable.filter((r) => lowered.has(r.name.toLowerCase())) : judgeable;
 
     if (wanted.length === 0) {
-      const listed = roster.find((r) => r.name.toLowerCase() === body.name!.toLowerCase());
+      const first = asked?.[0];
+      const listed = roster.find((r) => r.name.toLowerCase() === first?.toLowerCase());
       throw badRequest(
         listed?.reason
           ? `${listed.name} ${listed.reason}`
-          : `${body.name} isn't among the characters the reading found`,
+          : `${first} isn't among the characters the reading found`,
       );
     }
 

@@ -75,12 +75,12 @@ export function AiPane({ workId }: { workId: string }) {
     return () => clearInterval(id);
   }, [walking, reload]);
 
-  async function start(what: "structure" | "characters") {
+  async function start(what: "structure" | "characters", names?: string[]) {
     setBusy(what);
     setError(null);
     try {
       if (what === "structure") await api.runStructureAnalysis(workId);
-      else await api.runCharacterAnalysis(workId, {});
+      else await api.runCharacterAnalysis(workId, names?.length ? { names } : {});
       await reload();
     } catch (err) {
       setError(
@@ -162,7 +162,7 @@ export function AiPane({ workId }: { workId: string }) {
               reports={characters}
               run={run}
               busy={busy === "characters"}
-              onRun={() => void start("characters")}
+              onRun={(names) => void start("characters", names)}
               onCancel={() => void cancel()}
               onReconcile={() => setReconciling(true)}
               workId={workId}
@@ -661,7 +661,7 @@ function CharactersPane({
   reports: AnalysisBundle["reports"];
   run: CharacterRunProgress | null;
   busy: boolean;
-  onRun: () => void;
+  onRun: (names?: string[]) => void;
   onCancel: () => void;
   onReconcile: () => void;
   workId: string;
@@ -677,6 +677,22 @@ function CharactersPane({
   const [queueOpen, setQueueOpen] = useState(reports.length === 0);
   const judgeable = bundle.roster.filter((r) => r.judgeable);
   const thin = bundle.roster.filter((r) => !r.judgeable);
+
+  /**
+   * Who has no current profile, which is the only prompt to re-run there is.
+   *
+   * Settling the queue deletes the profile of anyone whose record moved —
+   * deliberately, because a chart built on actions that have since been
+   * reassigned is not a weaker answer but an answer to a different question.
+   * The consequence was that their tile simply vanished from the grid and
+   * nothing said why, or that anything should be done about it. A writer who
+   * settled forty lines saw two characters disappear.
+   *
+   * Whether they were never profiled or were profiled and then changed does not
+   * alter what to do, so both are listed together and the wording covers both.
+   */
+  const profiled = new Set(reports.map((r) => (r.subject ?? "").toLowerCase()));
+  const missing = judgeable.filter((r) => !profiled.has(r.name.toLowerCase()));
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showThin, setShowThin] = useState(false);
 
@@ -739,7 +755,7 @@ function CharactersPane({
           className="btn"
           type="button"
           disabled={busy || working || judgeable.length === 0}
-          onClick={onRun}
+          onClick={() => onRun()}
         >
           {profiles.length > 0 ? <RefreshCw size={14} /> : <Play size={14} />}
           {working
@@ -766,6 +782,30 @@ function CharactersPane({
       {!working && run?.lastError ? (
         <div className="alert warn">
           <AlertTriangle size={14} /> {run.lastError}. The rest of the cast was profiled.
+        </div>
+      ) : null}
+
+      {missing.length > 0 && !working && reports.length > 0 ? (
+        <div className="cast-missing">
+          <p>
+            <strong>
+              {missing.length === 1
+                ? "One character has no current profile"
+                : `${missing.length} characters have no current profile`}
+            </strong>{" "}
+            &mdash; {missing.map((r) => r.name).join(", ")}. Settling an action removes the
+            profile of whoever it belonged to, because a chart drawn from a record that
+            has since changed is an answer to a different question.
+          </p>
+          <button
+            className="btn"
+            type="button"
+            disabled={busy}
+            onClick={() => onRun(missing.map((r) => r.name))}
+          >
+            <Play size={14} />
+            Profile {missing.length === 1 ? missing[0]!.name : `these ${missing.length}`}
+          </button>
         </div>
       ) : null}
 

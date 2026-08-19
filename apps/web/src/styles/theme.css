@@ -6529,3 +6529,18 @@ ul.rec-thin strong {
   stroke-dasharray: 3 4;
   opacity: 0.85;
 }
+
+/* Who still needs profiling, and the one button that does exactly them. */
+.cast-missing {
+  margin: 12px 0 4px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent, var(--text-faint));
+  border-radius: var(--radius);
+  background: var(--surface-sunk, var(--paper));
+}
+.cast-missing p {
+  margin: 0 0 9px;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}

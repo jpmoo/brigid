@@ -618,7 +618,10 @@ export const api = {
   runStructureAnalysis: (workId: string) =>
     post<{ progress: StructureRunProgress | null }>(`/works/${workId}/analysis/structure`),
   /** Queues the run and returns at once; watch `characterRun` for progress. */
-  runCharacterAnalysis: (workId: string, body: { name?: string; focal?: string }) =>
+  runCharacterAnalysis: (
+    workId: string,
+    body: { name?: string; names?: string[]; focal?: string },
+  ) =>
     post<{ queued: string[]; progress: CharacterRunProgress | null }>(
       `/works/${workId}/analysis/character`,
       body,
