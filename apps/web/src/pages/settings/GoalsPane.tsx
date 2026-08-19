@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { Play, Square } from "lucide-react";
 import { ApiError, api } from "../../api.js";
-import type { Block, Work, WorkLevel } from "../../api.js";
+import type { Block, Template, Work, WorkLevel } from "../../api.js";
 import { useSavedFlash } from "../../useSavedFlash.js";
 import { readSession, startSession, writeSession } from "../../components/SessionGoal.js";
+import { GoalProgress } from "./GoalProgress.js";
 
 const wordFmt = new Intl.NumberFormat();
 
@@ -20,12 +21,14 @@ export function GoalsPane({
   work,
   blocks,
   levels,
+  templates,
   onSaved,
 }: {
   workId: string;
   work: Work | null;
   blocks: Block[];
   levels: WorkLevel[];
+  templates: Template[];
   onSaved: () => void;
 }) {
   const total = blocks.reduce((sum, b) => sum + b.wordCount, 0);
@@ -83,6 +86,9 @@ export function GoalsPane({
 
   return (
     <div className="tpl-detail">
+      <h4 className="tpl-section">How we're doing</h4>
+      <GoalProgress work={work} blocks={blocks} levels={levels} templates={templates} />
+
       <h4 className="tpl-section">This session</h4>
       <p className="tpl-note">
         A stretch of writing against the clock. The timer sits in the corner of the

@@ -204,6 +204,7 @@ export function SettingsPage() {
                     work={work}
                     blocks={blocks}
                     levels={levels}
+                    templates={templates}
                     onSaved={() => void reloadWork()}
                   />
                 ) : projectTab === "stats" ? (
