@@ -7,6 +7,7 @@ import {
   ChevronsUpDown,
   Eraser,
   RotateCcw,
+  Save,
   Trash2,
   UserMinus,
 } from "lucide-react";
@@ -85,28 +86,61 @@ export function ReconcilePane({
    * replace the value under the cursor and take the focus with it.
    */
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const [savingText, setSavingText] = useState<Record<string, boolean>>({});
+  const flashes = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  /**
+   * Going, then gone.
+   *
+   * A spinner that simply disappears answers the wrong question — it says
+   * something was in flight and then looks identical whether it landed or fell
+   * over. The mark after it is the one worth having, and it stays long enough
+   * to be noticed by someone who was looking at the words rather than at it.
+   */
+  const [textState, setTextState] = useState<Record<string, "saving" | "saved">>({});
+
+  const forget = useCallback((id: string) => {
+    setTextState((held) => {
+      const next = { ...held };
+      delete next[id];
+      return next;
+    });
+  }, []);
+
+  /** Write it now, and show the mark. */
+  const persist = useCallback(
+    (id: string, action: string) => {
+      clearTimeout(timers.current[id]);
+      setTextState((held) => ({ ...held, [id]: "saving" }));
+      void api
+        .commitCast(workId, [{ id, action, edit: true }])
+        .then(() => {
+          setTextState((held) => ({ ...held, [id]: "saved" }));
+          clearTimeout(flashes.current[id]);
+          flashes.current[id] = setTimeout(() => forget(id), 2500);
+        })
+        .catch(() => {
+          setError("could not save that wording");
+          forget(id);
+        });
+    },
+    [workId, forget],
+  );
 
   const saveText = useCallback(
     (id: string, action: string) => {
       clearTimeout(timers.current[id]);
-      timers.current[id] = setTimeout(() => {
-        setSavingText((held) => ({ ...held, [id]: true }));
-        void api
-          .commitCast(workId, [{ id, action, edit: true }])
-          .catch(() => setError("could not save that wording"))
-          .finally(() => setSavingText((held) => ({ ...held, [id]: false })));
-      }, 700);
+      timers.current[id] = setTimeout(() => persist(id, action), 700);
     },
-    [workId],
+    [persist],
   );
 
   // A correction typed and immediately navigated away from is still a
   // correction. Anything still waiting on its timer goes now.
   useEffect(() => {
     const pending = timers.current;
+    const flashing = flashes.current;
     return () => {
       for (const timer of Object.values(pending)) clearTimeout(timer);
+      for (const timer of Object.values(flashing)) clearTimeout(timer);
     };
   }, []);
   const [newName, setNewName] = useState("");
@@ -701,14 +735,9 @@ export function ReconcilePane({
                             // through a queue should not write forty rows.
                             clearTimeout(timers.current[row.id]);
                             if (e.target.value === row.action) return;
-                            void api
-                              .commitCast(workId, [
-                                { id: row.id, action: e.target.value, edit: true },
-                              ])
-                              .catch(() => setError("could not save that wording"));
+                            persist(row.id, e.target.value);
                           }}
                         />
-                        {savingText[row.id] ? <span className="rec-saving">Saving…</span> : null}
                         </>
                       ) : (
                         <span className="rec-empty">
@@ -769,6 +798,32 @@ export function ReconcilePane({
                             <option value={NEW}>New character…</option>
                           </select>
                         )}
+                        {/* Beside the menu rather than under the words, so it
+                            cannot shift the line being typed as it appears. */}
+                        <span
+                          className={`rec-mark ${textState[row.id] ?? "idle"}`}
+                          aria-live="polite"
+                          title={
+                            textState[row.id] === "saving"
+                              ? "Saving"
+                              : textState[row.id] === "saved"
+                                ? "Saved"
+                                : undefined
+                          }
+                        >
+                          {textState[row.id] === "saved" ? (
+                            <>
+                              <Check size={13} />
+                              <span className="sr-only">Saved</span>
+                            </>
+                          ) : textState[row.id] === "saving" ? (
+                            <>
+                              <Save size={13} />
+                              <span className="sr-only">Saving</span>
+                            </>
+                          ) : null}
+                        </span>
+
                         <button
                           type="button"
                           className="rec-drop"
