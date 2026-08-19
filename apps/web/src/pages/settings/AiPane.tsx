@@ -727,7 +727,7 @@ function CharactersPane({
           onClick={() => setQueueOpen(!queueOpen)}
         >
           <ChevronRight size={14} className="fit-caret" aria-hidden="true" />
-          <span className="thin-title">Reviews characters and their actions</span>
+          <span className="thin-title">Review characters and their actions</span>
           {pending > 0 ? <span className="rec-new">{pending} to review</span> : null}
         </button>
       </div>
