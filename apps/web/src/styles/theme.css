@@ -6519,3 +6519,13 @@ ul.rec-thin strong {
   white-space: nowrap;
   border: 0;
 }
+
+/* The halves of the wheel: with the arc, against it.
+   Fainter than the rings, because it is a reading aid and not a score — it
+   should be findable when looked for and invisible when the shape is. */
+.spider-divide {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  opacity: 0.85;
+}

@@ -73,4 +73,28 @@ check("Tuan's profile is measurably less jagged", () => {
   assert.ok(after < before, `expected less than ${before}, got ${after}`);
 });
 
+/**
+ * The divider drawn across the chart claims the two halves mean something. If a
+ * later reorder breaks that, the line stops being a reading aid and becomes a
+ * false claim about the character — so the claim is asserted here rather than
+ * left to whoever next edits the list.
+ */
+check("the halves are the two kinds of function", () => {
+  const carries = ["hero", "ally", "mentor", "sacrifice", "beloved"];
+  const resists = ["shadow", "rival", "trickster", "shapeshifter", "guardian"];
+  assert.deepEqual(AXIS_KEYS.slice(0, 5), carries, "first half carries the arc");
+  assert.deepEqual(AXIS_KEYS.slice(5), resists, "second half resists it");
+});
+
+check("the divider is a diameter, drawn between spokes", () => {
+  const count = AXIS_KEYS.length;
+  const angle = (i: number) => ((Math.PI * 2 * i) / count - Math.PI / 2);
+  const a = angle(count - 0.5);
+  const b = angle(count / 2 - 0.5);
+  // Half a turn apart, so it is one straight line through the centre.
+  assert.ok(Math.abs(Math.abs(a - b) - Math.PI) < 1e-9, "the two ends must be opposite");
+  // And exactly between the spokes it separates, not on top of either.
+  assert.ok(Math.abs(a - (angle(count - 1) + angle(count)) / 2) < 1e-9);
+});
+
 console.log(`\n${passed} passed`);

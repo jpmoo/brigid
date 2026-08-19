@@ -63,6 +63,36 @@ export function SpiderGraph({
           />
         ))}
 
+        {/**
+          * The one line worth drawing through the middle.
+          *
+          * Five diameters would only be the spokes again, in a heavier pen. But
+          * the axes are now arranged so that each faces its opposite, and that
+          * arrangement puts every function which carries or supports the arc on
+          * one side — Hero, Ally, Mentor, Sacrifice, Beloved — and every
+          * function which resists or complicates it on the other. That boundary
+          * was not designed; it fell out of the pairing, which is a decent sign
+          * it is real.
+          *
+          * So a character who leans is visible as a lean rather than as a shape
+          * to be read spoke by spoke. Drawn between the spokes rather than
+          * along one, because it separates them rather than belonging to any.
+          */}
+        {count % 2 === 0 ? (
+          <line
+            className="spider-divide"
+            x1={point(count - 0.5, count, MAX + 0.5)[0]}
+            y1={point(count - 0.5, count, MAX + 0.5)[1]}
+            x2={point(count / 2 - 0.5, count, MAX + 0.5)[0]}
+            y2={point(count / 2 - 0.5, count, MAX + 0.5)[1]}
+          >
+            <title>
+              Functions that carry the arc on one side, functions that resist it on the
+              other.
+            </title>
+          </line>
+        ) : null}
+
         {axes.map((axis, i) => {
           const [x, y] = point(i, count, MAX);
           const [lx, ly] = point(i, count, MAX + 1.15);
