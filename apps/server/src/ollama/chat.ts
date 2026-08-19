@@ -406,11 +406,41 @@ export function buildBrief(context: ChatContext, numCtx: number | null): string 
 
   if (context.profiles.length > 0) {
     const heads = ["=== CHARACTERS (your notes: each action summarizes a scene, it is not a line from it) ==="];
-    for (const profile of context.profiles) {
+    /**
+     * Heaviest first, so a brief that runs out of room loses the walk-ons.
+     *
+     * These arrived in whatever order the database returned them, and the loop
+     * below stops when the budget does — so on a large cast the characters that
+     * fell out were arbitrary, and could as easily have been the protagonist as
+     * a messenger. Summed scores are a rough weight and a good enough one: a
+     * lead carries several axes, a walk-on carries one.
+     */
+    const byWeight = [...context.profiles].sort(
+      (a, b) =>
+        b.axes.reduce((sum, x) => sum + x.score, 0) - a.axes.reduce((sum, x) => sum + x.score, 0),
+    );
+
+    let left = 0;
+    for (const profile of byWeight) {
       const line = brief(profile);
-      if (spent + line.length > budget) break;
+      if (spent + line.length > budget) {
+        left += 1;
+        continue;
+      }
       heads.push(line);
       spent += line.length;
+    }
+    /**
+     * And say so when some did not fit.
+     *
+     * Silently short, this reads as the whole cast — so a model asked who else
+     * is in the book answers from what it was given and sounds certain about
+     * it. Better to say the list is partial and let it say so too.
+     */
+    if (left > 0) {
+      heads.push(
+        `(${left} further ${left === 1 ? "character has" : "characters have"} a profile that did not fit in this brief. If a question turns on ${left === 1 ? "someone" : "someone"} not listed here, say so rather than answering from what is above.)`,
+      );
     }
     parts.push(heads.join("\n\n"));
   }
