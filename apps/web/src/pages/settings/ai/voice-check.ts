@@ -211,6 +211,93 @@ export function checkDraft(prose: string, dna: ProseDna | null): Check | null {
 }
 
 /**
+ * Prose the model wrote for the manuscript, when it forgot to say so.
+ *
+ * It is told to fence manuscript prose and it often does not, and everything
+ * that matters hangs off that fence: the page it is set on, the measurements,
+ * and the button to ask again. A draft that arrives unfenced gets none of them
+ * and reads as though nobody checked it, which is exactly when checking it
+ * matters.
+ *
+ * Found by elimination rather than recognition. There is no reliable mark of
+ * narrative prose, but the sentences a model writes *about* a passage are
+ * formulaic — they open by announcing what was done, they address the writer as
+ * "you", they name the machinery ("sentence length", "the draft", "your
+ * notes"), or they are set as lists and headings. Paragraphs that do none of
+ * that, in a long enough run, are the passage.
+ *
+ * Conservative on purpose. Missing a draft leaves prose rendered as chat, which
+ * is what happens today; claiming a paragraph of commentary is a manuscript
+ * page puts a frame and a set of measurements around a sentence about the
+ * weather. The first is a shame and the second looks broken.
+ */
+const META =
+  /^(here('s| is)|i('ve| have| had)?\s|this (is|passage|revision|draft|version)|note that|one point|the (main |only )?(change|difference|passage|draft|revision|prose)|as (requested|asked)|revised|rewritten|i kept|i broke|i corrected|i adjusted|i also|below is|okay|ok[,.]|sure[,.])/i;
+
+const MACHINERY =
+  /\b(sentence length|words per sentence|paragraph length|standard deviation|your (voice|notes|prose|style|sections|manuscript|baseline)|the (draft|passage|rewrite|revision|dictation)|measurements?|stylistic|syntax|cadence|comma frequency)\b/i;
+
+function commentary(para: string): boolean {
+  const trimmed = para.trim();
+  if (!trimmed) return true;
+  // Anything set as markdown is the model talking, not the manuscript.
+  if (/^(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(trimmed)) return true;
+  if (META.test(trimmed)) return true;
+  if (MACHINERY.test(trimmed)) return true;
+  // Addressing the writer. Counted rather than spotted, because dialogue says
+  // "you" too — "What say you now, brother Tuan?" is not commentary.
+  const words = trimmed.split(/\s+/).length;
+  const second = (trimmed.match(/\b(you|your|yours)\b/gi) ?? []).length;
+  return words >= 12 && second / words > 0.03;
+}
+
+/**
+ * The longest stretch of the message that is manuscript rather than talk.
+ *
+ * Returned with what surrounds it so the commentary is still shown as
+ * commentary — a model that explains its changes is doing something useful and
+ * should not have that swallowed into the page.
+ */
+export function findProse(
+  text: string,
+): { before: string; prose: string; after: string } | null {
+  const paras = text.split(/\n\s*\n/);
+  let best: { from: number; to: number; words: number } | null = null;
+  let from = -1;
+  let words = 0;
+
+  const close = (to: number) => {
+    if (from >= 0 && (!best || words > best.words)) best = { from, to, words };
+    from = -1;
+    words = 0;
+  };
+
+  for (let i = 0; i < paras.length; i += 1) {
+    if (commentary(paras[i]!)) {
+      close(i);
+      continue;
+    }
+    if (from < 0) from = i;
+    words += paras[i]!.trim().split(/\s+/).filter(Boolean).length;
+  }
+  close(paras.length);
+
+  const run = best as { from: number; to: number; words: number } | null;
+  if (!run) return null;
+
+  const prose = paras.slice(run.from, run.to).join("\n\n").trim();
+  // Long enough to be a passage, or short but plainly staged as one.
+  const staged = run.to - run.from >= 3 || /["“]/.test(prose);
+  if (run.words < 50 || (run.words < 120 && !staged)) return null;
+
+  return {
+    before: paras.slice(0, run.from).join("\n\n").trim(),
+    prose,
+    after: paras.slice(run.to).join("\n\n").trim(),
+  };
+}
+
+/**
  * How a re-ask is recognized after the fact.
  *
  * Both forms of the note open with this, and it is the only marker available:

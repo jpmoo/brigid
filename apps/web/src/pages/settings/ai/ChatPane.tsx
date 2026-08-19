@@ -283,13 +283,19 @@ export function ChatPane({ workId, ready }: { workId: string; ready: boolean }) 
                 message.role === "assistant" ? (
                   <Markdown
                     text={message.content}
+                    // Only the last turn can be the one still arriving; every
+                    // earlier draft is finished and should be measured whether
+                    // or not something else is streaming now.
+                    settled={!(streaming && i === messages.length - 1)}
                     onManuscript={(prose, key) => (
                       <ManuscriptDraft
                         key={key}
                         prose={prose}
                         dna={dna}
-                        streaming={streaming}
-                        onRetry={streaming ? undefined : (note) => void send(note, prose)}
+                        streaming={streaming && i === messages.length - 1}
+                        onRetry={
+                          streaming ? undefined : (note) => void send(note, prose)
+                        }
                       />
                     )}
                   />

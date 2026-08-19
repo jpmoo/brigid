@@ -100,8 +100,8 @@ export function ManuscriptDraft({
           </ul>
           {check.tooShort ? (
             <p className="ms-draft-stub">
-              {check.words} words — too short to measure, and far shorter than a
-              passage. It has answered with the ending rather than the scene.
+              {check.words} words — too short for the measurements to mean
+              anything. Rates over a passage this short are noise.
             </p>
           ) : null}
 
@@ -117,7 +117,7 @@ export function ManuscriptDraft({
             <div className="ms-draft-miss">
               <p>
                 {check.tooShort
-                  ? "Asking again is the right move here — this is not a draft to judge."
+                  ? "If this was meant to be a whole passage, asking again is the right move."
                   : missed.length === 0
                   ? "Everything above sits inside your range."
                   : `${missed.length === 1 ? "One measure sits" : `${missed.length} measures sit`} outside the range your own sections cover${

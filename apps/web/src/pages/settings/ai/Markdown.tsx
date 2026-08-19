@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { findProse } from "./voice-check.js";
 
 /**
  * Just enough Markdown for a model's answer.
@@ -100,6 +101,7 @@ function tableAt(lines: string[], from: number): { node: ReactNode; next: number
 export function Markdown({
   text,
   onManuscript,
+  settled = true,
 }: {
   text: string;
   /**
@@ -111,7 +113,38 @@ export function Markdown({
    * writer's own fingerprint, which is what the caller does with it.
    */
   onManuscript?: (prose: string, key: string) => ReactNode;
+  /** False while tokens are still arriving. */
+  settled?: boolean;
 }) {
+  /**
+   * Prose the model wrote for the manuscript without saying so.
+   *
+   * It is told to fence manuscript prose and often does not, and the fence is
+   * what earns a passage its page, its measurements and its button to ask
+   * again. An unfenced draft got none of them — rendered as chat, unchecked,
+   * with nothing to do about it but retype the request.
+   *
+   * Only once the reply has finished. Deciding this from a half-arrived message
+   * would frame the first paragraph as a manuscript and then unframe it when
+   * the sentence explaining it turned up, and a block that appears and
+   * disappears under a reader is worse than one that appears late.
+   *
+   * Skipped entirely when the model did fence it — that path already works, and
+   * guessing alongside it could only disagree with it.
+   */
+  if (onManuscript && settled && !/^\s*```manuscript/m.test(text)) {
+    const found = findProse(text);
+    if (found) {
+      return (
+        <>
+          {found.before ? <Markdown text={found.before} /> : null}
+          {onManuscript(found.prose, "u0")}
+          {found.after ? <Markdown text={found.after} /> : null}
+        </>
+      );
+    }
+  }
+
   const lines = text.split("\n");
   const out: ReactNode[] = [];
   let at = 0;
