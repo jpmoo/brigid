@@ -541,6 +541,33 @@ export const chatMessages = pgTable(
  * Coordinates are relative to the parent region, so moving a chapter carries
  * its scenes without touching a row for each one.
  */
+/**
+ * Words added and removed, by the minute.
+ *
+ * The only record of how the manuscript got to its current length. Nothing else
+ * keeps it: updated_at is overwritten on every save, so it says when a section
+ * was last touched and nothing about what happened to it.
+ *
+ * Kept as two numbers rather than one. Their difference is what a word count
+ * already tells you; the pair is what says whether a morning was spent writing
+ * or cutting, and those are not the same morning.
+ */
+export const writingActivity = pgTable(
+  "writing_activity",
+  {
+    workId: uuid("work_id")
+      .notNull()
+      .references(() => works.id, { onDelete: "cascade" }),
+    /** Truncated to the minute. Days are rolled up from these on read. */
+    minute: timestamp("minute", { withTimezone: true }).notNull(),
+    added: integer("added").notNull().default(0),
+    deleted: integer("deleted").notNull().default(0),
+  },
+  (table) => ({
+    pk: primaryKey({ columns: [table.workId, table.minute] }),
+  }),
+);
+
 export const canvasNodes = pgTable(
   "canvas_nodes",
   {

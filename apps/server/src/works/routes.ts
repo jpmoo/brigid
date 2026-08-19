@@ -67,6 +67,67 @@ async function lastEditedByWork(): Promise<Map<string, string>> {
 export async function worksRoutes(app: FastifyInstance): Promise<void> {
   app.addHook("preHandler", authenticate);
 
+  /**
+   * When the writing happened, added and deleted kept apart.
+   *
+   * Two grains, because the two kinds of goal ask different questions. A
+   * sitting is an hour long and wants minutes; a target for the book is months
+   * long and wants days. Rolled up in the database rather than in the browser:
+   * a year of work is tens of thousands of minutes and about three hundred
+   * days, and there is no reason to send the first to draw the second.
+   *
+   * Days are cut in the viewer's own zone. A day is a thing a person had, and
+   * someone who works past midnight should see the night they remember rather
+   * than whatever UTC made of it.
+   */
+  app.get("/works/:workId/activity", async (req) => {
+    requireUser(req);
+    const { workId } = z.object({ workId: z.string().uuid() }).parse(req.params);
+    const { by, days, zone } = z
+      .object({
+        by: z.enum(["minute", "day"]).default("day"),
+        days: z.coerce.number().int().min(1).max(3650).default(90),
+        zone: z.string().max(64).default("UTC"),
+      })
+      .parse(req.query);
+
+    const [work] = await db.select({ id: works.id }).from(works).where(eq(works.id, workId)).limit(1);
+    if (!work) throw notFound("work");
+
+    // An IANA name from the browser. Tried rather than trusted; anything
+    // Postgres will not accept falls back to UTC instead of failing the page.
+    let safeZone = zone;
+    try {
+      await db.execute(sql`SELECT now() AT TIME ZONE ${safeZone}`);
+    } catch {
+      safeZone = "UTC";
+    }
+
+    const bucket =
+      by === "minute" ? sql`minute` : sql`date_trunc('day', minute AT TIME ZONE ${safeZone})`;
+
+    const buckets = await db.execute<{ at: string; added: number; deleted: number }>(sql`
+      SELECT ${bucket} AS at,
+             sum(added)::int AS added,
+             sum(deleted)::int AS deleted
+      FROM writing_activity
+      WHERE work_id = ${workId}
+        AND minute >= now() - make_interval(days => ${days})
+      GROUP BY 1
+      ORDER BY 1`);
+
+    /**
+     * Where the record begins, so the graph can say so.
+     *
+     * An empty stretch before this is not a quiet week — it is a time nobody
+     * was counting, and a chart that draws those the same way is lying.
+     */
+    const started = await db.execute<{ at: string | null }>(sql`
+      SELECT min(minute) AS at FROM writing_activity WHERE work_id = ${workId}`);
+
+    return { by, zone: safeZone, since: started[0]?.at ?? null, buckets };
+  });
+
   app.get("/works", async (req) => {
     requireUser(req);
     const { archived } = z

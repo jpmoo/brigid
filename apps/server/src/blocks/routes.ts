@@ -7,6 +7,7 @@ import { blocks, templates, workLevels, works } from "@brigid/db";
 import { authenticate, requireUser } from "../auth/middleware.js";
 import { db } from "../db.js";
 import { extractText } from "./text.js";
+import { recordChange } from "./activity.js";
 import { badRequest, conflict, notFound } from "../lib/errors.js";
 
 /**
@@ -331,8 +332,24 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
       patch.wordCount = countWords(text);
     }
 
+    /**
+     * The previous text, so the change can be weighed before it is lost.
+     *
+     * Read only when the content is actually being replaced — the same endpoint
+     * carries renames and format changes, and neither is writing.
+     */
+    const [was] =
+      body.content !== undefined
+        ? await db
+            .select({ workId: blocks.workId, text: blocks.contentText })
+            .from(blocks)
+            .where(eq(blocks.id, id))
+            .limit(1)
+        : [];
+
     const [updated] = await db.update(blocks).set(patch).where(eq(blocks.id, id)).returning();
     if (!updated) throw notFound("block");
+    if (was) await recordChange(was.workId, was.text, updated.contentText);
     return { block: updated };
   });
 
@@ -603,9 +620,14 @@ export async function blocksRoutes(app: FastifyInstance): Promise<void> {
   app.delete("/blocks/:id", async (req) => {
     requireUser(req);
     const { id } = z.object({ id: z.string().uuid() }).parse(req.params);
-    // parent_id cascades in the schema, so the subtree goes with it.
-    const [deleted] = await db.delete(blocks).where(eq(blocks.id, id)).returning({ id: blocks.id });
+    // parent_id cascades in the schema, so the subtree goes with it — and the
+    // prose in it leaves the manuscript, which is cutting and counts as such.
+    const [deleted] = await db
+      .delete(blocks)
+      .where(eq(blocks.id, id))
+      .returning({ id: blocks.id, workId: blocks.workId, text: blocks.contentText });
     if (!deleted) throw notFound("block");
+    if (deleted.text.trim()) await recordChange(deleted.workId, deleted.text, "");
     return { ok: true };
   });
 

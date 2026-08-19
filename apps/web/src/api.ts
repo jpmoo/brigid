@@ -403,6 +403,18 @@ export const api = {
    * far every section sits from it — all of it worked out server-side on the
    * way out, because none of it is stored.
    */
+  /**
+   * When the writing happened. Minutes for a sitting, days for everything else.
+   *
+   * The zone goes up because a day is a thing a person had — someone writing
+   * past midnight should see the night they remember, not what UTC made of it.
+   */
+  workActivity: (workId: string, by: "minute" | "day", days: number) =>
+    request<WritingActivity>(
+      `/works/${workId}/activity?by=${by}&days=${days}` +
+        `&zone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC")}`,
+    ),
+
   proseDna: (workId: string) => request<ProseDna>(`/works/${workId}/style`),
 
   setStyleSections: (
@@ -733,6 +745,14 @@ export interface ProseSection {
   against: string | null;
   byStream: { overall: number; narration: number; dialogue: number };
   moved: { key: string; label: string; z: number; value: number; mean: number }[];
+}
+
+export interface WritingActivity {
+  by: "minute" | "day";
+  zone: string;
+  /** When counting began. Nothing before this was recorded, quiet or not. */
+  since: string | null;
+  buckets: { at: string; added: number; deleted: number }[];
 }
 
 export interface ProseDna {

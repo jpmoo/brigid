@@ -5,6 +5,7 @@ import type { Block, Template, Work, WorkLevel } from "../../api.js";
 import { useSavedFlash } from "../../useSavedFlash.js";
 import { readSession, startSession, writeSession } from "../../components/SessionGoal.js";
 import { GoalProgress } from "./GoalProgress.js";
+import { WritingGraph } from "./WritingGraph.js";
 
 const wordFmt = new Intl.NumberFormat();
 
@@ -88,6 +89,10 @@ export function GoalsPane({
     <div className="tpl-detail">
       <h4 className="tpl-section">How we're doing</h4>
       <GoalProgress work={work} blocks={blocks} levels={levels} templates={templates} />
+
+      {/* Minutes while a sitting is running, days otherwise — the graph follows
+          whichever goal is actually being worked against. */}
+      <WritingGraph workId={workId} by={running ? "minute" : "day"} days={running ? 1 : 90} />
 
       <h4 className="tpl-section">This session</h4>
       <p className="tpl-note">
