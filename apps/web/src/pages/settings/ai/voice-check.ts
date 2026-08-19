@@ -115,12 +115,39 @@ export function paragraphsOf(prose: string): string[] {
  * Kept apart from the rows for that reason. A fault is a fact, and it should
  * not have to compete for attention with a number that might be fine.
  */
-function faultsIn(prose: string, dna: ProseDna): string[] {
+function faultsIn(prose: string, dna: ProseDna, spoken: number): string[] {
   const found: string[] = [];
 
-  // The writer speaks on the page but this passage never opens a quotation.
-  if (dna.dialogueShare > 0.02 && !/["“]/.test(prose)) {
-    found.push("No dialogue is in quotation marks, and your prose uses them.");
+  /**
+   * How much of this is in quotation marks, against how much of the writer is.
+   *
+   * Asking whether the passage contains a quotation mark at all was useless: a
+   * draft with every line of dialogue bare — What are we doing? I asked — ended
+   * on a quoted "Attack." and passed. One mark in six hundred words satisfied
+   * the test that was supposed to catch exactly this.
+   *
+   * Measuring the share catches it, because a scene of unquoted dialogue reads
+   * as almost entirely narration however many stray marks are in it.
+   */
+  if (dna.dialogueShare > 0.04 && spoken < dna.dialogueShare / 3) {
+    found.push(
+      `Almost none of this is in quotation marks — ${Math.round(spoken * 100)}% against your ${Math.round(dna.dialogueShare * 100)}%. The dialogue has been written as narration.`,
+    );
+  }
+
+  /**
+   * A speech tag with nothing quoted in front of it.
+   *
+   * "What are we doing? I asked" and "We have to survive. She said" are the
+   * shape this failure takes, and it is unambiguous: a tag reports speech, so
+   * speech must precede it, in marks.
+   */
+  const bare = prose
+    .match(/\S+["”]?[?!.]["”]?\s+(?:I|he|she|they|we|it)\s+(?:said|asked|replied|answered|shouted|whispered)\b/gi)
+    // A closing mark anywhere in the match means the speech was quoted.
+    ?.find((m) => !/["”]/.test(m));
+  if (bare) {
+    found.push(`A speech tag follows unquoted words — "${bare.trim()}".`);
   }
 
   // A speech tag after a full stop inside the quote: "Wait." She said.
@@ -160,7 +187,7 @@ export function checkDraft(prose: string, dna: ProseDna | null): Check | null {
   if (!dna) return null;
   const words = prose.trim().split(/\s+/).filter(Boolean).length;
   if (words < MEASURABLE_WORDS) {
-    return { words, rows: [], faults: faultsIn(prose, dna), tooShort: true };
+    return { words, rows: [], faults: faultsIn(prose, dna, measure(prose).dialogueShare), tooShort: true };
   }
 
   const mine = measure(paragraphsOf(prose).join("\n\n"));
@@ -180,7 +207,7 @@ export function checkDraft(prose: string, dna: ProseDna | null): Check | null {
     return row;
   }).filter((r): r is Row => r !== null);
 
-  return { words, rows, faults: faultsIn(prose, dna), tooShort: false };
+  return { words, rows, faults: faultsIn(prose, dna, mine.dialogueShare), tooShort: false };
 }
 
 /** A figure as the writer reads it, share or rate. */
@@ -232,6 +259,8 @@ export function retryNote(rows: Row[], faults: string[] = [], tooShort = false, 
   return `The passage above is your previous attempt, and the figures below describe it. Revise it, working from my notes and my request further up. Write the whole scene — every event in my notes, in order, start to finish. Not a summary, not the closing lines.
 
 ${wrong}Keep the events, the order and the point of view. Dialogue goes in double quotation marks with a comma before the speech tag, a new speaker starts a new paragraph, and paragraphs are separated by a blank line.
+
+My notes are raw dictation. They contain transcription errors, repeated phrases and half-finished clauses. Repair them — do not copy them through. Repunctuating my notes is not rewriting them.
 
 Measured against my own sections, the last attempt missed: ${missed.map(fmt).join("; ")}.${keep}${varies}
 
