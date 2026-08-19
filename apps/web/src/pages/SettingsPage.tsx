@@ -51,12 +51,37 @@ export function SettingsPage() {
    * tab for the things that belong to it rather than to the app. Opened from
    * the library there is no such thing, so the tab isn't offered.
    */
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const workId = params.get("work");
 
   // Arriving from a manuscript, the manuscript is what you came about.
-  const [tab, setTab] = useState<TabKey>(workId ? "project" : "templates");
-  const [projectTab, setProjectTab] = useState<ProjectTabKey>("stats");
+  /**
+   * Which tab, in the address rather than in memory.
+   *
+   * Reloading a settings page dropped the writer back on the first tab, which
+   * on a page this deep means finding their way in again every time — and the
+   * browser's own back button walked out of the page instead of back through
+   * it. A tab is a place, and places belong in the URL: it survives a reload,
+   * it can be sent to someone, and going back does what going back looks like.
+   *
+   * `replace` on every change, so flipping between tabs does not bury the page
+   * the writer arrived from under twenty history entries.
+   */
+  const tab = (params.get("tab") as TabKey | null) ?? (workId ? "project" : "templates");
+  const projectTab = (params.get("sub") as ProjectTabKey | null) ?? "stats";
+
+  const setTab = (next: TabKey) => {
+    const held = new URLSearchParams(params);
+    held.set("tab", next);
+    held.delete("sub");
+    setParams(held, { replace: true });
+  };
+  const setProjectTab = (next: ProjectTabKey) => {
+    const held = new URLSearchParams(params);
+    held.set("tab", "project");
+    held.set("sub", next);
+    setParams(held, { replace: true });
+  };
   const [templates, setTemplates] = useState<Template[]>([]);
   const [work, setWork] = useState<Work | null>(null);
   const [blocks, setBlocks] = useState<Block[]>([]);

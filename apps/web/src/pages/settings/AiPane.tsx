@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronRight,
@@ -42,7 +43,20 @@ type Tab = "structure" | "characters" | "chat" | "raw";
 
 export function AiPane({ workId }: { workId: string }) {
   const [bundle, setBundle] = useState<AnalysisBundle | null>(null);
-  const [tab, setTab] = useState<Tab>("structure");
+  /**
+   * The subtab too, for the same reason and by the same route.
+   *
+   * This is the one the writer is likeliest to be sent back out of: chat is
+   * where the long work happens, and a reload landing on the story shape means
+   * finding the way back every time.
+   */
+  const [params, setParams] = useSearchParams();
+  const tab = (params.get("ai") as Tab | null) ?? "structure";
+  const setTab = (next: Tab) => {
+    const held = new URLSearchParams(params);
+    held.set("ai", next);
+    setParams(held, { replace: true });
+  };
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 

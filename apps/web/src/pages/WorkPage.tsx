@@ -26,6 +26,7 @@ import {
 } from "@brigid/shared";
 import type { BlockOptions, CanvasNode, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
+import { readLastPlace, writeLastPlace } from "../lastPlace.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { CanvasView } from "../components/CanvasView.js";
@@ -1050,14 +1051,60 @@ export function WorkPage() {
     panel.scrollTop += delta;
   }, [selectedId, showPanel]);
 
-  // Something is always current. The observer only speaks when a block crosses
-  // its band, which never happens on first load — so the first block takes the
-  // shade until scrolling says otherwise.
+  /**
+   * Back where the writer left off, rather than at the top.
+   *
+   * Kept as the section that was current, not as a scroll offset. An offset is
+   * a claim about a document that has since been edited — write two paragraphs
+   * into chapter three and every number below it means somewhere else — while a
+   * section is the same section whatever happens above it. The outline already
+   * tracks which one is current as the page scrolls, so this is a matter of
+   * writing that down and reading it back.
+   *
+   * Per manuscript, and in the browser rather than the database: it is a fact
+   * about this machine's window, not about the book. Two machines open on the
+   * same manuscript should each stay where they were.
+   *
+   * Once, on the first load with sections in hand. Restoring on every change to
+   * `entries` would drag the page back the moment a section was added.
+   */
+  const restored = useRef(false);
   useEffect(() => {
-    if (selectedId) return;
+    if (selectedId || entries.length === 0) return;
+
+    if (!restored.current) {
+      restored.current = true;
+      const held = readLastPlace(id);
+      // Gone since — deleted, or cut into another section. Start at the top
+      // rather than at nothing.
+      if (held && entries.some((e) => e.block.id === held)) {
+        setSelectedId(held);
+        // Straight there. Sliding the whole manuscript past on every load is a
+        // journey nobody asked to watch.
+        window.requestAnimationFrame(() => {
+          const target =
+            blockRefs.current.get(breakRefKey(held)) ?? blockRefs.current.get(held);
+          scrollingTo.current = held;
+          target?.scrollIntoView({ block: "start" });
+          window.setTimeout(() => {
+            if (scrollingTo.current === held) scrollingTo.current = null;
+          }, 400);
+        });
+        return;
+      }
+    }
+
+    // Something is always current. The observer only speaks when a block
+    // crosses its band, which never happens on first load — so the first block
+    // takes the shade until scrolling says otherwise.
     const first = entries[0]?.block.id;
     if (first) setSelectedId(first);
-  }, [entries, selectedId]);
+  }, [entries, selectedId, id]);
+
+  // Written on the way past, so a reload lands where the reading did.
+  useEffect(() => {
+    if (selectedId && restored.current) writeLastPlace(id, selectedId);
+  }, [id, selectedId]);
 
   // Only blocks with children can be collapsed, so they're the whole question:
   // if every one is already shut, the control opens them, and otherwise it
