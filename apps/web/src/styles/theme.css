@@ -6544,3 +6544,24 @@ ul.rec-thin strong {
   font-size: 0.88rem;
   line-height: 1.5;
 }
+
+/* A button that removes something.
+   The class was already being set on confirm dialogs and had no rule behind it,
+   so "Delete" and "Save" have been arriving in the same clothes. */
+.btn.danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 35%, transparent);
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+}
+.btn.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 55%, transparent);
+}
+.btn.ghost.danger {
+  background: none;
+  border-color: transparent;
+}
+.btn.ghost.danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: transparent;
+}

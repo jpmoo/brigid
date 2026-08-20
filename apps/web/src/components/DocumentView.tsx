@@ -766,10 +766,21 @@ export function DocumentView({
                 return;
               }
               e.preventDefault();
-              // The payload is unreadable until the drop, so the effect is
-              // "move" throughout: a marker being carried is the common case,
-              // and a new one arriving from the strip reads fine as either.
-              e.dataTransfer.dropEffect = "move";
+              /**
+               * Whatever the drag said it allowed.
+               *
+               * This announced "move" for everything. A marker already in the
+               * manuscript is being moved and that was right, but the strip
+               * offers a new one as a copy — and a dropEffect the drag does not
+               * allow is not a mismatch the browser negotiates, it is a refusal:
+               * the drop never happens and the marker flies home. Creating a
+               * bookmark by dragging had not worked since.
+               *
+               * `effectAllowed` is readable here, unlike the payload, so the
+               * answer is asked for rather than assumed.
+               */
+              e.dataTransfer.dropEffect =
+                e.dataTransfer.effectAllowed === "copy" ? "copy" : "move";
               setDropTarget(item.block.id);
             }}
             onDragLeave={() => setDropTarget((c) => (c === item.block.id ? null : c))}

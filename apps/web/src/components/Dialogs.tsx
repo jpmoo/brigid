@@ -35,6 +35,16 @@ interface PromptOptions {
   message?: ReactNode;
   fields: PromptField[];
   confirmLabel?: string;
+  /**
+   * A third way out, for a dialog that edits something deletable.
+   *
+   * Handed back as a callback rather than as a third resolution, because the
+   * promise resolves to the field values and a caller reading `answer[0]` off a
+   * string instead of an array would be wrong in a way the types would not
+   * catch. It closes the dialog and runs; whether anything is confirmed after
+   * that is the caller's business, and here it is.
+   */
+  destructive?: { label: string; run: () => void };
 }
 
 interface Dialogs {
@@ -150,6 +160,21 @@ export function DialogProvider({ children }: { children: ReactNode }) {
               : null}
 
             <div className="modal-actions">
+              {/* Left, away from the pair on the right: it is not the other
+                  half of Cancel and should not sit where Save is expected. */}
+              {pending.kind === "prompt" && pending.options.destructive ? (
+                <button
+                  className="btn ghost danger"
+                  type="button"
+                  onClick={() => {
+                    const act = pending.options.destructive!.run;
+                    cancel();
+                    act();
+                  }}
+                >
+                  {pending.options.destructive.label}
+                </button>
+              ) : null}
               <div className="spacer" />
               <button className="btn secondary" type="button" onClick={cancel}>
                 {pending.kind === "confirm" ? (pending.options.cancelLabel ?? "Cancel") : "Cancel"}
