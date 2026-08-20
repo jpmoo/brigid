@@ -1300,6 +1300,24 @@ export function ProseEditor({
     const target = event.target as HTMLElement;
 
     /**
+     * A double-click is a request to select the word, not to open its menu.
+     *
+     * The browser selects a word on the second click of a pair, and every
+     * misspelling here is a word — so the one place a writer most expects
+     * double-click-to-select was the one place it did not work. The menu opened
+     * on the first click, landed over the word, and the second click hit the
+     * menu instead of the text.
+     *
+     * `detail` counts the clicks in the run, so the second and any after it
+     * step aside: the menu closes, nothing is prevented, and the selection the
+     * browser was about to make happens.
+     */
+    if (event.detail >= 2) {
+      setMenu(null);
+      return;
+    }
+
+    /**
      * Not a press on the manuscript at all.
      *
      * The menu is drawn through a portal, but a React portal's events bubble
