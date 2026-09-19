@@ -24,6 +24,7 @@ import {
   deriveDocument,
   foldForSearch,
   proseFromParagraphs,
+  occurrencesIn,
   replaceInDoc,
   smartenText,
   subtreeWordCounts,
@@ -102,6 +103,18 @@ function stepForScale(scale: number): number {
 interface AddRequest {
   relativeTo: string | null;
   placement: Placement;
+}
+
+/** A section's prose as a document, whether or not it was ever edited here. */
+function docOf(block: Block): ProseDoc {
+  return (
+    asProseDoc(block.content) ??
+    proseFromParagraphs(block.contentText ? block.contentText.split(/\n{2,}/) : [""])
+  );
+}
+
+function sameDoc(a: ProseDoc, b: ProseDoc): boolean {
+  return JSON.stringify(asProseDoc(a)) === JSON.stringify(asProseDoc(b));
 }
 
 export function WorkPage() {
@@ -189,9 +202,35 @@ export function WorkPage() {
     note: string;
     entries: { blockId: string; before: ProseDoc; after: ProseDoc; replaced: number }[];
   } | null>(null);
-  // Set when the index moved because the page scrolled, so the effect that
-  // scrolls to the active hit doesn't chase it back.
-  const fromScroll = useRef(false);
+  /**
+   * A request to bring the current result on screen, counted.
+   *
+   * The page used to scroll whenever the current result changed — and the
+   * current result is recomputed on every save, because the list of matches is
+   * drawn from the text. So editing the very word Find had landed on, until it
+   * no longer matched, made the next occurrence current, and the page leapt to
+   * it mid-sentence. Scrolling now happens when the writer asks: a step, a new
+   * query, a replacement. The list changing underneath is not asking.
+   *
+   * This also retires the one-shot flag that stopped the effect chasing the
+   * index when it followed a hand scroll. Nothing chases it now, and the flag
+   * could be left set by a scroll that did not change the index, silently
+   * swallowing the next real step.
+   */
+  const [seek, setSeek] = useState(0);
+  /** The current result as last rendered, for effects and saves that run later. */
+  const activeRef = useRef<SearchMatch | null>(null);
+  /**
+   * The result the writer was on has been edited away.
+   *
+   * Its place in the list is taken by the one after it, so a plain "next" from
+   * here would skip that one. Set when a save removes an occurrence from the
+   * section holding the current result; the next forward step lands where it
+   * stands instead of one further on.
+   */
+  const consumed = useRef(false);
+  /** Whether a section smartens its punctuation, readable from a save queued earlier. */
+  const smartRef = useRef<(blockId: string) => boolean>(() => false);
   /**
    * Until when the scroll tracker should keep quiet.
    *
@@ -201,8 +240,7 @@ export function WorkPage() {
    * scrolled toward the next hit, the tracker caught the page mid-flight and
    * put the index back, and the next press started the same journey again.
    *
-   * `fromScroll` cannot cover this: it is a one-shot flag for the opposite
-   * direction, and one flag cannot suppress a stream of events. A deadline can.
+   * A one-shot flag cannot suppress a stream of events. A deadline can.
    */
   const scrollingUntil = useRef(0);
   // The tracker below runs off a listener bound once, so it reads the current
@@ -368,8 +406,23 @@ export function WorkPage() {
   );
 
   const saveProse = useCallback(
-    (blockId: string, doc: ProseDoc) => enqueue(blockId, () => persistProse(blockId, doc)),
-    [enqueue, persistProse],
+    (blockId: string, doc: ProseDoc) =>
+      enqueue(blockId, () => {
+        // Only the editor saves through here — replacements manage the index
+        // themselves — so an occurrence lost from the section holding the
+        // current result was edited away by the writer.
+        const q = queryRef.current.trim();
+        const active = activeRef.current;
+        const was = currentBlock(blockId);
+        if (q && active?.blockId === blockId && was) {
+          const smart = smartRef.current(blockId);
+          if (occurrencesIn(doc, q, smart).length < occurrencesIn(docOf(was), q, smart).length) {
+            consumed.current = true;
+          }
+        }
+        return persistProse(blockId, doc);
+      }),
+    [enqueue, persistProse, currentBlock],
   );
 
   useEffect(() => {
@@ -787,6 +840,7 @@ export function WorkPage() {
     },
     [items],
   );
+  smartRef.current = smartPunctuationFor;
 
   // The outline shows each break attached above the block it precedes, so the
   // structure reads the same in both panes.
@@ -897,6 +951,7 @@ export function WorkPage() {
 
   const matches = mode === "canvas" ? canvasMatches : allMatches;
   const activeMatch = matches[matchIndex] ?? null;
+  activeRef.current = activeMatch;
 
   /** Which cards hold the term, for lighting them where they sit. */
   const canvasHits = useMemo(
@@ -933,6 +988,8 @@ export function WorkPage() {
 
   useEffect(() => {
     setMatchIndex(0);
+    consumed.current = false;
+    setSeek((n) => n + 1);
   }, [query]);
 
   // Replacing the last occurrence leaves the index pointing past the end.
@@ -1052,7 +1109,8 @@ export function WorkPage() {
         const mark = marks[i];
         if (!mark) continue;
         if (mark.getBoundingClientRect().top >= rect.top) {
-          fromScroll.current = true;
+          // Picked up from where the writer is reading, so nothing was skipped.
+          consumed.current = false;
           setMatchIndex((current) => (current === i ? current : i));
           break;
         }
@@ -1220,15 +1278,13 @@ export function WorkPage() {
    */
   const stepMatch = (delta: 1 | -1) => {
     if (matches.length === 0) return;
-    setMatchIndex((matchIndex + delta + matches.length) % matches.length);
+    // The one after the edited-away result already holds this index.
+    const stay = delta === 1 && consumed.current;
+    consumed.current = false;
+    if (!stay) setMatchIndex((matchIndex + delta + matches.length) % matches.length);
+    setSeek((n) => n + 1);
   };
 
-  /** A section's prose as a document, whether or not it was ever edited here. */
-  const docOf = (block: Block): ProseDoc =>
-    asProseDoc(block.content) ??
-    proseFromParagraphs(block.contentText ? block.contentText.split(/\n{2,}/) : [""]);
-  const sameDoc = (a: ProseDoc, b: ProseDoc) =>
-    JSON.stringify(asProseDoc(a)) === JSON.stringify(asProseDoc(b));
 
   /**
    * Close the editor and let it put its last words on the queue.
@@ -1276,6 +1332,8 @@ export function WorkPage() {
       if (r && foldForSearch(r).includes(foldForSearch(q.trim()))) {
         setMatchIndex((i) => i + 1);
       }
+      consumed.current = false;
+      setSeek((n) => n + 1);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "could not replace that");
     } finally {
@@ -1360,13 +1418,10 @@ export function WorkPage() {
    * page motionless while the active mark moved somewhere off screen.
    */
   useEffect(() => {
-    if (!activeMatch) return;
-    if (fromScroll.current) {
-      fromScroll.current = false;
-      return;
-    }
+    if (!activeRef.current) return;
     const id = window.requestAnimationFrame(() => {
       const pane = paneRef.current;
+      const activeMatch = activeRef.current;
       if (!pane || !activeMatch) return;
 
       /**
@@ -1404,7 +1459,7 @@ export function WorkPage() {
       }
     });
     return () => window.cancelAnimationFrame(id);
-  }, [activeMatch]);
+  }, [seek]);
 
   async function moveBlock(blockId: string, parentId: string | null, afterId: string | null) {
     try {
