@@ -1,5 +1,14 @@
-import { useEffect, useRef } from "react";
-import { ChevronDown, ChevronUp, Search, SpellCheck, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import {
+  ChevronDown,
+  ChevronUp,
+  Replace,
+  ReplaceAll,
+  Search,
+  SpellCheck,
+  Undo2,
+  X,
+} from "lucide-react";
 import { foldForSearch } from "@brigid/shared";
 
 export interface SearchMatch {
@@ -51,6 +60,13 @@ export function SearchBar({
   onStep,
   stepping = true,
   onNextMisspelling,
+  replacement,
+  onReplacement,
+  onReplaceOne,
+  onReplaceAll,
+  replaceBusy = false,
+  replaceNote = null,
+  onUndoReplace = null,
 }: {
   open: boolean;
   query: string;
@@ -74,8 +90,34 @@ export function SearchBar({
    * checking is switched off, in which case the control isn't offered.
    */
   onNextMisspelling?: (() => void) | undefined;
+  /** What to put in place of the query. Held by the page, shared by both bars. */
+  replacement?: string;
+  onReplacement?: (value: string) => void;
+  /**
+   * Replace the occurrence currently picked out, then move to the next.
+   *
+   * Absent where there is no current occurrence to replace — the canvas, which
+   * does not step.
+   */
+  onReplaceOne?: (() => void) | undefined;
+  onReplaceAll?: (() => void) | undefined;
+  /** A replacement is being written. Everything that would start another waits. */
+  replaceBusy?: boolean;
+  /** What the last replacement did, and the way to take it back. */
+  replaceNote?: string | null;
+  onUndoReplace?: (() => void) | null;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  /**
+   * Whether the replace row is showing.
+   *
+   * Shut by default. Find is used far more than replace, and a second field
+   * under it every time is a second field to tab past on the way to reading.
+   */
+  const [replacing, setReplacing] = useState(false);
+  const replaceInput = useRef<HTMLInputElement>(null);
+  const canReplace = Boolean(onReplaceAll);
+  const nothing = matches.length === 0 || query.trim().length === 0;
 
   useEffect(() => {
     if (open) input.current?.focus();
@@ -95,6 +137,7 @@ export function SearchBar({
 
       {open ? (
         <div className="search-panel" role="search">
+          <div className="search-row">
           <input
             ref={input}
             type="text"
@@ -162,9 +205,94 @@ export function SearchBar({
               </button>
             </>
           ) : null}
-          <button className="btn ghost" type="button" title="Close" onClick={onClose}>
+          {canReplace ? (
+            <button
+              className={`btn ghost${replacing ? " on" : ""}`}
+              type="button"
+              title="Replace"
+              aria-expanded={replacing}
+              onClick={() => {
+                setReplacing(!replacing);
+                if (!replacing) window.requestAnimationFrame(() => replaceInput.current?.focus());
+              }}
+            >
+              <Replace size={15} />
+            </button>
+          ) : null}
+          <button
+            className="btn ghost"
+            type="button"
+            title="Close"
+            onClick={() => {
+              setReplacing(false);
+              onClose();
+            }}
+          >
             <X size={15} />
           </button>
+          </div>
+
+          {canReplace && replacing ? (
+            <div className="search-row">
+              <input
+                ref={replaceInput}
+                type="text"
+                value={replacement ?? ""}
+                placeholder="Replace with"
+                onChange={(e) => onReplacement?.(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") onClose();
+                  // Enter does the careful thing, one at a time. Replacing
+                  // every occurrence in a manuscript should never be what a
+                  // stray keypress does.
+                  if (e.key === "Enter" && onReplaceOne && !nothing && !replaceBusy) {
+                    e.preventDefault();
+                    onReplaceOne();
+                  }
+                }}
+              />
+              {onReplaceOne ? (
+                <button
+                  className="btn ghost"
+                  type="button"
+                  title="Replace this one, then go to the next (Enter)"
+                  disabled={nothing || replaceBusy}
+                  onClick={onReplaceOne}
+                >
+                  <Replace size={15} />
+                  <span className="search-label">Replace</span>
+                </button>
+              ) : null}
+              <button
+                className="btn ghost"
+                type="button"
+                title="Replace every occurrence"
+                disabled={nothing || replaceBusy}
+                onClick={onReplaceAll}
+              >
+                <ReplaceAll size={15} />
+                <span className="search-label">All</span>
+              </button>
+            </div>
+          ) : null}
+
+          {replaceNote ? (
+            <div className="search-row search-note">
+              <span>{replaceNote}</span>
+              {onUndoReplace ? (
+                <button
+                  className="btn ghost"
+                  type="button"
+                  title="Put back what was replaced"
+                  disabled={replaceBusy}
+                  onClick={onUndoReplace}
+                >
+                  <Undo2 size={14} />
+                  <span className="search-label">Undo</span>
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>

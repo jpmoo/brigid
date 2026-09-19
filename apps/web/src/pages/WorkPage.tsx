@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
+import { flushSync } from "react-dom";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -17,10 +18,13 @@ import {
   X
 } from "lucide-react";
 import {
+  asProseDoc,
   buildOutline,
   currentBlockAt,
   deriveDocument,
   foldForSearch,
+  proseFromParagraphs,
+  replaceInDoc,
   smartenText,
   subtreeWordCounts,
 } from "@brigid/shared";
@@ -170,6 +174,21 @@ export function WorkPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+  const [replacement, setReplacement] = useState("");
+  const [replaceBusy, setReplaceBusy] = useState(false);
+  /**
+   * The last replacement, kept so it can be taken back.
+   *
+   * One level, and only this: a replace-all touches a dozen sections at once
+   * with no editor open in any of them, so the editor's own undo cannot reach
+   * it. `after` is kept as well as `before` because undo must not put old text
+   * back over writing done since — it checks the section still says what the
+   * replacement left, and leaves it alone if not.
+   */
+  const [lastReplace, setLastReplace] = useState<{
+    note: string;
+    entries: { blockId: string; before: ProseDoc; after: ProseDoc; replaced: number }[];
+  } | null>(null);
   // Set when the index moved because the page scrolled, so the effect that
   // scrolls to the active hit doesn't chase it back.
   const fromScroll = useRef(false);
@@ -276,14 +295,60 @@ export function WorkPage() {
     }
   }, [id]);
 
-  const saveProse = useCallback(
+  /**
+   * Saves to one section, one after another.
+   *
+   * They were fire-and-forget, which was fine while the editor was the only
+   * thing that ever wrote prose. Replace is a second writer. Closing the editor
+   * flushes its last few seconds of typing as it goes, and a replacement made
+   * in the same section a moment later would race that flush: whichever reached
+   * the server second would win, and either the writer's last sentence or the
+   * replacement would quietly vanish.
+   *
+   * So each section's saves queue behind each other, and anything that needs
+   * the section as it now stands waits its turn and reads it then.
+   */
+  const saveQueue = useRef(new Map<string, Promise<unknown>>());
+  const enqueue = useCallback(<T,>(blockId: string, job: () => Promise<T>): Promise<T> => {
+    const prev = saveQueue.current.get(blockId) ?? Promise.resolve();
+    const next = prev.catch(() => undefined).then(job);
+    saveQueue.current.set(blockId, next.catch(() => undefined));
+    return next;
+  }, []);
+
+  /**
+   * The server's latest answer for each section, as soon as it arrives.
+   *
+   * State is updated too, but on React's schedule — a job queued behind a save
+   * can run before the render that would have shown it the result, and would
+   * then replace text in the version from before that save.
+   */
+  const latest = useRef(new Map<string, Block>());
+  const blocksRef = useRef(blocks);
+  blocksRef.current = blocks;
+  // Only a bridge until state catches up. Left longer, it would shadow anything
+  // newer that arrives some other way — a reload, a restructure.
+  useEffect(() => {
+    for (const [blockId, held] of latest.current) {
+      const shown = blocks.find((b) => b.id === blockId);
+      // The same object that was handed to setBlocks: state now has it.
+      if (!shown || shown === held) latest.current.delete(blockId);
+    }
+  }, [blocks]);
+  const currentBlock = useCallback(
+    (blockId: string) => latest.current.get(blockId) ?? blocksRef.current.find((b) => b.id === blockId),
+    [],
+  );
+
+  const persistProse = useCallback(
     async (blockId: string, doc: ProseDoc) => {
       // What this block was worth before the save, so the change can be counted
       // as movement rather than only as a new total.
-      const before = blocks.find((b) => b.id === blockId)?.wordCount ?? 0;
+      const before = currentBlock(blockId)?.wordCount ?? 0;
       const { block } = await api.updateBlock(blockId, {
         content: doc as unknown as Record<string, unknown>,
       });
+      latest.current.set(blockId, block);
 
       const delta = block.wordCount - before;
       if (delta !== 0) {
@@ -297,8 +362,14 @@ export function WorkPage() {
       // The word count is derived on the server, so the block that comes back
       // is the authority — including for the outline's totals.
       setBlocks((current) => current.map((b) => (b.id === blockId ? block : b)));
+      return block;
     },
-    [blocks],
+    [currentBlock],
+  );
+
+  const saveProse = useCallback(
+    (blockId: string, doc: ProseDoc) => enqueue(blockId, () => persistProse(blockId, doc)),
+    [enqueue, persistProse],
   );
 
   useEffect(() => {
@@ -864,6 +935,12 @@ export function WorkPage() {
     setMatchIndex(0);
   }, [query]);
 
+  // Replacing the last occurrence leaves the index pointing past the end.
+  // Wrapping to the first is what stepping forward from there would do.
+  useEffect(() => {
+    if (matches.length > 0 && matchIndex >= matches.length) setMatchIndex(0);
+  }, [matches.length, matchIndex]);
+
   const registerRef = useCallback((key: string, el: HTMLDivElement | null) => {
     if (el) blockRefs.current.set(key, el);
     else blockRefs.current.delete(key);
@@ -1144,6 +1221,137 @@ export function WorkPage() {
   const stepMatch = (delta: 1 | -1) => {
     if (matches.length === 0) return;
     setMatchIndex((matchIndex + delta + matches.length) % matches.length);
+  };
+
+  /** A section's prose as a document, whether or not it was ever edited here. */
+  const docOf = (block: Block): ProseDoc =>
+    asProseDoc(block.content) ??
+    proseFromParagraphs(block.contentText ? block.contentText.split(/\n{2,}/) : [""]);
+  const sameDoc = (a: ProseDoc, b: ProseDoc) =>
+    JSON.stringify(asProseDoc(a)) === JSON.stringify(asProseDoc(b));
+
+  /**
+   * Close the editor and let it put its last words on the queue.
+   *
+   * The editor draws its section once, when it opens, so the caret is never
+   * pulled out from under the writer — which means a replacement made beneath
+   * an open editor would not appear in it, and the editor's next autosave
+   * would write the old text straight back over the replacement. So it is
+   * closed first. Synchronously, so its unmount runs now: that is where its
+   * pending save is flushed, and the flush has to be queued ahead of the
+   * replacement rather than behind it.
+   */
+  const settleEditor = async () => {
+    if (!editingProse) return;
+    flushSync(() => setEditingProse(null));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+  };
+
+  /** Replace in one section, in its turn on that section's queue. */
+  const replaceIn = (blockId: string, which: number | "all", q: string, r: string) =>
+    enqueue(blockId, async () => {
+      const block = currentBlock(blockId);
+      if (!block) return null;
+      const before = docOf(block);
+      const { doc: after, replaced } = replaceInDoc(before, q, r, smartPunctuationFor(blockId), which);
+      if (replaced === 0) return null;
+      await persistProse(blockId, after);
+      return { blockId, before, after, replaced };
+    });
+
+  const replaceOne = async () => {
+    if (!activeMatch || replaceBusy) return;
+    const target = activeMatch;
+    const q = query;
+    const r = replacement;
+    setReplaceBusy(true);
+    try {
+      await settleEditor();
+      const done = await replaceIn(target.blockId, target.indexInBlock, q, r);
+      if (!done) return;
+      setLastReplace({ note: "Replaced 1.", entries: [done] });
+      // A replacement that contains the query still matches where it went in,
+      // and Replace would land on it again forever. Step past it instead. When
+      // it does not, the next occurrence has already moved up into this index.
+      if (r && foldForSearch(r).includes(foldForSearch(q.trim()))) {
+        setMatchIndex((i) => i + 1);
+      }
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not replace that");
+    } finally {
+      setReplaceBusy(false);
+    }
+  };
+
+  const replaceAll = async () => {
+    if (replaceBusy) return;
+    const q = query.trim();
+    const r = replacement;
+    const sections = [...new Set(allMatches.map((m) => m.blockId))];
+    const total = allMatches.length;
+    if (sections.length === 0) return;
+
+    const where = `${sections.length} ${sections.length === 1 ? "section" : "sections"}`;
+    const ok = await dialogs.confirm({
+      title: `Replace ${total} ${total === 1 ? "occurrence" : "occurrences"}?`,
+      message: r
+        ? `Every “${q}” in ${where} becomes “${r}”. You can undo it straight afterwards.`
+        : `Every “${q}” in ${where} is deleted. You can undo it straight afterwards.`,
+      confirmLabel: "Replace all",
+    });
+    if (!ok) return;
+
+    setReplaceBusy(true);
+    try {
+      await settleEditor();
+      const results = await Promise.all(sections.map((id) => replaceIn(id, "all", q, r)));
+      const entries = results.filter((e): e is NonNullable<typeof e> => e !== null);
+      const count = entries.reduce((n, e) => n + e.replaced, 0);
+      setLastReplace({
+        note: `Replaced ${count} in ${entries.length} ${entries.length === 1 ? "section" : "sections"}.`,
+        entries,
+      });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not replace everything");
+    } finally {
+      setReplaceBusy(false);
+    }
+  };
+
+  const undoReplace = async () => {
+    if (!lastReplace || replaceBusy) return;
+    const { entries } = lastReplace;
+    setReplaceBusy(true);
+    try {
+      await settleEditor();
+      let changedSince = 0;
+      await Promise.all(
+        entries.map((entry) =>
+          enqueue(entry.blockId, async () => {
+            const block = currentBlock(entry.blockId);
+            // Written in since: putting the old text back would take that
+            // writing with it. Left alone, and said so.
+            if (!block || !sameDoc(docOf(block), entry.after)) {
+              changedSince += 1;
+              return;
+            }
+            await persistProse(entry.blockId, entry.before);
+          }),
+        ),
+      );
+      setLastReplace(
+        changedSince > 0
+          ? {
+              note: `Undone, except in ${changedSince} ${changedSince === 1 ? "section" : "sections"} written in since.`,
+              entries: [],
+            }
+          : null,
+      );
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not undo that");
+    } finally {
+      setReplaceBusy(false);
+    }
   };
 
   /**
@@ -1522,8 +1730,16 @@ export function WorkPage() {
           onClose={() => {
             setSearchOpen(false);
             setQuery("");
+            setLastReplace(null);
           }}
           onQuery={setQuery}
+          replacement={replacement}
+          onReplacement={setReplacement}
+          onReplaceOne={mode === "canvas" ? undefined : () => void replaceOne()}
+          onReplaceAll={() => void replaceAll()}
+          replaceBusy={replaceBusy}
+          replaceNote={lastReplace?.note ?? null}
+          onUndoReplace={lastReplace && lastReplace.entries.length > 0 ? () => void undoReplace() : null}
           onStep={stepMatch}
           stepping={mode !== "canvas"}
           onNextMisspelling={
@@ -1782,8 +1998,16 @@ export function WorkPage() {
                 onClose={() => {
                   setSearchOpen(false);
                   setQuery("");
+                  setLastReplace(null);
                 }}
                 onQuery={setQuery}
+                replacement={replacement}
+                onReplacement={setReplacement}
+                onReplaceOne={mode === "canvas" ? undefined : () => void replaceOne()}
+                onReplaceAll={() => void replaceAll()}
+                replaceBusy={replaceBusy}
+                replaceNote={lastReplace?.note ?? null}
+                onUndoReplace={lastReplace && lastReplace.entries.length > 0 ? () => void undoReplace() : null}
                 onStep={stepMatch}
                 stepping={mode !== "canvas"}
             /* Offered whenever checking is switched on, not only once the
