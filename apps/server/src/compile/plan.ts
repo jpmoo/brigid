@@ -1,5 +1,6 @@
 import {
   asProseDoc,
+  baseDoc,
   deriveDocument,
   hasMark,
   proseParagraphs,
@@ -271,7 +272,10 @@ function nodesFor(
 
       case "content": {
         if (!prose) break;
-        const doc = asProseDoc(prose.content);
+        // Compiled as it stands: a suggestion nobody has accepted is not part of
+        // the manuscript, and a submission is the last place one should turn up.
+        const parsed = asProseDoc(prose.content);
+        const doc = parsed ? baseDoc(parsed) : null;
         const paragraphs = doc
           ? proseParagraphs(doc)
           : prose.contentText

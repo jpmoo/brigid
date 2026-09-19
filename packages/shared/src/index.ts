@@ -11,6 +11,7 @@ export * from "./punctuation.js";
 export * from "./prose.js";
 export * from "./spelling.js";
 export * from "./replace.js";
+export * from "./suggestions.js";
 export * from "./stats.js";
 export * from "./digest.js";
 // `sentences` is stats' own, re-exported by style for its own use; taking it

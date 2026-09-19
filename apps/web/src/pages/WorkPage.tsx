@@ -1309,7 +1309,8 @@ export function WorkPage() {
       const block = currentBlock(blockId);
       if (!block) return null;
       const before = docOf(block);
-      const { doc: after, replaced } = replaceInDoc(before, q, r, smartPunctuationFor(blockId), which);
+      const { doc: after, replaced, held } = replaceInDoc(before, q, r, smartPunctuationFor(blockId), which);
+      if (held) return { blockId, held: true as const };
       if (replaced === 0) return null;
       await persistProse(blockId, after);
       return { blockId, before, after, replaced };
@@ -1325,6 +1326,10 @@ export function WorkPage() {
       await settleEditor();
       const done = await replaceIn(target.blockId, target.indexInBlock, q, r);
       if (!done) return;
+      if ("held" in done) {
+        setLastReplace({ note: "This section has suggestions waiting. Settle those first.", entries: [] });
+        return;
+      }
       setLastReplace({ note: "Replaced 1.", entries: [done] });
       // A replacement that contains the query still matches where it went in,
       // and Replace would land on it again forever. Step past it instead. When
@@ -1363,10 +1368,16 @@ export function WorkPage() {
     try {
       await settleEditor();
       const results = await Promise.all(sections.map((id) => replaceIn(id, "all", q, r)));
-      const entries = results.filter((e): e is NonNullable<typeof e> => e !== null);
+      const entries = results.filter(
+        (e): e is Exclude<typeof e, null | { held: true }> => e !== null && !("held" in e),
+      );
+      const held = results.filter((e) => e !== null && "held" in e).length;
       const count = entries.reduce((n, e) => n + e.replaced, 0);
+      const plural = (n: number) => `${n} ${n === 1 ? "section" : "sections"}`;
       setLastReplace({
-        note: `Replaced ${count} in ${entries.length} ${entries.length === 1 ? "section" : "sections"}.`,
+        note:
+          `Replaced ${count} in ${plural(entries.length)}.` +
+          (held ? ` ${plural(held)} with suggestions waiting ${held === 1 ? "was" : "were"} left alone.` : ""),
         entries,
       });
     } catch (err) {

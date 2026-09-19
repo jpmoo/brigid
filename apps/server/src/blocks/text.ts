@@ -26,8 +26,22 @@
  */
 export function extractText(doc: unknown): string {
   if (!doc || typeof doc !== "object") return "";
-  const node = doc as { type?: string; text?: string; content?: unknown[] };
-  if (typeof node.text === "string") return node.text;
+  const node = doc as { type?: string; text?: string; content?: unknown[]; marks?: unknown[] };
+  if (typeof node.text === "string") {
+    /**
+     * A suggested insertion is not in the manuscript yet.
+     *
+     * Everything downstream reads this field — the word count, the goals, the
+     * writing history, the style measurements, the model's reading of the book
+     * — so leaving proposed words out here is what keeps a change nobody has
+     * accepted from moving any of them. A suggested deletion stays: until it is
+     * accepted, those words are still on the page.
+     */
+    const inserted = (node.marks ?? []).some(
+      (mark) => !!mark && typeof mark === "object" && (mark as { type?: unknown }).type === "ins",
+    );
+    return inserted ? "" : node.text;
+  }
   if (!Array.isArray(node.content)) return "";
 
   // Told apart by what the children are rather than by a list of node types:

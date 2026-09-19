@@ -14,8 +14,26 @@
 
 export type ProseMarkType = "strong" | "em" | "underline";
 
+/**
+ * A change proposed rather than made: text suggested in, or suggested out.
+ *
+ * Marks on the runs, like emphasis, because that is what they are — a property
+ * of particular words — and because it keeps a suggestion inside the one
+ * document the editor, the reading view and the export already share, rather
+ * than in a second store that could fall out of step with the prose.
+ */
+export type SuggestionMarkType = "ins" | "del";
+
 export interface ProseMark {
-  type: ProseMarkType;
+  type: ProseMarkType | SuggestionMarkType;
+  /**
+   * Which suggestion a run belongs to. An insertion and a deletion made in one
+   * act — typing over a selection — share an id, and that pair is what a
+   * replacement is.
+   */
+  id?: string;
+  /** When it was suggested, as an ISO timestamp. */
+  at?: string;
 }
 
 export interface ProseText {
@@ -65,8 +83,18 @@ export function asProseDoc(value: unknown): ProseDoc | null {
         const marks: ProseMark[] = [];
         if (Array.isArray(run.marks)) {
           for (const mark of run.marks) {
-            const t = (mark as { type?: unknown } | null)?.type;
+            const held = mark as { type?: unknown; id?: unknown; at?: unknown } | null;
+            const t = held?.type;
             if (t === "strong" || t === "em" || t === "underline") marks.push({ type: t });
+            // A suggestion without an id cannot be accepted or rejected, so it
+            // is not kept as one — the words stay, as ordinary text.
+            else if ((t === "ins" || t === "del") && typeof held?.id === "string") {
+              marks.push({
+                type: t,
+                id: held.id,
+                ...(typeof held.at === "string" ? { at: held.at } : {}),
+              });
+            }
           }
         }
         runs.push(marks.length ? { type: "text", text: run.text, marks } : { type: "text", text: run.text });
@@ -104,15 +132,25 @@ export function proseToText(doc: ProseDoc): string {
     .join("\n\n");
 }
 
-export function hasMark(run: ProseText, type: ProseMarkType): boolean {
+export function hasMark(run: ProseText, type: ProseMarkType | SuggestionMarkType): boolean {
   return (run.marks ?? []).some((m) => m.type === type);
 }
 
 /** Every mark a run can carry, as a comparable key. */
 const MARK_TYPES: ProseMarkType[] = ["strong", "em", "underline"];
 
-const markKey = (run: ProseText): string =>
-  MARK_TYPES.map((type) => (hasMark(run, type) ? "1" : "0")).join("");
+/**
+ * Two runs fuse only if they would read the same and belong to the same
+ * suggestion. Emphasis alone was the key; with suggestions in it, two separate
+ * insertions sitting side by side would have fused into one and been accepted
+ * or rejected together.
+ */
+const markKey = (run: ProseText): string => {
+  const shape = MARK_TYPES.map((type) => (hasMark(run, type) ? "1" : "0")).join("");
+  const ins = run.marks?.find((m) => m.type === "ins")?.id ?? "";
+  const del = run.marks?.find((m) => m.type === "del")?.id ?? "";
+  return `${shape}|${ins}|${del}`;
+};
 
 /** Drops empty runs and fuses neighbors that carry the same marks. */
 export function normalizeProse(doc: ProseDoc): ProseDoc {

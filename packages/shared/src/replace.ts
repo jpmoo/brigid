@@ -1,6 +1,7 @@
 import { normalizeProse } from "./prose.js";
 import type { ProseDoc, ProseMark, ProseText } from "./prose.js";
 import { foldForSearch } from "./spelling.js";
+import { baseDoc, hasSuggestions } from "./suggestions.js";
 
 /**
  * Find and replace, on the document rather than on its text.
@@ -118,7 +119,10 @@ export function occurrencesIn(doc: ProseDoc, query: string, smartens: boolean): 
   if (!needle) return [];
   const out: Occurrence[] = [];
 
-  doc.content.forEach((paragraph, index) => {
+  // Find searches the text as it stands, so pending suggestions are counted as
+  // they are counted everywhere else: insertions not yet there, deletions
+  // still there.
+  baseDoc(doc).content.forEach((paragraph, index) => {
     const text = paragraphText(paragraph.content);
     const mapped = foldForReplace(text, smartens);
     let from = 0;
@@ -189,7 +193,16 @@ export function replaceInDoc(
   replacement: string,
   smartens: boolean,
   which: number | "all",
-): { doc: ProseDoc; replaced: number } {
+): { doc: ProseDoc; replaced: number; held?: boolean } {
+  /**
+   * Not in a section with suggestions waiting.
+   *
+   * A match there can straddle a suggested deletion, run into a suggested
+   * insertion, or sit inside text already proposed for removal, and there is
+   * no replacement that is right in all three. So the section is left alone
+   * and reported, and its suggestions can be settled first.
+   */
+  if (hasSuggestions(doc)) return { doc, replaced: 0, held: true };
   const found = occurrencesIn(doc, query, smartens);
   const chosen = which === "all" ? found : found[which] ? [found[which]!] : [];
   if (chosen.length === 0) return { doc, replaced: 0 };
