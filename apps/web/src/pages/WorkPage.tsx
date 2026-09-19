@@ -200,6 +200,9 @@ export function WorkPage() {
   /** Proofreading: edits become suggestions. Remembered per manuscript. */
   const [proofreading, setProofreadingState] = useState(() => readProofreading(id));
   const setProofreading = (on: boolean) => {
+    // The column beside the page appears or goes with the mode, and the page
+    // reflows around it. Note where the reading is first.
+    rememberPositionRef.current();
     setProofreadingState(on);
     writeProofreading(id, on);
   };
@@ -464,6 +467,8 @@ export function WorkPage() {
    * invisible while a chapter of drift is the whole problem.
    */
   const holdPosition = useRef<{ blockId: string; fromTop: number } | null>(null);
+  /** Held in a ref: the mode switch is wired up above the callback it calls. */
+  const rememberPositionRef = useRef<() => void>(() => {});
 
   const rememberPosition = useCallback(() => {
     const pane = paneRef.current;
@@ -481,15 +486,19 @@ export function WorkPage() {
   }, []);
 
   /**
-   * Restored after the browser has laid the new size out, not after React has
-   * rendered it — a layout effect would measure the old boxes.
+   * Put the reading back where it was, after the browser has laid the new size
+   * out — not after React has rendered it, since a layout effect would measure
+   * the old boxes.
+   *
+   * Shared by everything that reflows the page under the reader: a change of
+   * text size, and the margin column for suggestions coming or going.
    */
-  useEffect(() => {
+  const restoreHeldPosition = useCallback(() => {
     const held = holdPosition.current;
-    if (!held) return;
+    if (!held) return undefined;
     holdPosition.current = null;
 
-    const id = window.requestAnimationFrame(() => {
+    return window.requestAnimationFrame(() => {
       const pane = paneRef.current;
       const el = pane?.querySelector<HTMLElement>(`[data-block-id="${held.blockId}"]`);
       if (!pane || !el) return;
@@ -500,8 +509,16 @@ export function WorkPage() {
       pane.scrollBy({ top: moved });
       window.scrollBy({ top: moved });
     });
-    return () => window.cancelAnimationFrame(id);
-  }, [scaleIndex]);
+  }, []);
+
+  useEffect(() => {
+    const id = restoreHeldPosition();
+    return () => {
+      if (id !== undefined) window.cancelAnimationFrame(id);
+    };
+  }, [scaleIndex, restoreHeldPosition]);
+
+  rememberPositionRef.current = rememberPosition;
 
   const scaleLoaded = useRef(false);
 
@@ -1453,6 +1470,25 @@ export function WorkPage() {
     [enqueue, currentBlock, persistProse],
   );
 
+  /**
+   * Whether the page is making room for the margin column.
+   *
+   * Reserved for the whole of Proofreading, not only while a card is showing.
+   * Opening it costs a reflow — the page narrows and every line after the caret
+   * moves — and doing that the moment the first suggestion was saved threw the
+   * writer somewhere above or below the words they had just changed. It is open
+   * before they type now, and closes only when the mode is left or the last
+   * suggestion is settled, both of which note the reading position first.
+   */
+  const gutter = proofreading || placedSuggestions.length > 0;
+
+  useEffect(() => {
+    const id = restoreHeldPosition();
+    return () => {
+      if (id !== undefined) window.cancelAnimationFrame(id);
+    };
+  }, [gutter, restoreHeldPosition]);
+
   /** The suggestion being reviewed, shared by the cards and the review bar. */
   const [currentSuggestion, setCurrentSuggestion] = useState<string | null>(null);
 
@@ -1499,6 +1535,7 @@ export function WorkPage() {
     const here = placedSuggestions[index];
     if (!here) return;
     const next = placedSuggestions[index + 1] ?? placedSuggestions[index - 1] ?? null;
+    if (!next && !proofreading) rememberPosition();
     try {
       await settle(here.blockId, here.suggestion.id, accept);
       if (next) goToSuggestion(next.suggestion.id);
@@ -1521,6 +1558,7 @@ export function WorkPage() {
       danger: !accept,
     });
     if (!ok) return;
+    if (!proofreading) rememberPosition();
     try {
       await Promise.all(sections.map((blockId) => settle(blockId, null, accept)));
     } catch (err) {
@@ -2097,7 +2135,7 @@ export function WorkPage() {
 
         <main
           className={`document-pane${mode === "canvas" ? " canvas-mode" : ""}${
-            placedSuggestions.length > 0 ? " has-suggestions" : ""
+            gutter ? " has-suggestions" : ""
           }`}
           ref={attachPane}
         >
@@ -2109,6 +2147,8 @@ export function WorkPage() {
               focused={currentSuggestion}
               onFocus={setCurrentSuggestion}
               onResolve={(blockId, sid, accept) => {
+                // The last one settled outside Proofreading closes the column.
+                if (placedSuggestions.length === 1 && !proofreading) rememberPosition();
                 void settle(blockId, sid, accept).catch((err) =>
                   setError(err instanceof ApiError ? err.message : "could not settle that suggestion"),
                 );
