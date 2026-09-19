@@ -23,15 +23,24 @@ import {
   currentBlockAt,
   deriveDocument,
   foldForSearch,
+  hasSuggestions,
   proseFromParagraphs,
+  proseToText,
   occurrencesIn,
   replaceInDoc,
+  resolveAll,
+  resolveSuggestion,
   smartenText,
+  suggestionsIn,
   subtreeWordCounts,
 } from "@brigid/shared";
 import type { BlockOptions, CanvasNode, ProseDoc, TemplateBody, Typography } from "@brigid/shared";
 import { ApiError, api } from "../api.js";
 import { readLastPlace, writeLastPlace } from "../lastPlace.js";
+import { readProofreading, writeProofreading } from "../proofreading.js";
+import { ModeSwitch } from "../components/ModeSwitch.js";
+import { SuggestionCards } from "../components/SuggestionCards.js";
+import type { PlacedSuggestion } from "../components/SuggestionCards.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
 import { CanvasView } from "../components/CanvasView.js";
@@ -187,6 +196,12 @@ export function WorkPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [matchIndex, setMatchIndex] = useState(0);
+  /** Proofreading: edits become suggestions. Remembered per manuscript. */
+  const [proofreading, setProofreadingState] = useState(() => readProofreading(id));
+  const setProofreading = (on: boolean) => {
+    setProofreadingState(on);
+    writeProofreading(id, on);
+  };
   const [replacement, setReplacement] = useState("");
   const [replaceBusy, setReplaceBusy] = useState(false);
   /**
@@ -795,6 +810,7 @@ export function WorkPage() {
         fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
         speller={spelling.speller}
         smartPunctuation={smartPunctuationFor(editingProse.id)}
+        suggesting={proofreading}
         onSave={(doc) => {
           void saveProse(editingProse.id, doc);
           // Writing is what the clock is for, so writing starts it.
@@ -915,16 +931,18 @@ export function WorkPage() {
         .filter((i) => i.kind === "block")
         // Smartened where the format smartens it, so the tally counts what is
         // on the page rather than what is in the column behind it.
-        .map((i) =>
-          i.kind === "block"
-            ? {
-                id: i.block.id,
-                contentText: i.smartPunctuation
-                  ? smartenText(i.block.contentText)
-                  : i.block.contentText,
-              }
-            : null,
-        )
+        .map((i) => {
+          if (i.kind !== "block") return null;
+          /**
+           * What is on the page, suggestions and all.
+           *
+           * The stored plain text is the manuscript as it stands, which leaves
+           * suggested words out — right for counting and exporting, wrong for
+           * finding. Read from the document instead, where they are.
+           */
+          const shown = hasSuggestions(docOf(i.block)) ? proseToText(docOf(i.block)) : i.block.contentText;
+          return { id: i.block.id, contentText: i.smartPunctuation ? smartenText(shown) : shown };
+        })
         .filter((b): b is { id: string; contentText: string } => b !== null),
     [items],
   );
@@ -1387,6 +1405,73 @@ export function WorkPage() {
     }
   };
 
+  /**
+   * Every pending suggestion in the manuscript, in reading order.
+   *
+   * Read from the saved documents, so a suggestion appears once its save has
+   * landed — about a second after it is typed — which is when it has become
+   * something that can be accepted.
+   */
+  const placedSuggestions = useMemo<PlacedSuggestion[]>(() => {
+    if (mode === "canvas") return [];
+    const out: PlacedSuggestion[] = [];
+    for (const item of items) {
+      if (item.kind !== "block") continue;
+      for (const suggestion of suggestionsIn(docOf(item.block))) {
+        out.push({ blockId: item.block.id, suggestion });
+      }
+    }
+    return out;
+  }, [items, mode]);
+
+  /**
+   * Accept or reject one suggestion, or every suggestion in a section.
+   *
+   * Where the section is open for typing, the editor does it, so the caret
+   * stays where it is and the editor's next save is the settled text. Anywhere
+   * else it waits its turn behind that section's saves and settles the latest
+   * version, like a replacement does.
+   */
+  const settle = useCallback(
+    async (blockId: string, id: string | null, accept: boolean) => {
+      const editor = paneRef.current?.querySelector<HTMLElement>(
+        `[data-editing-block="${CSS.escape(blockId)}"]`,
+      );
+      if (editor) {
+        editor.dispatchEvent(new CustomEvent("brigid-resolve", { detail: { id, accept } }));
+        return;
+      }
+      await enqueue(blockId, async () => {
+        const block = currentBlock(blockId);
+        if (!block) return;
+        const doc = docOf(block);
+        const next = id ? resolveSuggestion(doc, id, accept) : resolveAll(doc, accept);
+        if (!sameDoc(next, doc)) await persistProse(blockId, next);
+      });
+    },
+    [enqueue, currentBlock, persistProse],
+  );
+
+  const settleEverything = async (accept: boolean) => {
+    const sections = [...new Set(placedSuggestions.map((p) => p.blockId))];
+    const count = placedSuggestions.length;
+    if (count === 0) return;
+    const ok = await dialogs.confirm({
+      title: `${accept ? "Accept" : "Reject"} all ${count} ${count === 1 ? "suggestion" : "suggestions"}?`,
+      message: accept
+        ? `Every suggestion in ${sections.length} ${sections.length === 1 ? "section" : "sections"} becomes part of the manuscript, and counts toward its word count and goals from now.`
+        : `Every suggestion in ${sections.length} ${sections.length === 1 ? "section" : "sections"} is discarded, and the text stays as it was.`,
+      confirmLabel: accept ? "Accept all" : "Reject all",
+      danger: !accept,
+    });
+    if (!ok) return;
+    try {
+      await Promise.all(sections.map((blockId) => settle(blockId, null, accept)));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not settle the suggestions");
+    }
+  };
+
   const undoReplace = async () => {
     if (!lastReplace || replaceBusy) return;
     const { entries } = lastReplace;
@@ -1758,6 +1843,13 @@ export function WorkPage() {
         </div>
         <div className="spacer" />
 
+        <ModeSwitch
+          proofreading={proofreading}
+          onChange={setProofreading}
+          pending={placedSuggestions.length}
+          onSettleAll={(accept) => void settleEverything(accept)}
+        />
+
         <div className="segmented compact" role="group" aria-label="View mode">
           <button
             type="button"
@@ -1942,9 +2034,23 @@ export function WorkPage() {
         </aside>
 
         <main
-          className={`document-pane${mode === "canvas" ? " canvas-mode" : ""}`}
+          className={`document-pane${mode === "canvas" ? " canvas-mode" : ""}${
+            placedSuggestions.length > 0 ? " has-suggestions" : ""
+          }`}
           ref={attachPane}
         >
+          {placedSuggestions.length > 0 ? (
+            <SuggestionCards
+              pane={paneEl}
+              placed={placedSuggestions}
+              author={work?.authorFirstName ?? ""}
+              onResolve={(blockId, sid, accept) => {
+                void settle(blockId, sid, accept).catch((err) =>
+                  setError(err instanceof ApiError ? err.message : "could not settle that suggestion"),
+                );
+              }}
+            />
+          ) : null}
           {mode === "canvas" ? (
             <CanvasView
               items={canvasItems}
@@ -2024,6 +2130,13 @@ export function WorkPage() {
             // down the page. Held open while a search is running: the results
             // count is part of what you are reading at that moment.
             <div className={`zen-controls${searchOpen ? " revealed" : ""}`}>
+              <ModeSwitch
+                proofreading={proofreading}
+                onChange={setProofreading}
+                pending={placedSuggestions.length}
+                onSettleAll={(accept) => void settleEverything(accept)}
+                compact
+              />
               <div className="segmented compact" role="group" aria-label="View mode">
                 <button
                   type="button"

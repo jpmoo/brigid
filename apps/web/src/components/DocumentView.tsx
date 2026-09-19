@@ -458,20 +458,33 @@ function Nodes({
                     {runs.map((run, k) => {
                       const text = smart ? smartenText(run.text) : run.text;
                       const marked = highlight(text, search, counter, activeIndex, speller);
-                      if (
-                        !hasMark(run, "strong") &&
-                        !hasMark(run, "em") &&
-                        !hasMark(run, "underline")
-                      ) {
-                        return <Fragment key={k}>{marked}</Fragment>;
-                      }
                       const underlined = hasMark(run, "underline") ? <u>{marked}</u> : marked;
-                      const inner = hasMark(run, "em") ? <em>{underlined}</em> : underlined;
-                      return hasMark(run, "strong") ? (
-                        <strong key={k}>{inner}</strong>
-                      ) : (
-                        <Fragment key={k}>{inner}</Fragment>
-                      );
+                      const emphasized = hasMark(run, "em") ? <em>{underlined}</em> : underlined;
+                      const inner = hasMark(run, "strong") ? <strong>{emphasized}</strong> : emphasized;
+                      /**
+                       * A suggestion shows here as it does in the editor.
+                       *
+                       * Proofreading is mostly reading: the suggestions made
+                       * across a chapter are read in this view far more than in
+                       * the one paragraph open for typing, and a card in the
+                       * margin needs something on the page to point at.
+                       */
+                      const suggestion = run.marks?.find((m) => (m.type === "ins" || m.type === "del") && m.id);
+                      if (suggestion?.type === "ins") {
+                        return (
+                          <ins key={k} className="sug" data-sid={suggestion.id}>
+                            {inner}
+                          </ins>
+                        );
+                      }
+                      if (suggestion?.type === "del") {
+                        return (
+                          <del key={k} className="sug" data-sid={suggestion.id}>
+                            {inner}
+                          </del>
+                        );
+                      }
+                      return <Fragment key={k}>{inner}</Fragment>;
                     })}
                   </p>
                   );

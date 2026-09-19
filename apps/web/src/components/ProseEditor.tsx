@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Bold, Italic, Quote, Redo2, SpellCheck, Underline, Undo2, ChevronRight } from "lucide-react";
 import {
+  acceptedDoc,
   asProseDoc,
   autocorrectKeystroke,
   countWords,
@@ -11,8 +12,10 @@ import {
   proseFromParagraphs,
   proseToText,
 } from "@brigid/shared";
-import type { ProseDoc, ProseText } from "@brigid/shared";
+import type { ProseDoc, ProseMark, ProseText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
+import { suggestDelete, suggestInsert } from "./suggesting.js";
+import type { Reach } from "./suggesting.js";
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
 
@@ -71,12 +74,32 @@ function runsToHtml(
   if (runs.length === 0) return "<br>";
   return runs
     .map((run) => {
+      const inserted = run.marks?.find((m) => m.type === "ins");
+      const deleted = run.marks?.find((m) => m.type === "del");
+      // Hits are marked in suggested text as well, since Find searches what is on
+      // the page, proposed words and struck ones alike.
       const inner = decorate(run.text, speller, search, counter, activeHit);
       const underlined = hasMark(run, "underline") ? `<u>${inner}</u>` : inner;
       const em = hasMark(run, "em") ? `<em>${underlined}</em>` : underlined;
-      return hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
+      const styled = hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
+      return suggestionHtml(styled, inserted ?? deleted);
     })
     .join("");
+}
+
+/**
+ * A suggestion, as the element it is drawn with.
+ *
+ * Outermost, so the emphasis inside it reads back the same, and carrying its id
+ * and time so the element can be told apart from its neighbours after the
+ * browser has edited around it. `<ins>` and `<del>` because that is what they
+ * are, and because the browser leaves them whole when text is typed into them.
+ */
+function suggestionHtml(inner: string, mark: ProseMark | undefined): string {
+  if (!mark?.id) return inner;
+  const tag = mark.type === "ins" ? "ins" : "del";
+  const at = mark.at ? ` data-at="${escapeHtml(mark.at)}"` : "";
+  return `<${tag} class="sug" data-sid="${escapeHtml(mark.id)}"${at}>${inner}</${tag}>`;
 }
 
 /**
@@ -339,6 +362,31 @@ function paragraphAttrs(
   return ` class="${classes}"${indent}${quote}`;
 }
 
+/**
+ * The editor's text as it stands, leaving suggested insertions out.
+ *
+ * The number under the writer's hands has to agree with the one stored, and the
+ * one stored does not count a word nobody has accepted.
+ */
+function standingText(el: HTMLElement): string {
+  if (!el.querySelector("ins.sug")) return el.textContent ?? "";
+  const copy = el.cloneNode(true) as HTMLElement;
+  for (const ins of Array.from(copy.querySelectorAll("ins.sug"))) ins.remove();
+  return copy.textContent ?? "";
+}
+
+/** Which deletions Suggesting mode takes over, and how far each reaches. */
+const DELETE_REACH: Record<string, ["backward" | "forward", Reach]> = {
+  deleteContentBackward: ["backward", "character"],
+  deleteContentForward: ["forward", "character"],
+  deleteWordBackward: ["backward", "word"],
+  deleteWordForward: ["forward", "word"],
+  deleteSoftLineBackward: ["backward", "lineboundary"],
+  deleteSoftLineForward: ["forward", "lineboundary"],
+  deleteHardLineBackward: ["backward", "lineboundary"],
+  deleteHardLineForward: ["forward", "lineboundary"],
+};
+
 export function docToHtml(
   doc: ProseDoc,
   speller: Speller | null,
@@ -376,14 +424,21 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
 
   const readParagraph = (node: Node): ProseText[] => {
     const runs: ProseText[] = [];
-    const walk = (current: Node, strong: boolean, em: boolean, underline: boolean) => {
+    const walk = (
+      current: Node,
+      strong: boolean,
+      em: boolean,
+      underline: boolean,
+      suggestion: ProseMark | null,
+    ) => {
       if (current.nodeType === Node.TEXT_NODE) {
         const text = (current.textContent ?? "").replace(new RegExp(ZWSP, "g"), "");
         if (!text) return;
-        const marks = [
+        const marks: ProseMark[] = [
           ...(strong ? [{ type: "strong" as const }] : []),
           ...(em ? [{ type: "em" as const }] : []),
           ...(underline ? [{ type: "underline" as const }] : []),
+          ...(suggestion ? [suggestion] : []),
         ];
         runs.push(marks.length ? { type: "text", text, marks } : { type: "text", text });
         return;
@@ -394,10 +449,22 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
       if (tag === "BR") return;
       const nextStrong = strong || tag === "STRONG" || tag === "B" || isBold(el);
       const nextEm = em || tag === "EM" || tag === "I" || isItalic(el);
-      const nextUnderline = underline || tag === "U" || isUnderlined(el);
-      for (const child of Array.from(el.childNodes)) walk(child, nextStrong, nextEm, nextUnderline);
+      // Not the <u> the underline read looks for: a suggestion is drawn with a
+      // tag of its own, and is not emphasis.
+      const nextUnderline = underline || tag === "U" || (!el.classList.contains("sug") && isUnderlined(el));
+      // Only our own, by their id. An <ins> pasted in from elsewhere is some
+      // other program's opinion, and is read as the plain text it contains.
+      const nextSuggestion =
+        (tag === "INS" || tag === "DEL") && el.dataset.sid
+          ? {
+              type: tag === "INS" ? ("ins" as const) : ("del" as const),
+              id: el.dataset.sid,
+              ...(el.dataset.at ? { at: el.dataset.at } : {}),
+            }
+          : suggestion;
+      for (const child of Array.from(el.childNodes)) walk(child, nextStrong, nextEm, nextUnderline, nextSuggestion);
     };
-    for (const child of Array.from(node.childNodes)) walk(child, false, false, false);
+    for (const child of Array.from(node.childNodes)) walk(child, false, false, false, null);
     return runs;
   };
 
@@ -786,6 +853,11 @@ export interface ProseEditorProps {
   onAddWord: (word: string) => void;
   onIgnoreWord: (word: string) => void;
   /**
+   * Proofreading: typing and deleting propose changes rather than make them.
+   * Read when an edit happens, so switching modes needs no remount.
+   */
+  suggesting?: boolean;
+  /**
    * Nothing left to check in this block. The editor knows only its own prose,
    * so carrying the pass into the next section is the page's business.
    */
@@ -813,6 +885,7 @@ export function ProseEditor({
   onAddWord,
   onIgnoreWord,
   onNoMoreHere,
+  suggesting = false,
 }: ProseEditorProps) {
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -851,6 +924,9 @@ export function ProseEditor({
   const [words, setWords] = useState(0);
   const [menu, setMenu] = useState<SpellMenu | null>(null);
   const saveTimer = useRef<number | null>(null);
+  /** Read by handlers bound once, so the mode can change without a remount. */
+  const suggestingRef = useRef(suggesting);
+  suggestingRef.current = suggesting;
 
   // Rendered once per block. Later renders would take the caret with them.
   useEffect(() => {
@@ -866,7 +942,7 @@ export function ProseEditor({
     // needs no scrolling of its own.
     el.focus({ preventScroll: true });
     setSelection(el, initialSelection.anchor, initialSelection.focus);
-    setWords(countWords(el.textContent ?? ""));
+    setWords(countWords(standingText(el)));
 
     /**
      * The gesture that opened this editor isn't over.
@@ -959,7 +1035,7 @@ export function ProseEditor({
    */
   const recount = useCallback(() => {
     const el = ref.current;
-    setWords(el ? countWords(el.textContent ?? "") : 0);
+    setWords(el ? countWords(standingText(el)) : 0);
   }, []);
 
   const scheduleSave = useCallback(() => {
@@ -1190,8 +1266,12 @@ export function ProseEditor({
   /** Writes the selection to the clipboard. False when there was none. */
   const writeClipboard = useCallback(
     (data: DataTransfer): boolean => {
-      const doc = selectionDoc();
-      if (!doc) return false;
+      const picked = selectionDoc();
+      if (!picked) return false;
+      // As proofread: suggestions carried into a paste elsewhere would arrive
+      // with ids that already belong to this section, and settling one would
+      // settle both.
+      const doc = acceptedDoc(picked);
       // Rebuilt from the model rather than lifted from the page, so the
       // underlines and their data attributes don't travel with the words.
       data.setData("text/plain", proseToText(doc));
@@ -1278,7 +1358,8 @@ export function ProseEditor({
           for (let i = 0; i < fix.replace; i += 1) {
             selection?.modify("extend", "backward", "character");
           }
-          document.execCommand("insertText", false, fix.text);
+          if (suggestingRef.current) suggestInsert(el, fix.text);
+          else document.execCommand("insertText", false, fix.text);
           scheduleSave();
           return;
         }
@@ -1481,13 +1562,112 @@ export function ProseEditor({
     if (!el) return;
     for (const span of Array.from(el.querySelectorAll(".misspelled"))) {
       if ((span.getAttribute("data-word") ?? span.textContent) !== word) continue;
-      span.replaceWith(document.createTextNode(replacement));
+      if (suggestingRef.current) {
+        // A correction is a change like any other, and proposed like one.
+        remember();
+        const range = document.createRange();
+        range.selectNodeContents(span);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+        suggestInsert(el, replacement);
+      } else {
+        span.replaceWith(document.createTextNode(replacement));
+      }
       break;
     }
     setMenu(null);
     recheck();
     scheduleSave();
   };
+
+  /**
+   * Suggesting mode, at the moment of the edit.
+   *
+   * `beforeinput` rather than keydown, because it is the one event that says
+   * what an edit will be — a character, a word deleted backwards, a paste —
+   * whatever key or menu or dictation produced it, and it can still be
+   * refused. What it describes is done here instead, as a suggestion.
+   *
+   * Bound once and read through refs, so the handlers see the current mode and
+   * the current save without the listener being torn down and put back on
+   * every render.
+   */
+  const scheduleSaveRef = useRef(scheduleSave);
+  scheduleSaveRef.current = scheduleSave;
+  const rememberRef = useRef(remember);
+  rememberRef.current = remember;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const onBefore = (event: InputEvent) => {
+      if (!suggestingRef.current) return;
+      const type = event.inputType;
+
+      if (type === "insertText" || type === "insertReplacementText") {
+        const text = event.data ?? event.dataTransfer?.getData("text/plain") ?? "";
+        if (!text) return;
+        event.preventDefault();
+        suggestInsert(el, text);
+        scheduleSaveRef.current();
+        return;
+      }
+
+      const reach = DELETE_REACH[type];
+      if (reach) {
+        // At a paragraph's edge the join is left to happen as ordinary editing
+        // for now — it removes no words. Everything else is ours, including a
+        // key that turns out to have nothing to do.
+        const outcome = suggestDelete(el, reach[0], reach[1]);
+        if (outcome !== "edge") event.preventDefault();
+        if (outcome === "done") scheduleSaveRef.current();
+        return;
+      }
+
+      /**
+       * A new paragraph typed over a selection.
+       *
+       * The break itself is made directly for now, but the words it would
+       * swallow are not deleted without a suggestion — that would change the
+       * manuscript, and its word count, behind the writer's back.
+       */
+      if ((type === "insertParagraph" || type === "insertLineBreak") && !window.getSelection()?.isCollapsed) {
+        event.preventDefault();
+        suggestDelete(el, "forward", "character");
+        document.execCommand(type === "insertParagraph" ? "insertParagraph" : "insertLineBreak");
+        scheduleSaveRef.current();
+        return;
+      }
+
+      // Text dragged within the editor would be moved outright.
+      if (type === "insertFromDrop" || type === "deleteByDrag") event.preventDefault();
+    };
+    /**
+     * A card's decision, made where the writer is typing.
+     *
+     * Settling a suggestion in the section open here has to happen here: the
+     * editor draws its section once, so a change made to the stored document
+     * would not show, and the next autosave would write the old state back over
+     * it. Unwrapping the element keeps its words; removing it drops them.
+     */
+    const onResolve = (event: Event) => {
+      const { id, accept } = (event as CustomEvent<{ id: string | null; accept: boolean }>).detail;
+      rememberRef.current();
+      const picked = id ? `.sug[data-sid="${CSS.escape(id)}"]` : ".sug";
+      for (const node of Array.from(el.querySelectorAll<HTMLElement>(picked))) {
+        const keep = node.tagName === "INS" ? accept : !accept;
+        if (keep) node.replaceWith(...Array.from(node.childNodes));
+        else node.remove();
+      }
+      scheduleSaveRef.current();
+    };
+    el.addEventListener("beforeinput", onBefore);
+    el.addEventListener("brigid-resolve", onResolve);
+    return () => {
+      el.removeEventListener("beforeinput", onBefore);
+      el.removeEventListener("brigid-resolve", onResolve);
+    };
+  }, []);
 
   /**
    * A pending save is flushed, never dropped. Held in a ref so this effect runs
@@ -1613,6 +1793,8 @@ export function ProseEditor({
         className="prose-surface"
         ref={ref}
         contentEditable
+        // So a card in the margin can find the section it belongs to here.
+        data-editing-block={blockId}
         suppressContentEditableWarning
         role="textbox"
         aria-multiline="true"
@@ -1683,7 +1865,10 @@ export function ProseEditor({
           // We took the event, so the deletion is ours to do. execCommand rather
           // than deleteFromDocument: it merges the paragraphs either side of a
           // selection that spanned them, which is what a cut should leave.
-          document.execCommand("delete");
+          // Proofreading, it is a deletion proposed like any other.
+          const el = ref.current;
+          if (suggestingRef.current && el) suggestDelete(el, "backward", "character");
+          else document.execCommand("delete");
           window.setTimeout(recheck, 0);
           scheduleSave();
         }}
@@ -1697,7 +1882,22 @@ export function ProseEditor({
           // its formats.
           const own = event.clipboardData.getData(PROSE_FLAVOUR);
           const doc = own ? readFlavour(own) : null;
-          if (doc) {
+          const el = ref.current;
+          if (suggestingRef.current && el) {
+            /**
+             * Pasted as a suggestion, a paragraph at a time.
+             *
+             * Plain, because a pasted passage is proposed words, and the breaks
+             * between its paragraphs are made directly for now — only the words
+             * are proposed.
+             */
+            const plain = doc ? proseToText(doc) : event.clipboardData.getData("text/plain");
+            const chunks = plain.replace(/\r\n?/g, "\n").split(/\n{2,}/).map((c) => c.replace(/\n/g, " "));
+            chunks.forEach((chunk, i) => {
+              if (i > 0) document.execCommand("insertParagraph");
+              if (chunk) suggestInsert(el, chunk);
+            });
+          } else if (doc) {
             // A single paragraph is inserted inline so it joins the sentence it
             // was dropped into; more than one brings its paragraph breaks.
             const html =

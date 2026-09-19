@@ -1,7 +1,7 @@
 import { normalizeProse } from "./prose.js";
 import type { ProseDoc, ProseMark, ProseText } from "./prose.js";
 import { foldForSearch } from "./spelling.js";
-import { baseDoc, hasSuggestions } from "./suggestions.js";
+import { hasSuggestions } from "./suggestions.js";
 
 /**
  * Find and replace, on the document rather than on its text.
@@ -119,10 +119,10 @@ export function occurrencesIn(doc: ProseDoc, query: string, smartens: boolean): 
   if (!needle) return [];
   const out: Occurrence[] = [];
 
-  // Find searches the text as it stands, so pending suggestions are counted as
-  // they are counted everywhere else: insertions not yet there, deletions
-  // still there.
-  baseDoc(doc).content.forEach((paragraph, index) => {
+  // Find searches what is on the page, suggestions included — the words
+  // proposed and the words they would replace. A writer looking for a word
+  // wants to land on it whether or not it has been struck.
+  doc.content.forEach((paragraph, index) => {
     const text = paragraphText(paragraph.content);
     const mapped = foldForReplace(text, smartens);
     let from = 0;

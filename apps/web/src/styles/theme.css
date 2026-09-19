@@ -25,6 +25,12 @@
      — against dark ink on cream it read as another shade of the palette rather
      than as a mark. A misspelling has one job: to be seen. */
   --misspelled: #e02020;
+  /* Proofreading, in Google's green: the words proposed, and the same green
+     struck through for the words they would remove. Brighter than the app's
+     own accent on purpose, so a suggestion never reads as part of the page's
+     furniture. The tint is what a suggestion sits on while its card is open. */
+  --suggest: #188038;
+  --suggest-tint: #e6f4ea;
   --shadow: 0 1px 2px rgba(19, 70, 37, 0.06), 0 8px 24px rgba(19, 70, 37, 0.07);
   --shadow-lift: 0 2px 4px rgba(19, 70, 37, 0.08), 0 16px 40px rgba(19, 70, 37, 0.12);
 
@@ -59,6 +65,8 @@
     --shadow-lift: 0 2px 4px rgba(0, 0, 0, 0.5), 0 16px 40px rgba(0, 0, 0, 0.45);
 
     color-scheme: dark;
+  --suggest: #81c995;
+  --suggest-tint: rgba(129, 201, 149, 0.16);
 }
 
 * {
@@ -6585,4 +6593,195 @@ ul.rec-thin strong {
 }
 .search-note span:first-child {
   flex: 1;
+}
+
+/* --- Proofreading ----------------------------------------------------------
+   A suggestion is drawn in its author's color: added words in green, removed
+   words in the same green with a line through them. No underline on the
+   additions — that is Word's convention, not Docs'. */
+ins.sug {
+  color: var(--suggest);
+  text-decoration: none;
+}
+del.sug {
+  color: var(--suggest);
+  text-decoration: line-through;
+  text-decoration-color: var(--suggest);
+}
+/* The suggestion whose card is open, picked out on the page. */
+.sug.focused {
+  background: var(--suggest-tint);
+  border-radius: 2px;
+}
+
+/* Editing or proofreading. Green when proofreading, in the suggestions' own
+   color, so the mode reads from across the room. */
+.mode-switch {
+  position: relative;
+}
+.mode-button {
+  gap: 5px;
+}
+.mode-button.proofreading {
+  color: var(--suggest);
+  background: var(--suggest-tint);
+}
+.mode-menu {
+  min-width: 290px;
+  padding: 6px;
+}
+.mode-menu button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 10px;
+}
+.mode-menu button.proofreading > svg:first-child {
+  color: var(--suggest);
+}
+.mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  flex: 1;
+}
+.mode-text small {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.mode-check {
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+.mode-pending {
+  padding: 4px 10px 6px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* How many are waiting, on the switch itself, in their color. */
+.mode-count {
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  color: #fff;
+  background: var(--suggest);
+}
+
+/* --- Suggestion cards ------------------------------------------------------
+   The page steps left to make a column beside it, as Docs does, and each card
+   sits level with the words it is about. */
+.document-pane.has-suggestions {
+  position: relative;
+  padding-right: 316px;
+}
+.sug-cards {
+  position: absolute;
+  top: 0;
+  right: 22px;
+  width: 280px;
+}
+.sug-card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 11px 12px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.15);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.sug-card.hover {
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px rgba(60, 64, 67, 0.15);
+}
+/* The card being worked on steps out toward the page, as in Docs. */
+.sug-card.active {
+  transform: translateX(-18px);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+}
+.sug-card-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.sug-avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  background: var(--suggest);
+}
+.sug-who {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  line-height: 1.25;
+}
+.sug-who strong {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sug-who small {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.sug-accept,
+.sug-reject {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  cursor: pointer;
+}
+.sug-accept {
+  color: var(--suggest);
+}
+.sug-reject {
+  color: var(--text-faint);
+}
+.sug-accept:hover {
+  background: var(--suggest-tint);
+}
+.sug-reject:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+.sug-what {
+  margin: 9px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  /* A long passage is summarized, not reproduced: the page has it. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.sug-quote {
+  font-weight: 600;
+}
+/* No room for a column beside the page: the page keeps its width, and the
+   switch's Accept all and Reject all remain. */
+@media (max-width: 1100px) {
+  .document-pane.has-suggestions {
+    padding-right: 20px;
+  }
+  .sug-cards {
+    display: none;
+  }
 }

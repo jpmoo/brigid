@@ -107,10 +107,10 @@ check("a suggestion mark with no id is kept as plain text, not lost", () => {
   assert.equal(hasSuggestions(odd), false);
 });
 
-check("Find counts the text as it stands", () => {
-  // "receive" is only suggested; "recieve" is still there.
-  assert.equal(occurrencesIn(proofed, "receive", false).length, 0);
-  assert.equal(occurrencesIn(proofed, "recieve", false).length, 1);
+check("Find lands on suggested words and the words they replace", () => {
+  assert.equal(occurrencesIn(proofed, "receive", false).length, 1, "the suggested word");
+  assert.equal(occurrencesIn(proofed, "recieve", false).length, 1, "the struck word");
+  assert.equal(occurrencesIn(proofed, "soon", false).length, 1, "a suggested addition");
 });
 
 check("Replace leaves a section with pending suggestions alone", () => {
