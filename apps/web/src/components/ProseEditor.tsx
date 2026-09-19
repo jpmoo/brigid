@@ -5,6 +5,9 @@ import {
   acceptedDoc,
   asProseDoc,
   autocorrectKeystroke,
+  proposeFormatting,
+  resolveAll,
+  resolveSuggestion,
   countWords,
   foldForSearch,
   hasMark,
@@ -12,9 +15,16 @@ import {
   proseFromParagraphs,
   proseToText,
 } from "@brigid/shared";
-import type { ProseDoc, ProseMark, ProseText } from "@brigid/shared";
+import type { ProseDoc, ProseMark, ProseMarkType, ProseText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
-import { suggestDelete, suggestInsert } from "./suggesting.js";
+import {
+  clearInheritedBreak,
+  newStamp,
+  suggestDelete,
+  suggestInsert,
+  suggestJoin,
+  suggestSplit,
+} from "./suggesting.js";
 import type { Reach } from "./suggesting.js";
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
@@ -82,7 +92,7 @@ function runsToHtml(
       const underlined = hasMark(run, "underline") ? `<u>${inner}</u>` : inner;
       const em = hasMark(run, "em") ? `<em>${underlined}</em>` : underlined;
       const styled = hasMark(run, "strong") ? `<strong>${em}</strong>` : em;
-      return suggestionHtml(styled, inserted ?? deleted);
+      return suggestionHtml(formatHtml(styled, run.marks?.find((m) => m.type === "fmt")), inserted ?? deleted);
     })
     .join("");
 }
@@ -95,6 +105,19 @@ function runsToHtml(
  * browser has edited around it. `<ins>` and `<del>` because that is what they
  * are, and because the browser leaves them whole when text is typed into them.
  */
+/**
+ * A change of emphasis, as a span around the emphasis proposed.
+ *
+ * No color: Docs shows a formatting suggestion as the formatting itself, with
+ * the card to say it is only proposed. The span carries what the emphasis was,
+ * so rejecting it can put that back.
+ */
+function formatHtml(inner: string, mark: ProseMark | undefined): string {
+  if (!mark?.id) return inner;
+  const at = mark.at ? ` data-at="${escapeHtml(mark.at)}"` : "";
+  return `<span class="sug sug-fmt" data-sid="${escapeHtml(mark.id)}"${at} data-was="${(mark.was ?? []).join(",")}">${inner}</span>`;
+}
+
 function suggestionHtml(inner: string, mark: ProseMark | undefined): string {
   if (!mark?.id) return inner;
   const tag = mark.type === "ins" ? "ins" : "del";
@@ -337,6 +360,27 @@ function bookmarkMarkup(here: EditorBookmark[]): string {
   return `<span class="doc-bookmarks" contenteditable="false">${marks}</span>`;
 }
 
+/**
+ * A paragraph break's suggestion, as attributes on the paragraph after it.
+ *
+ * The pilcrow that shows it is drawn by the stylesheet, at the end of the
+ * paragraph before. Drawn rather than written, so it is never a character: not
+ * in the text, not counted, not somewhere a caret can land or a search can hit.
+ */
+function breakAttrs(paragraph: ProseDoc["content"][number] | undefined): string {
+  if (!paragraph) return "";
+  let out = "";
+  if (paragraph.split) {
+    out += ` data-split="${escapeHtml(paragraph.split.id)}"`;
+    if (paragraph.split.at) out += ` data-split-at="${escapeHtml(paragraph.split.at)}"`;
+  }
+  if (paragraph.join) {
+    out += ` data-join="${escapeHtml(paragraph.join.id)}"`;
+    if (paragraph.join.at) out += ` data-join-at="${escapeHtml(paragraph.join.at)}"`;
+  }
+  return out;
+}
+
 function paragraphAttrs(
   index: number,
   quoted: boolean,
@@ -369,10 +413,33 @@ function paragraphAttrs(
  * one stored does not count a word nobody has accepted.
  */
 function standingText(el: HTMLElement): string {
-  if (!el.querySelector("ins.sug")) return el.textContent ?? "";
-  const copy = el.cloneNode(true) as HTMLElement;
-  for (const ins of Array.from(copy.querySelectorAll("ins.sug"))) ins.remove();
-  return copy.textContent ?? "";
+  /**
+   * Paragraph by paragraph, as the server reads it.
+   *
+   * This read the element's text in one go, which runs the paragraphs together
+   * with nothing between them — "the sea." and "He waited" became "sea.He", one
+   * word — so the counter under the writer's hands came up short by about one
+   * word a paragraph, and never agreed with the count it claims to match. Now
+   * paragraphs are joined as the stored text joins them: a blank line, or
+   * nothing where the break is only a suggestion.
+   */
+  let out = "";
+  let first = true;
+  for (const child of Array.from(el.childNodes)) {
+    const isParagraph = child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === "P";
+    let text: string;
+    if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).querySelector("ins.sug")) {
+      const copy = child.cloneNode(true) as HTMLElement;
+      for (const ins of Array.from(copy.querySelectorAll("ins.sug"))) ins.remove();
+      text = copy.textContent ?? "";
+    } else {
+      text = child.textContent ?? "";
+    }
+    if (!first) out += isParagraph && (child as HTMLElement).dataset.split ? "" : "\n\n";
+    out += text;
+    first = false;
+  }
+  return out;
 }
 
 /** Which deletions Suggesting mode takes over, and how far each reaches. */
@@ -402,7 +469,7 @@ export function docToHtml(
   return doc.content
     .map(
       (p, i) =>
-        `<p${paragraphAttrs(i, p.blockquote === true, layout, (bookmarks ?? []).some((b) => b.paragraphIndex === i))}>` +
+        `<p${paragraphAttrs(i, p.blockquote === true, layout, (bookmarks ?? []).some((b) => b.paragraphIndex === i))}${breakAttrs(p)}>` +
         `${bookmarkMarkup((bookmarks ?? []).filter((b) => b.paragraphIndex === i))}` +
         `${runsToHtml(p.content ?? [], speller, search, counter, activeHit)}</p>`,
     )
@@ -430,6 +497,7 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
       em: boolean,
       underline: boolean,
       suggestion: ProseMark | null,
+      format: ProseMark | null,
     ) => {
       if (current.nodeType === Node.TEXT_NODE) {
         const text = (current.textContent ?? "").replace(new RegExp(ZWSP, "g"), "");
@@ -439,6 +507,7 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
           ...(em ? [{ type: "em" as const }] : []),
           ...(underline ? [{ type: "underline" as const }] : []),
           ...(suggestion ? [suggestion] : []),
+          ...(format ? [format] : []),
         ];
         runs.push(marks.length ? { type: "text", text, marks } : { type: "text", text });
         return;
@@ -462,9 +531,21 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
               ...(el.dataset.at ? { at: el.dataset.at } : {}),
             }
           : suggestion;
-      for (const child of Array.from(el.childNodes)) walk(child, nextStrong, nextEm, nextUnderline, nextSuggestion);
+      const nextFormat: ProseMark | null =
+        el.classList.contains("sug-fmt") && el.dataset.sid
+          ? {
+              type: "fmt",
+              id: el.dataset.sid,
+              ...(el.dataset.at ? { at: el.dataset.at } : {}),
+              was: (el.dataset.was ?? "")
+                .split(",")
+                .filter((w): w is ProseMarkType => w === "strong" || w === "em" || w === "underline"),
+            }
+          : format;
+      for (const child of Array.from(el.childNodes))
+        walk(child, nextStrong, nextEm, nextUnderline, nextSuggestion, nextFormat);
     };
-    for (const child of Array.from(node.childNodes)) walk(child, false, false, false, null);
+    for (const child of Array.from(node.childNodes)) walk(child, false, false, false, null, null);
     return runs;
   };
 
@@ -481,11 +562,14 @@ export function htmlToDoc(root: HTMLElement): ProseDoc {
     if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === "P") {
       flush();
       const runs = readParagraph(child);
-      const quoted = (child as HTMLElement).dataset.blockquote === "1";
+      const data = (child as HTMLElement).dataset;
+      const quoted = data.blockquote === "1";
       paragraphs.push({
         type: "paragraph",
         ...(runs.length ? { content: runs } : {}),
         ...(quoted ? { blockquote: true } : {}),
+        ...(data.split ? { split: { id: data.split, ...(data.splitAt ? { at: data.splitAt } : {}) } } : {}),
+        ...(data.join ? { join: { id: data.join, ...(data.joinAt ? { at: data.joinAt } : {}) } } : {}),
       });
     } else if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName === "BR") {
       flush();
@@ -927,6 +1011,8 @@ export function ProseEditor({
   /** Read by handlers bound once, so the mode can change without a remount. */
   const suggestingRef = useRef(suggesting);
   suggestingRef.current = suggesting;
+  const spellerRef = useRef(speller);
+  spellerRef.current = speller;
 
   // Rendered once per block. Later renders would take the caret with them.
   useEffect(() => {
@@ -1241,7 +1327,25 @@ export function ProseEditor({
 
   const applyMark = (kind: "bold" | "italic" | "underline") => {
     remember();
-    document.execCommand(kind);
+    const el = ref.current;
+    if (suggestingRef.current && el) {
+      /**
+       * Proofreading: the emphasis is applied, then recorded as a suggestion.
+       *
+       * The browser is left to decide what Bold means for the selection — it
+       * already handles a selection that is partly bold, or crosses paragraphs —
+       * and the document before and after is compared letter by letter. What
+       * changed becomes a formatting suggestion remembering what it was.
+       */
+      const before = htmlToDoc(el);
+      const held = selectionOffsets(el);
+      document.execCommand(kind);
+      const proposed = proposeFormatting(before, htmlToDoc(el), newStamp());
+      el.innerHTML = docToHtml(proposed, spellerRef.current, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
+      if (held) setSelection(el, held.anchor, held.focus);
+    } else {
+      document.execCommand(kind);
+    }
     refreshMarks();
     scheduleSave();
   };
@@ -1615,26 +1719,35 @@ export function ProseEditor({
 
       const reach = DELETE_REACH[type];
       if (reach) {
-        // At a paragraph's edge the join is left to happen as ordinary editing
-        // for now — it removes no words. Everything else is ours, including a
-        // key that turns out to have nothing to do.
         const outcome = suggestDelete(el, reach[0], reach[1]);
-        if (outcome !== "edge") event.preventDefault();
+        // A paragraph's edge with nothing live left to take: the break itself
+        // is proposed for removal — unless it is a proposal already, which the
+        // browser's own join withdraws exactly.
+        if (outcome === "edge") {
+          if (suggestJoin(el, reach[0]) === "done") {
+            event.preventDefault();
+            scheduleSaveRef.current();
+          }
+          return;
+        }
+        event.preventDefault();
         if (outcome === "done") scheduleSaveRef.current();
         return;
       }
 
       /**
-       * A new paragraph typed over a selection.
+       * A new paragraph, proposed.
        *
-       * The break itself is made directly for now, but the words it would
-       * swallow are not deleted without a suggestion — that would change the
-       * manuscript, and its word count, behind the writer's back.
+       * Typed over a selection, the words it would swallow are struck first —
+       * deleting them outright would change the manuscript, and its word
+       * count, behind the writer's back. A soft break is proposed as a
+       * paragraph: the manuscript has no line breaks inside a paragraph to
+       * propose.
        */
-      if ((type === "insertParagraph" || type === "insertLineBreak") && !window.getSelection()?.isCollapsed) {
+      if (type === "insertParagraph" || type === "insertLineBreak") {
         event.preventDefault();
-        suggestDelete(el, "forward", "character");
-        document.execCommand(type === "insertParagraph" ? "insertParagraph" : "insertLineBreak");
+        if (!window.getSelection()?.isCollapsed) suggestDelete(el, "forward", "character");
+        suggestSplit(el);
         scheduleSaveRef.current();
         return;
       }
@@ -1655,16 +1768,50 @@ export function ProseEditor({
       rememberRef.current();
       const picked = id ? `.sug[data-sid="${CSS.escape(id)}"]` : ".sug";
       for (const node of Array.from(el.querySelectorAll<HTMLElement>(picked))) {
+        if (node.classList.contains("sug-fmt")) {
+          // Accepted, the proposed emphasis simply stays; rejected, the words
+          // are redrawn below with what they had before.
+          if (accept) node.replaceWith(...Array.from(node.childNodes));
+          else node.dataset.reject = "1";
+          continue;
+        }
         const keep = node.tagName === "INS" ? accept : !accept;
         if (keep) node.replaceWith(...Array.from(node.childNodes));
         else node.remove();
       }
+      /**
+       * Breaks, and rejected emphasis, are settled on the model and redrawn.
+       *
+       * Joining two paragraphs, or restoring what a word's emphasis was, is a
+       * change to structure the DOM makes awkward and the model makes exact.
+       * The selection is kept by offset, which a join does not disturb: it
+       * removes a boundary, not a character.
+       */
+      const breaks = id
+        ? el.querySelector(`p[data-split="${CSS.escape(id)}"], p[data-join="${CSS.escape(id)}"], .sug-fmt[data-reject]`)
+        : el.querySelector("p[data-split], p[data-join], .sug-fmt[data-reject]");
+      if (breaks) {
+        const held = selectionOffsets(el);
+        let doc = htmlToDoc(el);
+        doc = id ? resolveSuggestion(doc, id, accept) : resolveAll(doc, accept);
+        el.innerHTML = docToHtml(doc, spellerRef.current, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
+        if (held) setSelection(el, held.anchor, held.focus);
+      }
       scheduleSaveRef.current();
     };
+    // In Editing the browser makes the break, and copies the paragraph's own
+    // break suggestion onto the new half as it does.
+    const onInputDone = (event: Event) => {
+      if (!suggestingRef.current && (event as InputEvent).inputType === "insertParagraph") {
+        clearInheritedBreak(el);
+      }
+    };
     el.addEventListener("beforeinput", onBefore);
+    el.addEventListener("input", onInputDone);
     el.addEventListener("brigid-resolve", onResolve);
     return () => {
       el.removeEventListener("beforeinput", onBefore);
+      el.removeEventListener("input", onInputDone);
       el.removeEventListener("brigid-resolve", onResolve);
     };
   }, []);

@@ -151,6 +151,33 @@ function textEndingAt(node: Node, offset: number, root: HTMLElement): Text | nul
   return before && root.contains(before) ? (before as Text) : null;
 }
 
+/** Live text — anything not already struck — in a range. */
+function liveIn(range: Range, root: HTMLElement): number {
+  let count = 0;
+  for (const node of textNodesIn(range, root)) {
+    if (delAround(node, root)) continue;
+    const [start, end] = clip(range, node);
+    count += Math.max(0, end - start);
+  }
+  return count;
+}
+
+/** How much live text sits between a paragraph's start and a caret. */
+function liveBefore(paragraph: HTMLElement, caret: Range): number {
+  const span = document.createRange();
+  span.setStart(paragraph, 0);
+  span.setEnd(caret.startContainer, caret.startOffset);
+  return liveIn(span, paragraph);
+}
+
+/** How much live text sits between a caret and its paragraph's end. */
+function liveAfter(paragraph: HTMLElement, caret: Range): number {
+  const span = document.createRange();
+  span.setStart(caret.startContainer, caret.startOffset);
+  span.setEnd(paragraph, paragraph.childNodes.length);
+  return liveIn(span, paragraph);
+}
+
 /**
  * Type text as a suggestion, wherever the caret or selection is.
  *
@@ -202,9 +229,24 @@ export function suggestInsert(root: HTMLElement, text: string): void {
     }
   }
 
+  /**
+   * Typing on from a proposed break is the same suggestion.
+   *
+   * Enter pressed in the middle of an insertion carries that insertion's id on
+   * to the break; the words typed next, at the head of the new paragraph, carry
+   * it on again, so a passage typed across a break is one card to accept — as
+   * it is in Docs — rather than one card for the words before and another for
+   * the words after.
+   */
+  let continuing: Stamp | null = null;
+  const paragraph = paragraphOf(node, root);
+  if (!pair && paragraph?.dataset.split && liveBefore(paragraph, range) === 0) {
+    continuing = { id: paragraph.dataset.split, at: paragraph.dataset.splitAt ?? new Date().toISOString() };
+  }
+
   // A new suggestion. Never inside a deletion: typed words are not proposed for
   // removal, so the insertion goes just after the struck text.
-  const ins = suggestionElement("ins", pair ?? newStamp());
+  const ins = suggestionElement("ins", pair ?? continuing ?? newStamp());
   const body = document.createTextNode(text);
   ins.appendChild(body);
   const struckAround = delAround(node, root);
@@ -237,6 +279,26 @@ export function suggestDelete(
   if (!root.contains(original.commonAncestorContainer)) return "nothing";
 
   let range = original;
+
+  /**
+   * At a paragraph's edge, the delete is about the break.
+   *
+   * Asked to extend one character back from the start of a paragraph, Chrome
+   * steps over the break and the last character before it together, so the
+   * step came back holding the full stop of the paragraph above — which was then
+   * struck, and on acceptance deleted, when the writer had asked to join two
+   * paragraphs. The edge is found here instead, by asking whether anything live
+   * lies between the caret and the paragraph's start (or end). Struck text does
+   * not count: backspacing through it to the start is reaching the start.
+   */
+  if (original.collapsed) {
+    const paragraph = paragraphOf(original.startContainer, root);
+    if (paragraph) {
+      const live = direction === "backward" ? liveBefore(paragraph, original) : liveAfter(paragraph, original);
+      if (live === 0) return "edge";
+    }
+  }
+
   if (original.collapsed) {
     /**
      * One step, taken past anything already struck.
@@ -307,4 +369,120 @@ export function suggestDelete(
     after.collapse(direction === "backward");
   }
   return "done";
+}
+
+/** The paragraph a point sits in, within the editor. */
+function paragraphOf(node: Node | null, root: HTMLElement): HTMLElement | null {
+  for (let at: Node | null = node; at && at !== root; at = at.parentNode) {
+    if (at.nodeType === Node.ELEMENT_NODE && (at as HTMLElement).tagName === "P") return at as HTMLElement;
+  }
+  return null;
+}
+
+/**
+ * The suggestion being typed at the caret, if the caret is inside one or just
+ * after one — so an Enter pressed mid-insertion joins it rather than starting a
+ * second suggestion, and "Hello" ¶ "World" is one card, as in Docs.
+ */
+function insertionAtCaret(root: HTMLElement): Stamp | null {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
+  const { startContainer, startOffset } = selection.getRangeAt(0);
+  const inside = insAround(startContainer, root) ?? insAround(textEndingAt(startContainer, startOffset, root), root);
+  return inside?.dataset.sid ? { id: inside.dataset.sid, at: inside.dataset.at ?? new Date().toISOString() } : null;
+}
+
+/**
+ * A new paragraph, proposed.
+ *
+ * The break is made — the writer sees the paragraph they asked for — and the
+ * paragraph after it records that the break is only a suggestion. The browser
+ * copies a paragraph's attributes onto the new half when it splits one, so
+ * whatever that half inherited is replaced, not added to.
+ */
+export function suggestSplit(root: HTMLElement): void {
+  const stamp = insertionAtCaret(root) ?? newStamp();
+  document.execCommand("insertParagraph");
+  const selection = window.getSelection();
+  const now = selection && selection.rangeCount ? paragraphOf(selection.getRangeAt(0).startContainer, root) : null;
+  if (!now) return;
+  delete now.dataset.join;
+  delete now.dataset.joinAt;
+  now.dataset.split = stamp.id;
+  now.dataset.splitAt = stamp.at;
+}
+
+/** The first thing that is really there at the start of a paragraph. */
+function leading(el: HTMLElement): Node | null {
+  let node = el.firstChild;
+  while (node && node.nodeType === Node.TEXT_NODE && !(node.textContent ?? "").length) node = node.nextSibling;
+  return node;
+}
+
+/**
+ * A paragraph break proposed for removal.
+ *
+ * Called when a delete has reached a paragraph's edge with nothing live left to
+ * take. The caret is at the start of the paragraph (backward) or the end
+ * (forward); the break in question is before the paragraph that follows it.
+ *
+ * Returns "native" when the break is itself an unaccepted suggestion: taking
+ * back your own proposed break is a withdrawal, not a change to the prose, and
+ * the browser's own join does it exactly. Otherwise the break is marked, the
+ * paragraphs stay apart, and the caret steps across it so the next delete
+ * carries on into the paragraph beyond.
+ */
+export function suggestJoin(root: HTMLElement, direction: "backward" | "forward"): "native" | "done" {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return "done";
+  const here = paragraphOf(selection.getRangeAt(0).startContainer, root);
+  if (!here) return "done";
+  const after = direction === "backward" ? here : (here.nextElementSibling as HTMLElement | null);
+  const before = after?.previousElementSibling as HTMLElement | null;
+  if (!after || !before || after.tagName !== "P" || before.tagName !== "P") return "done";
+
+  if (after.dataset.split) return "native";
+
+  if (!after.dataset.join) {
+    // One run of deletes is one suggestion: a join reached by backspacing
+    // through struck text at the start of a paragraph belongs with that text.
+    const first = leading(after);
+    const joining =
+      first && first.nodeType === Node.ELEMENT_NODE && (first as HTMLElement).matches("del.sug") ? (first as HTMLElement) : null;
+    const stamp = joining?.dataset.sid ? { id: joining.dataset.sid, at: joining.dataset.at ?? new Date().toISOString() } : newStamp();
+    after.dataset.join = stamp.id;
+    after.dataset.joinAt = stamp.at;
+  }
+
+  // Across the break, to where the next delete would reach.
+  const target = direction === "backward" ? before : after;
+  const range = document.createRange();
+  range.selectNodeContents(target);
+  range.collapse(direction !== "backward");
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return "done";
+}
+
+/**
+ * Take off a break suggestion the paragraph just made by Enter only inherited.
+ *
+ * Splitting a paragraph copies its attributes onto the new half, so pressing
+ * Enter — in Editing, where the break is simply made — inside a paragraph whose
+ * own break is a suggestion would give the new half that suggestion too: one
+ * break proposed twice, and a real one mislabeled. The new half is the one the
+ * caret lands in, and a break made directly is not a suggestion at all.
+ *
+ * Only that paragraph. Comparing each paragraph with the one before would be
+ * wrong: words typed across two breaks are one suggestion, so two paragraphs in
+ * a row can rightly carry the same id.
+ */
+export function clearInheritedBreak(root: HTMLElement): void {
+  const selection = window.getSelection();
+  const now = selection && selection.rangeCount ? paragraphOf(selection.getRangeAt(0).startContainer, root) : null;
+  if (!now) return;
+  delete now.dataset.split;
+  delete now.dataset.splitAt;
+  delete now.dataset.join;
+  delete now.dataset.joinAt;
 }

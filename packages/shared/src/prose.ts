@@ -22,7 +22,7 @@ export type ProseMarkType = "strong" | "em" | "underline";
  * document the editor, the reading view and the export already share, rather
  * than in a second store that could fall out of step with the prose.
  */
-export type SuggestionMarkType = "ins" | "del";
+export type SuggestionMarkType = "ins" | "del" | "fmt";
 
 export interface ProseMark {
   type: ProseMarkType | SuggestionMarkType;
@@ -33,6 +33,20 @@ export interface ProseMark {
    */
   id?: string;
   /** When it was suggested, as an ISO timestamp. */
+  at?: string;
+  /**
+   * A formatting suggestion's other half: the emphasis these words had before.
+   *
+   * The run carries the formatting proposed, so it reads as it would once
+   * accepted; this is what it goes back to if rejected, and what it still is
+   * for every purpose that reads the manuscript as it stands.
+   */
+  was?: ProseMarkType[];
+}
+
+/** A paragraph break proposed or proposed for removal, as a suggestion carries it. */
+export interface BreakSuggestion {
+  id: string;
   at?: string;
 }
 
@@ -56,11 +70,30 @@ export interface ProseParagraph {
    * one.
    */
   blockquote?: boolean;
+  /**
+   * The break before this paragraph is a suggestion: Enter, pressed while
+   * proofreading. Until accepted, this paragraph is still the end of the one
+   * above it.
+   */
+  split?: BreakSuggestion;
+  /**
+   * The break before this paragraph is proposed for removal: a backspace at its
+   * start, while proofreading. Until accepted, the two stay apart.
+   */
+  join?: BreakSuggestion;
 }
 
 export interface ProseDoc {
   type: "doc";
   content: ProseParagraph[];
+}
+
+/** A break suggestion, if the value is one. Without an id it could not be settled. */
+function readBreak(value: unknown): BreakSuggestion | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const held = value as { id?: unknown; at?: unknown };
+  if (typeof held.id !== "string") return undefined;
+  return { id: held.id, ...(typeof held.at === "string" ? { at: held.at } : {}) };
 }
 
 /** Reads an unknown blob as a doc, or null if it isn't one. */
@@ -88,11 +121,19 @@ export function asProseDoc(value: unknown): ProseDoc | null {
             if (t === "strong" || t === "em" || t === "underline") marks.push({ type: t });
             // A suggestion without an id cannot be accepted or rejected, so it
             // is not kept as one — the words stay, as ordinary text.
-            else if ((t === "ins" || t === "del") && typeof held?.id === "string") {
+            else if ((t === "ins" || t === "del" || t === "fmt") && typeof held?.id === "string") {
+              const was = (held as { was?: unknown }).was;
               marks.push({
                 type: t,
                 id: held.id,
                 ...(typeof held.at === "string" ? { at: held.at } : {}),
+                ...(t === "fmt"
+                  ? {
+                      was: Array.isArray(was)
+                        ? was.filter((w): w is ProseMarkType => w === "strong" || w === "em" || w === "underline")
+                        : [],
+                    }
+                  : {}),
               });
             }
           }
@@ -101,10 +142,14 @@ export function asProseDoc(value: unknown): ProseDoc | null {
       }
     }
     const quoted = (para as { blockquote?: unknown }).blockquote === true;
+    const split = readBreak((para as { split?: unknown }).split);
+    const join = readBreak((para as { join?: unknown }).join);
     paragraphs.push({
       type: "paragraph",
       ...(runs.length ? { content: runs } : {}),
       ...(quoted ? { blockquote: true } : {}),
+      ...(split ? { split } : {}),
+      ...(join ? { join } : {}),
     });
   }
   return { type: "doc", content: paragraphs };
@@ -149,7 +194,8 @@ const markKey = (run: ProseText): string => {
   const shape = MARK_TYPES.map((type) => (hasMark(run, type) ? "1" : "0")).join("");
   const ins = run.marks?.find((m) => m.type === "ins")?.id ?? "";
   const del = run.marks?.find((m) => m.type === "del")?.id ?? "";
-  return `${shape}|${ins}|${del}`;
+  const fmt = run.marks?.find((m) => m.type === "fmt");
+  return `${shape}|${ins}|${del}|${fmt ? `${fmt.id}:${[...(fmt.was ?? [])].sort().join(",")}` : ""}`;
 };
 
 /** Drops empty runs and fuses neighbors that carry the same marks. */
@@ -171,6 +217,8 @@ export function normalizeProse(doc: ProseDoc): ProseDoc {
         type: "paragraph",
         ...(runs.length ? { content: runs } : {}),
         ...(para.blockquote ? { blockquote: true } : {}),
+        ...(para.split ? { split: para.split } : {}),
+        ...(para.join ? { join: para.join } : {}),
       };
     }),
   };

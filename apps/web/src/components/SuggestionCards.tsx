@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Check, X } from "lucide-react";
-import type { Suggestion } from "@brigid/shared";
+import type { ProseMarkType, Suggestion } from "@brigid/shared";
 
 export interface PlacedSuggestion {
   blockId: string;
@@ -19,6 +19,27 @@ function when(at: string | null): string {
   if (then.toDateString() === today.toDateString()) return `${time} Today`;
   if (then.toDateString() === yesterday.toDateString()) return `${time} Yesterday`;
   return then.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+/**
+ * What on the page a suggestion is: its words, its emphasis, or the paragraph
+ * whose break it proposes or proposes removing.
+ */
+const anchors = (id: string) => {
+  const key = CSS.escape(id);
+  return `.sug[data-sid="${key}"], p[data-split="${key}"], p[data-join="${key}"]`;
+};
+
+const EMPHASIS_NAME: Record<ProseMarkType, string> = { strong: "bold", em: "italic", underline: "underline" };
+
+/** "Italic", "Bold, italic", "Not underlined" — a format card's own words, as Docs puts them. */
+function formatWords(format: { added: ProseMarkType[]; removed: ProseMarkType[] }): string {
+  const parts = [
+    ...format.added.map((t) => EMPHASIS_NAME[t]),
+    ...format.removed.map((t) => `not ${EMPHASIS_NAME[t]}`),
+  ];
+  const text = parts.join(", ");
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 /** Room between two cards stacked because their suggestions sit close together. */
@@ -60,7 +81,7 @@ export function SuggestionCards({
     let floor = 0;
     for (const card of Array.from(box.querySelectorAll<HTMLElement>(".sug-card"))) {
       const id = card.dataset.card!;
-      const anchor = pane.querySelector<HTMLElement>(`.sug[data-sid="${CSS.escape(id)}"]`);
+      const anchor = pane.querySelector<HTMLElement>(anchors(id));
       if (!anchor) {
         // Not on the page — in a section folded away in the outline. Its card
         // has nothing to sit beside.
@@ -113,9 +134,11 @@ export function SuggestionCards({
   useEffect(() => {
     if (!pane) return;
     const lit = focused ?? hovered;
-    for (const el of Array.from(pane.querySelectorAll(".sug.focused"))) el.classList.remove("focused");
+    for (const el of Array.from(pane.querySelectorAll(".sug.focused, p.focused[data-split], p.focused[data-join]"))) {
+      el.classList.remove("focused");
+    }
     if (!lit) return;
-    for (const el of Array.from(pane.querySelectorAll(`.sug[data-sid="${CSS.escape(lit)}"]`))) {
+    for (const el of Array.from(pane.querySelectorAll(anchors(lit)))) {
       el.classList.add("focused");
     }
   }, [pane, focused, hovered, placed]);
@@ -172,6 +195,8 @@ export function SuggestionCards({
                 Replace: “<span className="sug-quote">{s.removed}</span>” with “
                 <span className="sug-quote">{s.added}</span>”
               </>
+            ) : s.kind === "format" && s.format ? (
+              <>Format: {formatWords(s.format)}</>
             ) : s.kind === "add" ? (
               <>
                 Add: “<span className="sug-quote">{s.added}</span>”

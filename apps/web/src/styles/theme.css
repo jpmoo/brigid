@@ -6785,3 +6785,26 @@ del.sug {
     display: none;
   }
 }
+
+/* A paragraph break as a suggestion: the pilcrow Docs draws at the end of the
+   line where Enter was pressed, green, and struck through when the break is the
+   thing proposed for removal. Drawn by the stylesheet so it is never text. */
+p:has(+ p[data-split])::after,
+p:has(+ p[data-join])::after {
+  content: "¶";
+  margin-left: 1px;
+  color: var(--suggest);
+}
+p:has(+ p[data-join])::after {
+  text-decoration: line-through;
+}
+p:has(+ p.focused[data-split])::after,
+p:has(+ p.focused[data-join])::after {
+  background: var(--suggest-tint);
+  border-radius: 2px;
+}
+/* Proposed emphasis has no color of its own, as in Docs. It shows only while
+   its card is open. */
+.sug-fmt.focused {
+  background: var(--suggest-tint);
+}

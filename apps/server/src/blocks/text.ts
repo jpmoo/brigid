@@ -50,5 +50,21 @@ export function extractText(doc: unknown): string {
   const inline = node.content.some(
     (child) => !!child && typeof child === "object" && typeof (child as { text?: unknown }).text === "string",
   );
-  return node.content.map((child) => extractText(child)).join(inline ? "" : "\n\n");
+  if (inline) return node.content.map((child) => extractText(child)).join("");
+
+  /**
+   * A suggested break has not split anything yet.
+   *
+   * A paragraph whose break is only proposed is still the end of the one above
+   * it, so it joins with nothing — the words either side of an Enter pressed
+   * mid-sentence come back together, and the sentence counts as one. A break
+   * proposed for removal still stands until accepted, so it keeps its blank line.
+   */
+  let out = "";
+  node.content.forEach((child, i) => {
+    const split = !!child && typeof child === "object" && !!(child as { split?: unknown }).split;
+    if (i > 0) out += split ? "" : "\n\n";
+    out += extractText(child);
+  });
+  return out;
 }

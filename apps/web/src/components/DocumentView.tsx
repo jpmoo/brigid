@@ -428,6 +428,10 @@ function Nodes({
                     }`}
                     key={j}
                     style={indent !== undefined && !flush ? { textIndent: indent } : undefined}
+                    // A suggested break, or one proposed for removal: the
+                    // stylesheet draws its pilcrow at the end of the line before.
+                    data-split={doc?.content[j]?.split?.id}
+                    data-join={doc?.content[j]?.join?.id}
                   >
                     {/* Beside the line it marks, rather than at the top of the
                         section — which is the whole point of storing a line. */}
@@ -460,7 +464,17 @@ function Nodes({
                       const marked = highlight(text, search, counter, activeIndex, speller);
                       const underlined = hasMark(run, "underline") ? <u>{marked}</u> : marked;
                       const emphasized = hasMark(run, "em") ? <em>{underlined}</em> : underlined;
-                      const inner = hasMark(run, "strong") ? <strong>{emphasized}</strong> : emphasized;
+                      const strong = hasMark(run, "strong") ? <strong>{emphasized}</strong> : emphasized;
+                      // Proposed emphasis shows as itself, as in Docs; the span
+                      // is only something for its card to point at.
+                      const format = run.marks?.find((m) => m.type === "fmt" && m.id);
+                      const inner = format ? (
+                        <span className="sug sug-fmt" data-sid={format.id}>
+                          {strong}
+                        </span>
+                      ) : (
+                        strong
+                      );
                       /**
                        * A suggestion shows here as it does in the editor.
                        *
