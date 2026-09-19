@@ -1296,31 +1296,6 @@ export function ProseEditor({
     flush();
   }, [flush, readDoc]);
 
-  /**
-   * Double-clicking a misspelling selects it, like double-clicking any word.
-   *
-   * The selection is made here rather than left to the browser. Opening the
-   * menu re-renders this editor, and a re-render of a contenteditable takes the
-   * selection with it — so the word the browser had just selected was unselected
-   * again a moment later, by us.
-   *
-   * A first attempt guarded the pointerup handler on `event.detail >= 2`, which
-   * was wrong in a way worth recording: on pointerup `detail` counts
-   * consecutive clicks at the same spot, so clicking one word twice to see its
-   * suggestions — the ordinary way anyone tests a spellchecker — reached 2 and
-   * the menu stopped opening at all. It did not break the second click, it
-   * broke every click after the first.
-   */
-  const onDoubleClickBody = (event: React.MouseEvent<HTMLDivElement>) => {
-    const flagged = (event.target as HTMLElement).closest(".misspelled");
-    if (!flagged) return;
-    const range = document.createRange();
-    range.selectNodeContents(flagged);
-    const selection = window.getSelection();
-    selection?.removeAllRanges();
-    selection?.addRange(range);
-  };
-
   const onClickBody = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
 
@@ -1688,10 +1663,7 @@ export function ProseEditor({
         onDoubleClick={(event) => {
           const marker = (event.target as HTMLElement).closest?.(".doc-bookmark");
           const id = marker?.getAttribute("data-bookmark");
-          if (!id || !onOpenBookmark) {
-            onDoubleClickBody(event);
-            return;
-          }
+          if (!id || !onOpenBookmark) return;
           // The word under a double-click would otherwise be selected as well.
           event.preventDefault();
           window.getSelection()?.removeAllRanges();
@@ -1753,7 +1725,45 @@ export function ProseEditor({
       {menu
         ? createPortal(
             <>
-          <div className="menu-scrim" role="presentation" onClick={() => setMenu(null)} />
+          <div
+            className="menu-scrim"
+            role="presentation"
+            onClick={(event) => {
+              /**
+               * The second click of a double-click, on the word the menu is about.
+               *
+               * The first click on a misspelling opens this menu, and with it
+               * this scrim — a clear sheet over the whole screen that catches
+               * any click outside the menu and closes it. So the second click
+               * of a double-click never reached the word: it landed here,
+               * closed the menu, and the browser, seeing two clicks on two
+               * different elements, never reported a double-click at all.
+               * Double-click-to-select worked on every word except the ones
+               * most likely to be double-clicked.
+               *
+               * `detail` on a click is the browser's own count, by the
+               * system's double-click timing. A second click that falls on a
+               * misspelling in this editor selects that word, as it would have
+               * if nothing had been in the way. Anything else closes the menu
+               * exactly as before.
+               */
+              if (event.detail >= 2) {
+                const word = document
+                  .elementsFromPoint(event.clientX, event.clientY)
+                  .map((el) => el.closest(".misspelled"))
+                  .find((el): el is Element => el !== null && Boolean(ref.current?.contains(el)));
+                if (word) {
+                  ref.current?.focus({ preventScroll: true });
+                  const range = document.createRange();
+                  range.selectNodeContents(word);
+                  const selection = window.getSelection();
+                  selection?.removeAllRanges();
+                  selection?.addRange(range);
+                }
+              }
+              setMenu(null);
+            }}
+          />
           <div
             className="menu spell-menu"
             role="menu"
