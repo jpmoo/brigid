@@ -6808,3 +6808,42 @@ p:has(+ p.focused[data-join])::after {
 .sug-fmt.focused {
   background: var(--suggest-tint);
 }
+
+/* Stepping through suggestions: previous, next, and settle-then-advance. */
+.review-bar {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.review-count {
+  min-width: 74px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.review-bar .btn {
+  gap: 4px;
+}
+.review-accept {
+  color: var(--suggest);
+}
+.review-accept:hover:not(:disabled) {
+  background: var(--suggest-tint);
+}
+.review-label {
+  font-size: 12px;
+}
+@media (max-width: 700px) {
+  .review-label {
+    display: none;
+  }
+  .review-count {
+    min-width: 0;
+  }
+}

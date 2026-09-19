@@ -25,7 +25,7 @@ function when(at: string | null): string {
  * What on the page a suggestion is: its words, its emphasis, or the paragraph
  * whose break it proposes or proposes removing.
  */
-const anchors = (id: string) => {
+export const anchors = (id: string) => {
   const key = CSS.escape(id);
   return `.sug[data-sid="${key}"], p[data-split="${key}"], p[data-join="${key}"]`;
 };
@@ -64,14 +64,21 @@ export function SuggestionCards({
   placed,
   author,
   onResolve,
+  focused,
+  onFocus,
 }: {
   pane: HTMLElement | null;
   placed: PlacedSuggestion[];
   author: string;
   onResolve: (blockId: string, id: string, accept: boolean) => void;
+  /**
+   * The suggestion being reviewed. Held by the page, because the review bar
+   * steps through suggestions too, and the two must agree on which is current.
+   */
+  focused: string | null;
+  onFocus: (id: string | null) => void;
 }) {
   const column = useRef<HTMLDivElement | null>(null);
-  const [focused, setFocused] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
 
   const layout = useCallback(() => {
@@ -154,7 +161,7 @@ export function SuggestionCards({
           className={`sug-card${focused === s.id ? " active" : ""}${hovered === s.id ? " hover" : ""}`}
           onMouseEnter={() => setHovered(s.id)}
           onMouseLeave={() => setHovered((h) => (h === s.id ? null : h))}
-          onClick={() => setFocused(focused === s.id ? null : s.id)}
+          onClick={() => onFocus(focused === s.id ? null : s.id)}
         >
           <div className="sug-card-head">
             <span className="sug-avatar" aria-hidden="true">

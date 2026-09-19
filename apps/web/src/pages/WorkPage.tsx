@@ -39,7 +39,8 @@ import { ApiError, api } from "../api.js";
 import { readLastPlace, writeLastPlace } from "../lastPlace.js";
 import { readProofreading, writeProofreading } from "../proofreading.js";
 import { ModeSwitch } from "../components/ModeSwitch.js";
-import { SuggestionCards } from "../components/SuggestionCards.js";
+import { SuggestionCards, anchors } from "../components/SuggestionCards.js";
+import { ReviewBar } from "../components/ReviewBar.js";
 import type { PlacedSuggestion } from "../components/SuggestionCards.js";
 import type { Block, Bookmark, Placement, Template, Work, WorkLevel } from "../api.js";
 import { BrandMark } from "../components/Brand.js";
@@ -1452,6 +1453,61 @@ export function WorkPage() {
     [enqueue, currentBlock, persistProse],
   );
 
+  /** The suggestion being reviewed, shared by the cards and the review bar. */
+  const [currentSuggestion, setCurrentSuggestion] = useState<string | null>(null);
+
+  // Settled by a card, or by typing, or by another pass: nothing to be on.
+  useEffect(() => {
+    if (currentSuggestion && !placedSuggestions.some((p) => p.suggestion.id === currentSuggestion)) {
+      setCurrentSuggestion(null);
+    }
+  }, [placedSuggestions, currentSuggestion]);
+
+  /**
+   * Go to a suggestion: make it current and bring it to the middle of the view,
+   * where its card is beside it.
+   *
+   * Scrolled by hand rather than with scrollIntoView, as the search does, so
+   * nothing but the manuscript pane moves — and with the tracker told to keep
+   * quiet while the page is in flight, or it would read the animation as the
+   * writer scrolling.
+   */
+  const goToSuggestion = useCallback((sid: string) => {
+    setCurrentSuggestion(sid);
+    window.requestAnimationFrame(() => {
+      const pane = paneRef.current;
+      const anchor = pane?.querySelector<HTMLElement>(anchors(sid));
+      if (!pane || !anchor) return;
+      const paneBox = pane.getBoundingClientRect();
+      const box = anchor.getBoundingClientRect();
+      const delta = box.top - paneBox.top - paneBox.height / 3;
+      if (Math.abs(delta) < 4) return;
+      scrollingUntil.current = Date.now() + 800;
+      pane.scrollBy({ top: delta, behavior: "smooth" });
+    });
+  }, []);
+
+  /**
+   * Accept or reject the suggestion in hand, and move to the next.
+   *
+   * The next is chosen before the current is settled, from the list as it is
+   * now: once the save lands the current one is gone, and "the one after it"
+   * would have nothing to be after. At the end of the list, the one before it.
+   */
+  const settleCurrent = async (accept: boolean) => {
+    const index = placedSuggestions.findIndex((p) => p.suggestion.id === currentSuggestion);
+    const here = placedSuggestions[index];
+    if (!here) return;
+    const next = placedSuggestions[index + 1] ?? placedSuggestions[index - 1] ?? null;
+    try {
+      await settle(here.blockId, here.suggestion.id, accept);
+      if (next) goToSuggestion(next.suggestion.id);
+      else setCurrentSuggestion(null);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "could not settle that suggestion");
+    }
+  };
+
   const settleEverything = async (accept: boolean) => {
     const sections = [...new Set(placedSuggestions.map((p) => p.blockId))];
     const count = placedSuggestions.length;
@@ -1843,6 +1899,12 @@ export function WorkPage() {
         </div>
         <div className="spacer" />
 
+        <ReviewBar
+          placed={placedSuggestions}
+          current={currentSuggestion}
+          onGo={goToSuggestion}
+          onSettle={(accept) => void settleCurrent(accept)}
+        />
         <ModeSwitch
           proofreading={proofreading}
           onChange={setProofreading}
@@ -2044,6 +2106,8 @@ export function WorkPage() {
               pane={paneEl}
               placed={placedSuggestions}
               author={work?.authorFirstName ?? ""}
+              focused={currentSuggestion}
+              onFocus={setCurrentSuggestion}
               onResolve={(blockId, sid, accept) => {
                 void settle(blockId, sid, accept).catch((err) =>
                   setError(err instanceof ApiError ? err.message : "could not settle that suggestion"),
@@ -2130,6 +2194,12 @@ export function WorkPage() {
             // down the page. Held open while a search is running: the results
             // count is part of what you are reading at that moment.
             <div className={`zen-controls${searchOpen ? " revealed" : ""}`}>
+              <ReviewBar
+                placed={placedSuggestions}
+                current={currentSuggestion}
+                onGo={goToSuggestion}
+                onSettle={(accept) => void settleCurrent(accept)}
+              />
               <ModeSwitch
                 proofreading={proofreading}
                 onChange={setProofreading}
