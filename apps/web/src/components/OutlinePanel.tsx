@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, MoreHorizontal, Plus, Scissors } from "lucide-react";
-import { subtreeWordCounts } from "@brigid/shared";
+import { smartenText, smarteningFor, subtreeWordCounts } from "@brigid/shared";
 import type { OutlineEntry } from "@brigid/shared";
 import type { Block, Placement, Template } from "../api.js";
 import type { TemplateBody } from "@brigid/shared";
@@ -12,8 +12,10 @@ function preview(block: Block, template?: Template): string {
   // A title page holds no prose of its own — what it says lives in its format,
   // as template lines. Falling back to those gives the card the same excerpt
   // every other card has, rather than leaving it blank and unlike the rest.
-  const text = block.contentText.trim() || literalText(template?.body ?? block.formatBody);
-  if (!text) return "";
+  const raw = block.contentText.trim() || literalText(template?.body ?? block.formatBody);
+  if (!raw) return "";
+  // As the page shows it, so the card and the manuscript agree on the words.
+  const text = smartenText(raw, smarteningFor(template?.formatSettings));
   return text.length > 180 ? `${text.slice(0, 180)}…` : text;
 }
 

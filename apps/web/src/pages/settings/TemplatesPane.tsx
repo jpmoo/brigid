@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import { smarteningFor } from "@brigid/shared";
 import type { BlockFormatSettings, BreakTemplateSettings, TemplateBody } from "@brigid/shared";
 import { ApiError, api } from "../../api.js";
 import type { Template } from "../../api.js";
@@ -204,6 +205,7 @@ function TemplateEditor({
         typography={typo}
         onTypography={setTypo}
         work={SAMPLE_WORK}
+        smart={smarteningFor(isBreak ? brk : fmt)}
       />
 
       <h4 className="tpl-section">Behavior</h4>
@@ -232,11 +234,21 @@ function TemplateEditor({
           <label className="check">
             <input
               type="checkbox"
+              checked={brk.smartQuotes ?? true}
+              onChange={(e) => setBrk({ ...brk, smartQuotes: e.target.checked })}
+            />
+            <span>
+              Smart quotes <em>— straight quotes and apostrophes are curled wherever they turn up</em>
+            </span>
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
               checked={brk.smartPunctuation ?? false}
               onChange={(e) => setBrk({ ...brk, smartPunctuation: e.target.checked })}
             />
             <span>
-              Typeset punctuation <em>— curly quotes, en and em dashes, ellipses</em>
+              Typeset dashes and ellipses <em>— two hyphens an em dash, three an en, three dots an ellipsis</em>
             </span>
           </label>
         </div>
@@ -263,11 +275,21 @@ function TemplateEditor({
           <label className="check">
             <input
               type="checkbox"
+              checked={fmt.smartQuotes ?? true}
+              onChange={(e) => setFmt({ ...fmt, smartQuotes: e.target.checked })}
+            />
+            <span>
+              Smart quotes <em>— straight quotes and apostrophes are curled wherever they turn up</em>
+            </span>
+          </label>
+          <label className="check">
+            <input
+              type="checkbox"
               checked={fmt.smartPunctuation ?? false}
               onChange={(e) => setFmt({ ...fmt, smartPunctuation: e.target.checked })}
             />
             <span>
-              Typeset punctuation <em>— curly quotes, en and em dashes, ellipses</em>
+              Typeset dashes and ellipses <em>— two hyphens an em dash, three an en, three dots an ellipsis</em>
             </span>
           </label>
         </div>

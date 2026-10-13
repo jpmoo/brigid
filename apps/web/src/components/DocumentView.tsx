@@ -14,7 +14,7 @@ import { offsetOfPoint, offsetOfPosition, paragraphUnder } from "./ProseEditor.j
 import { words } from "../spelling.js";
 import type { Speller } from "../spelling.js";
 import type { ProseLayout } from "./ProseEditor.js";
-import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Typography } from "@brigid/shared";
+import type { DocumentItem, ProseText, ResolvedNode, ResolvedSpan, Smartening, Typography } from "@brigid/shared";
 import type { Block } from "../api.js";
 
 /**
@@ -177,6 +177,8 @@ function highlight(
   return parts;
 }
 
+const NO_SMARTENING: Smartening = { quotes: false, dashes: false };
+
 function Nodes({
   nodes,
   prose,
@@ -187,7 +189,7 @@ function Nodes({
   search,
   activeIndex,
   counter,
-  smart = false,
+  smart = NO_SMARTENING,
   speller = null,
   editing = false,
   editor,
@@ -208,7 +210,7 @@ function Nodes({
   search: string;
   activeIndex: number | null;
   counter: { n: number };
-  smart?: boolean;
+  smart?: Smartening;
   /** Null when checking is off, or before the dictionary has arrived. */
   speller?: Speller | null;
   editing?: boolean;
@@ -460,7 +462,7 @@ function Nodes({
                       </span>
                     ) : null}
                     {runs.map((run, k) => {
-                      const text = smart ? smartenText(run.text) : run.text;
+                      const text = smartenText(run.text, smart);
                       const marked = highlight(text, search, counter, activeIndex, speller);
                       const underlined = hasMark(run, "underline") ? <u>{marked}</u> : marked;
                       const emphasized = hasMark(run, "em") ? <em>{underlined}</em> : underlined;
@@ -898,7 +900,7 @@ export function DocumentView({
                 activeMatch?.blockId === item.block.id ? activeMatch.indexInBlock : null
               }
               counter={{ n: 0 }}
-              smart={item.smartPunctuation}
+              smart={{ quotes: item.smartQuotes, dashes: item.smartPunctuation }}
             />
           </div>
         ),

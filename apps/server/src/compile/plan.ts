@@ -199,7 +199,10 @@ function nodesFor(
 ): CompiledNode[] {
   const out: CompiledNode[] = [];
   const typography = item.typography;
-  const smart = item.kind === "block" ? item.smartPunctuation === true : false;
+  const smart =
+    item.kind === "block"
+      ? { quotes: item.smartQuotes !== false, dashes: item.smartPunctuation === true }
+      : { quotes: false, dashes: false };
   const indentFirst = item.kind === "block" ? item.firstLineIndent !== false : true;
 
   for (const node of item.nodes) {
@@ -285,7 +288,7 @@ function nodesFor(
         paragraphs.forEach((runs, i) => {
           const compiled: CompiledRun[] = runs
             .map((run) => ({
-              text: smart ? smartenText(run.text) : run.text,
+              text: smartenText(run.text, smart),
               ...(hasMark(run, "strong") ? { bold: true } : {}),
               ...(hasMark(run, "em") ? { italic: true } : {}),
               ...(hasMark(run, "underline") ? { underline: true } : {}),

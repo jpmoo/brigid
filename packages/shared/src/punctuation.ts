@@ -12,6 +12,8 @@
  * way, which is worse than leaving it straight.
  */
 
+import type { ProseDoc } from "./prose.js";
+
 /**
  * What a quote opens after.
  *
@@ -36,17 +38,49 @@ function isWordChar(ch: string | undefined): boolean {
   return ch !== undefined && /[\p{L}\p{N}]/u.test(ch);
 }
 
-export function smartenText(input: string): string {
-  if (!input) return input;
+/**
+ * Which of the substitutions a format asks for.
+ *
+ * Two answers rather than one, because they are two different kinds of claim.
+ * A straight quote is never what a manuscript means — the keyboard simply has
+ * no other — so turning it is on unless a format says otherwise. Two hyphens
+ * might be exactly what the writer meant, so dashes and the ellipsis stay
+ * something a format opts into.
+ */
+export interface Smartening {
+  /** Straight quotes and apostrophes become curled ones. */
+  quotes: boolean;
+  /** Double and triple hyphens become dashes, three dots an ellipsis. */
+  dashes: boolean;
+}
+
+const EVERYTHING: Smartening = { quotes: true, dashes: true };
+
+/**
+ * A format's answer, read off its settings. Absent settings — a format saved
+ * before the quotes had a switch of their own, or no format at all — turn
+ * quotes and leave dashes, which is what each defaults to.
+ */
+export function smarteningFor(
+  settings: { smartQuotes?: boolean | undefined; smartPunctuation?: boolean | undefined } | null | undefined,
+): Smartening {
+  return { quotes: settings?.smartQuotes ?? true, dashes: settings?.smartPunctuation ?? false };
+}
+
+export function smartenText(input: string, what: Smartening = EVERYTHING): string {
+  if (!input || (!what.quotes && !what.dashes)) return input;
 
   // Dashes and the ellipsis first: they change what counts as the character
   // before a quote, which the quote pass then reads.
   // Triples first, so what is left of the pass is genuine pairs. Two hyphens
   // are an em dash and three an en, matching what typing them produces.
-  let text = input
-    .replace(/---/g, "–")
-    .replace(/(?<!-)--(?!-)/g, "—")
-    .replace(/\.\.\./g, "…");
+  const text = what.dashes
+    ? input
+        .replace(/---/g, "–")
+        .replace(/(?<!-)--(?!-)/g, "—")
+        .replace(/\.\.\./g, "…")
+    : input;
+  if (!what.quotes) return text;
 
   let out = "";
   for (let i = 0; i < text.length; i += 1) {
@@ -96,6 +130,38 @@ export function smartenText(input: string): string {
 
 
 /**
+ * A document with its straight quotes curled, for the editor to open on.
+ *
+ * Read a paragraph at a time rather than a run at a time: which way a quote
+ * turns depends on the character before it, and that character is as likely to
+ * sit in the neighbouring run as in its own — «she<em>'s</em>» is one word. A
+ * curled quote is the same length as a straight one, so every offset into the
+ * text — the caret, a search hit, a bookmark — still points where it did.
+ *
+ * Quotes only. A dash is shorter than the hyphens it replaces, and those are
+ * left to the keyboard and to the page.
+ */
+export function smartenQuotesInDoc(doc: ProseDoc): ProseDoc {
+  const only: Smartening = { quotes: true, dashes: false };
+  let changed = false;
+  const content = doc.content.map((paragraph) => {
+    const runs = paragraph.content;
+    if (!runs?.length) return paragraph;
+    const turned = smartenText(runs.map((run) => run.text).join(""), only);
+    let at = 0;
+    const next = runs.map((run) => {
+      const text = turned.slice(at, at + run.text.length);
+      at += run.text.length;
+      if (text === run.text) return run;
+      changed = true;
+      return { ...run, text };
+    });
+    return { ...paragraph, content: next };
+  });
+  return changed ? { ...doc, content } : doc;
+}
+
+/**
  * What a typed character should actually become, given what precedes it, or
  * null to let it through unchanged.
  *
@@ -104,9 +170,18 @@ export function smartenText(input: string): string {
  * exactly what they typed. `replace` is how many characters before the caret
  * the substitution eats.
  */
-export function autocorrectKeystroke(typed: string, before: string): { text: string; replace: number } | null {
+export function autocorrectKeystroke(
+  typed: string,
+  before: string,
+  what: Smartening = EVERYTHING,
+): { text: string; replace: number } | null {
   const prev = before.slice(-1);
   const prev2 = before.slice(-2);
+
+  // A quote and a dash are never the same key, so whichever half is switched
+  // off simply lets its own characters through.
+  const isQuote = typed === '"' || typed === "'" || /\p{N}/u.test(typed);
+  if (isQuote ? !what.quotes : !what.dashes) return null;
 
   if (typed === '"') {
     // Nothing before the caret means the start of a paragraph, which opens.

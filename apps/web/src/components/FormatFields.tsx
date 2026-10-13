@@ -1,4 +1,4 @@
-import type { TemplateBody, Typography, WorkMeta } from "@brigid/shared";
+import type { Smartening, TemplateBody, Typography, WorkMeta } from "@brigid/shared";
 import { BodyEditor } from "./BodyEditor.js";
 import { PagePreview } from "./PagePreview.js";
 import { StyleMenu } from "./StyleMenu.js";
@@ -17,6 +17,7 @@ export function FormatFields({
   typography,
   onTypography,
   work,
+  smart,
 }: {
   /** A format whose body is only the content slot has type but no arrangement. */
   styleOnly: boolean;
@@ -25,6 +26,8 @@ export function FormatFields({
   typography: Typography;
   onTypography: (next: Typography) => void;
   work: WorkMeta;
+  /** What the format typesets, so the preview shows the page it will make. */
+  smart?: Smartening | undefined;
 }) {
   if (styleOnly) {
     return (
@@ -44,7 +47,7 @@ export function FormatFields({
         </div>
         {/* Where things sit down the page is most of what a title page or a
             chapter opening is, and no list of rows shows that. */}
-        <PagePreview body={body} work={work} />
+        <PagePreview body={body} work={work} smart={smart} />
       </div>
     </>
   );

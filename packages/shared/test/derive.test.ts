@@ -345,6 +345,53 @@ check(
     smartenText(`—"Yes."`),
     "—“Yes.”",
   );
+
+  // Quotes and dashes are separate switches on a format.
+  const { smarteningFor, smartenQuotesInDoc } = await import("@brigid/shared");
+  check("a format that says nothing curls quotes and leaves dashes", smarteningFor({}), {
+    quotes: true,
+    dashes: false,
+  });
+  check("and so does no format at all", smarteningFor(null), { quotes: true, dashes: false });
+  check("quotes can be switched off", smarteningFor({ smartQuotes: false }).quotes, false);
+  check(
+    "quotes alone leave hyphens and dots as typed",
+    smartenText(`"Wait--don't..."`, { quotes: true, dashes: false }),
+    "“Wait--don’t...”",
+  );
+  check(
+    "dashes alone leave quotes straight",
+    smartenText(`"Wait--don't..."`, { quotes: false, dashes: true }),
+    `"Wait—don't…"`,
+  );
+  check(
+    "a typed quote is let through when quotes are off",
+    autocorrectKeystroke('"', "said, ", { quotes: false, dashes: true }),
+    null,
+  );
+  check(
+    "and a typed hyphen when dashes are off",
+    autocorrectKeystroke("-", "wait-", { quotes: true, dashes: false }),
+    null,
+  );
+  // «she's», with the apostrophe opening an italic run: one word across two runs.
+  const split = smartenQuotesInDoc({
+    type: "doc",
+    content: [
+      {
+        type: "paragraph",
+        content: [
+          { type: "text", text: `"I know she` },
+          { type: "text", text: `'s here,"`, marks: [{ type: "em" }] },
+        ],
+      },
+    ],
+  });
+  check(
+    "a document's quotes turn by the paragraph, not the run",
+    split.content[0]?.content?.map((r) => r.text),
+    ["“I know she", "’s here,”"],
+  );
 }
 
 // --- prose model ---

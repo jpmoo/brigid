@@ -1,4 +1,4 @@
-import type { CanvasNode } from "@brigid/shared";
+import type { CanvasNode, Smartening } from "@brigid/shared";
 import type { Block } from "../api.js";
 
 /**
@@ -189,6 +189,8 @@ export interface CanvasBlock {
   childCount: number;
   /** The break that falls before this block, if its level takes one. */
   breakName: string | null;
+  /** What the block's format typesets, so a card reads as its page does. */
+  smart?: Smartening;
   /**
    * The length this section is aiming at, or null when it has none. Shaded the
    * same way the outline shades it — the shape of the book should read the same

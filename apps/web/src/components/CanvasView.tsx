@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Grid3x3, Minus, Plus, RotateCcw, StickyNote } from "lucide-react";
-import { foldForSearch, foldForSearchMapped } from "@brigid/shared";
+import { foldForSearch, foldForSearchMapped, smartenText } from "@brigid/shared";
 import type { CanvasNode } from "@brigid/shared";
 import type { Block, Bookmark } from "../api.js";
 import { HoldToConfirm } from "./HoldToConfirm.js";
@@ -967,7 +967,10 @@ export function CanvasView({
                   drawn here for anything to overlap. */}
               {!isRegion && p.item.block.contentText.trim() ? (
                 <p className="cn-preview">
-                  {marked(p.item.block.contentText.trim().slice(0, 220), query)}
+                  {marked(
+                    smartenText(p.item.block.contentText.trim().slice(0, 220), p.item.smart),
+                    query,
+                  )}
                 </p>
               ) : null}
             </div>

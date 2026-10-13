@@ -31,6 +31,7 @@ import {
   resolveAll,
   resolveSuggestion,
   smartenText,
+  smarteningFor,
   suggestionsIn,
   subtreeWordCounts,
 } from "@brigid/shared";
@@ -828,6 +829,7 @@ export function WorkPage() {
         fallbackText={blocks.find((b) => b.id === editingProse.id)?.contentText ?? ""}
         speller={spelling.speller}
         smartPunctuation={smartPunctuationFor(editingProse.id)}
+        smartQuotes={smartQuotesFor(editingProse.id)}
         suggesting={proofreading}
         onSave={(doc) => {
           void saveProse(editingProse.id, doc);
@@ -875,6 +877,15 @@ export function WorkPage() {
     [items],
   );
   smartRef.current = smartPunctuationFor;
+
+  /** Quotes have their own switch, and unlike dashes they are on unless turned off. */
+  const smartQuotesFor = useCallback(
+    (blockId: string) => {
+      const item = items.find((i) => i.kind === "block" && i.block.id === blockId);
+      return item && item.kind === "block" ? item.smartQuotes : true;
+    },
+    [items],
+  );
 
   // The outline shows each break attached above the block it precedes, so the
   // structure reads the same in both panes.
@@ -925,11 +936,12 @@ export function WorkPage() {
          * depth implies and that it does not in fact take.
          */
         breakName: breaks.get(entry.block.id)?.templateName ?? null,
+        smart: smarteningFor(templateMap.get(entry.block.formatId)?.formatSettings),
         // Only structural blocks: a title page has no length to fall short of,
         // so it is never shaded short and never shaded met.
         goal: structural(entry.block) ? (levels[entry.depth]?.wordGoal ?? null) : null,
       })),
-    [entries, levels, templates, canvasTotals, structural, breaks],
+    [entries, levels, templates, templateMap, canvasTotals, structural, breaks],
   );
 
   const totalWords = useMemo(
@@ -959,7 +971,10 @@ export function WorkPage() {
            * finding. Read from the document instead, where they are.
            */
           const shown = hasSuggestions(docOf(i.block)) ? proseToText(docOf(i.block)) : i.block.contentText;
-          return { id: i.block.id, contentText: i.smartPunctuation ? smartenText(shown) : shown };
+          return {
+            id: i.block.id,
+            contentText: smartenText(shown, { quotes: i.smartQuotes, dashes: i.smartPunctuation }),
+          };
         })
         .filter((b): b is { id: string; contentText: string } => b !== null),
     [items],

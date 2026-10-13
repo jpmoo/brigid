@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { previewBody } from "@brigid/shared";
+import type { Smartening } from "@brigid/shared";
 import type { ResolvedSpan, TemplateBody, WorkMeta } from "@brigid/shared";
 
 /**
@@ -48,6 +49,7 @@ export function PagePreview({
   heightPt = 792,
   marginPt = MARGIN,
   scale = 0.46,
+  smart,
 }: {
   body: TemplateBody;
   work: WorkMeta;
@@ -55,8 +57,9 @@ export function PagePreview({
   heightPt?: number;
   marginPt?: number;
   scale?: number;
+  smart?: Smartening | undefined;
 }) {
-  const nodes = previewBody(body.nodes, work);
+  const nodes = previewBody(body.nodes, work, smart ? { smart } : {});
 
   const page: CSSProperties = {
     width: widthPt,

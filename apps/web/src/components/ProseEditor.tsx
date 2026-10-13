@@ -14,6 +14,8 @@ import {
   normalizeProse,
   proseFromParagraphs,
   proseToText,
+  smartenQuotesInDoc,
+  smartenText,
 } from "@brigid/shared";
 import type { ProseDoc, ProseMark, ProseMarkType, ProseText } from "@brigid/shared";
 import { BOOKMARK_DRAG_TYPE } from "./BookmarkStrip.js";
@@ -932,6 +934,8 @@ export interface ProseEditorProps {
   /** Whether checking is switched on, which is not the same as ready. */
   spellcheckWanted: boolean;
   smartPunctuation: boolean;
+  /** Straight quotes are curled: as typed, as pasted, and where already there. */
+  smartQuotes: boolean;
   onSave: (doc: ProseDoc) => void;
   onDone: () => void;
   onAddWord: (word: string) => void;
@@ -964,6 +968,7 @@ export function ProseEditor({
   speller,
   spellcheckWanted,
   smartPunctuation,
+  smartQuotes,
   onSave,
   onDone,
   onAddWord,
@@ -1018,9 +1023,12 @@ export function ProseEditor({
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const doc =
+    const stored =
       asProseDoc(content) ??
       proseFromParagraphs(fallbackText ? fallbackText.split(/\n{2,}/) : [""]);
+    // Straight quotes already in the prose — imported, or pasted in before the
+    // format curled them — open curled, as the page was already showing them.
+    const doc = smartQuotes ? smartenQuotesInDoc(stored) : stored;
     el.innerHTML = docToHtml(doc, speller, layoutRef.current, searchRef.current, activeHitRef.current, bookmarksRef.current);
     // Focusing an element scrolls it into view, and the writer has just clicked
     // on the very words they want to stay put — so the page shifted under the
@@ -1447,11 +1455,14 @@ export function ProseEditor({
       window.setTimeout(recheck, 0);
     }
 
-    if (smartPunctuation && event.key.length === 1) {
+    if ((smartPunctuation || smartQuotes) && event.key.length === 1) {
       const selection = window.getSelection();
       const range = selection && selection.rangeCount ? selection.getRangeAt(0) : null;
       if (range && range.collapsed && el.contains(range.startContainer)) {
-        const fix = autocorrectKeystroke(event.key, textBeforeCaret(el, range).slice(-2));
+        const fix = autocorrectKeystroke(event.key, textBeforeCaret(el, range).slice(-2), {
+          quotes: smartQuotes,
+          dashes: smartPunctuation,
+        });
         if (fix) {
           event.preventDefault();
           // The characters being replaced are taken back through the selection
@@ -2028,6 +2039,10 @@ export function ProseEditor({
           // it, and none of it belongs in a manuscript whose look is decided by
           // its formats.
           const own = event.clipboardData.getData(PROSE_FLAVOUR);
+          // Prose from anywhere else arrives with whatever quotes its source
+          // had, which from a plain-text editor or an email is straight ones.
+          const curl = (text: string) =>
+            smartQuotes ? smartenText(text, { quotes: true, dashes: false }) : text;
           const doc = own ? readFlavour(own) : null;
           const el = ref.current;
           if (suggestingRef.current && el) {
@@ -2038,7 +2053,7 @@ export function ProseEditor({
              * between its paragraphs are made directly for now — only the words
              * are proposed.
              */
-            const plain = doc ? proseToText(doc) : event.clipboardData.getData("text/plain");
+            const plain = doc ? proseToText(doc) : curl(event.clipboardData.getData("text/plain"));
             const chunks = plain.replace(/\r\n?/g, "\n").split(/\n{2,}/).map((c) => c.replace(/\n/g, " "));
             chunks.forEach((chunk, i) => {
               if (i > 0) document.execCommand("insertParagraph");
@@ -2053,7 +2068,7 @@ export function ProseEditor({
                 : docToHtml(doc, null);
             document.execCommand("insertHTML", false, html);
           } else {
-            document.execCommand("insertText", false, event.clipboardData.getData("text/plain"));
+            document.execCommand("insertText", false, curl(event.clipboardData.getData("text/plain")));
           }
 
           window.setTimeout(recheck, 0);

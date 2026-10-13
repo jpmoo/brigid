@@ -22,6 +22,7 @@ const typography = z
 const breakSettings = z.object({
   suppressOnFirstChild: z.boolean(),
   indentFirstParagraph: z.boolean().optional(),
+  smartQuotes: z.boolean().optional(),
   smartPunctuation: z.boolean().optional(),
   typography,
 });
@@ -29,6 +30,7 @@ const breakSettings = z.object({
 const formatSettings = z.object({
   countsTowardWordCount: z.boolean(),
   structural: z.boolean(),
+  smartQuotes: z.boolean().optional(),
   smartPunctuation: z.boolean().optional(),
   typography,
   sectionStart: z
