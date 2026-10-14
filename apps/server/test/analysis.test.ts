@@ -10,7 +10,8 @@
 import type { CharacterAnalysis, PlacedDigest } from "@brigid/shared";
 import { charBudget, contextLengthFrom } from "../src/ollama/client.js";
 import { mergeDigests, normalize, splitForBudget } from "../src/ollama/digest.js";
-import { buildRoster, dossierFor, reconcilePrimacy, timelineFor } from "../src/ollama/analysis.js";
+import { buildRoster, dossierFor, reconcilePrimacy, settleBestFit, timelineFor } from "../src/ollama/analysis.js";
+import { structurePrinciples } from "../src/ollama/frameworks.js";
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: string): void {
@@ -195,6 +196,37 @@ check("and scores below 5 are left alone", scoreOf("Ines") === 3);
 
 const single = reconcilePrimacy([profile("Vane", 5, ["a"])]);
 check("an uncontested 5 stands", single[0]!.axes[0]!.score === 5);
+
+// --- best fit agrees with the rest of the answer ---
+{
+  const fits = (pairs: Record<string, string>) =>
+    Object.entries(pairs).map(([model, fit]) => ({ model, fit, evidence: [], gaps: [], summary: "" })) as never;
+  const shape = (bestFit: string | null, bestFitWhy: string, models = fits({ immram: "good", freytag: "low" })) =>
+    settleBestFit({ models, bestFit, bestFitWhy, overview: "" }).bestFit;
+
+  check("a key stands", shape("immram", "") === "immram");
+  check("a name is read as its key", shape("The Immram", "") === "immram");
+  check("so is a name with its apostrophe curled", shape("The Hero\u2019s Journey", "") === "heros-journey");
+  check("and a name with its diacritic dropped", shape("Kishotenketsu", "") === "kishotenketsu");
+  check(
+    "nothing named, but the explanation argues for one",
+    shape("", "The voyage structure of the Immram fits best: a chain of island episodes.", fits({ immram: "moderate", freytag: "moderate" })) === "immram",
+  );
+  check("nothing named, one good fit alone at the top", shape("", "") === "immram");
+  check(
+    "two good fits and no word on which is left as none",
+    shape("", "", fits({ immram: "good", "story-circle": "good" })) === null,
+  );
+  check(
+    "no good fit and no word on one is left as none",
+    shape("", "Nothing here follows beat logic.", fits({ immram: "moderate", freytag: "low" })) === null,
+  );
+}
+
+// --- what the judge is told about whether the book is done ---
+check("a finished book is said to be finished", structurePrinciples(true).includes("MARKED THIS MANUSCRIPT AS FINISHED"));
+check("and is not called probably unfinished", !/PROBABLY UNFINISHED|MAY BE UNFINISHED/.test(structurePrinciples(true)));
+check("otherwise the judge is told it may not be", structurePrinciples(false).includes("MAY BE UNFINISHED"));
 
 console.log(failures === 0 ? "\nALL PASS" : `\n${failures} FAILURE(S)`);
 process.exit(failures === 0 ? 0 : 1);

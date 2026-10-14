@@ -128,6 +128,8 @@ export const works = pgTable("works", {
   pageSetup: jsonb("page_setup").$type<PageSetup>().notNull(),
   /** A length to aim at for the whole manuscript. Null means none. */
   totalWordGoal: integer("total_word_goal"),
+  /** The writer's word that the manuscript is complete, for the story-shape judge. */
+  finished: boolean("finished").notNull().default(false),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

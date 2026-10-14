@@ -13,7 +13,7 @@ import {
   MODEL_KEYS,
   MODEL_LABELS,
   STRUCTURE_MODELS,
-  STRUCTURE_PRINCIPLES,
+  structurePrinciples,
 } from "./frameworks.js";
 
 /**
@@ -231,7 +231,11 @@ const STRUCTURE_SCHEMA = {
         required: ["model", "fit", "evidence", "gaps", "summary"],
       },
     },
-    bestFit: { type: "string" },
+    // The keys or nothing. Left a free string, a judge would answer with the
+    // framework's name — "The Immram" — which matched no key and was thrown
+    // away, so the panel said no framework fit best directly above an
+    // explanation of why one did.
+    bestFit: { type: "string", enum: [...MODEL_KEYS, ""] },
     bestFitWhy: { type: "string" },
     overview: { type: "string" },
   },
@@ -248,9 +252,11 @@ export async function analyseStructure(opts: {
   title: string;
   totalWords: number;
   sections: PlacedDigest[];
+  /** The writer's word that the manuscript is complete. */
+  finished?: boolean;
   signal?: AbortSignal;
 }): Promise<{ result: StructureAnalysis; ms: number }> {
-  const prompt = `MANUSCRIPT: "${opts.title}" — ${opts.totalWords.toLocaleString()} words, ${opts.sections.length} sections.
+  const prompt = `MANUSCRIPT: "${opts.title}" — ${opts.totalWords.toLocaleString()} words, ${opts.sections.length} sections${opts.finished ? ", finished" : ""}.
 
 ${STRUCTURE_MODELS}
 
@@ -262,7 +268,7 @@ Judge all eight models. Return one entry per model, using these exact keys: ${MO
 
 For each: the fit rating, the distinctive elements you found with the events instantiating them and their positions, the distinctive elements that are absent or mislocated, and a summary of a few sentences explaining the rating in plain language.
 
-Then name the single best-fitting model in "bestFit" using one of those keys — or leave it empty if the manuscript follows rhetorical or associative logic and fits no beat model well, which is a legitimate finding. Explain in "bestFitWhy". In "overview", give a few sentences on the manuscript's shape overall.`;
+Then name the single best-fitting model in "bestFit" using one of those keys exactly — or leave it empty if the manuscript follows rhetorical or associative logic and fits no beat model well, which is a legitimate finding. Explain in "bestFitWhy". The two must agree: if "bestFitWhy" argues that one model fits best, "bestFit" is that model's key. In "overview", give a few sentences on the manuscript's shape overall.`;
 
   const answer = await generateJson<Partial<StructureAnalysis>>({
     url: opts.url,
@@ -271,7 +277,7 @@ Then name the single best-fitting model in "bestFit" using one of those keys —
     provider: opts.provider ?? null,
     apiKey: opts.apiKey ?? null,
     thinks: opts.thinks ?? null,
-    system: STRUCTURE_PRINCIPLES,
+    system: structurePrinciples(opts.finished === true),
     format: STRUCTURE_SCHEMA as unknown as Record<string, unknown>,
     prompt,
     ...(opts.signal ? { signal: opts.signal } : {}),
@@ -294,17 +300,75 @@ Then name the single best-fitting model in "bestFit" using one of those keys —
     };
   });
 
-  const bestFit = raw.bestFit && MODEL_KEYS.includes(raw.bestFit as never) ? raw.bestFit : null;
-
   return {
-    result: {
+    result: settleBestFit({
       models,
-      bestFit,
+      bestFit: raw.bestFit ?? null,
       bestFitWhy: raw.bestFitWhy ?? "",
       overview: raw.overview ?? "",
-    },
+    }),
     ms: answer.ms,
   };
+}
+
+/** A framework's name or key, reduced to what two spellings of it share. */
+function foldFramework(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .replace(/^the /, "")
+    .replace(/ structure$/, "");
+}
+
+const RANK: Record<string, number> = { good: 4, moderate: 3, low: 2, bad: 1, na: 0 };
+
+/**
+ * The best fit, made to agree with the rest of the answer.
+ *
+ * A judge names its best fit in one field and argues for it in another, and
+ * the two can come apart. When they do the panel shows the contradiction
+ * verbatim — "no single framework fits best", then a paragraph on why one
+ * does — which is worse than either answer. So, in order:
+ *
+ *  1. A key, as asked for, stands.
+ *  2. A name rather than a key — "The Immram", "Hero's Journey" — is read as
+ *     the framework it names.
+ *  3. Nothing usable, but the explanation names exactly one framework: that
+ *     is the one being argued for.
+ *  4. Nothing usable, but exactly one framework was rated a good fit and none
+ *     tied with it: the ratings have answered the question already.
+ *
+ * Otherwise it is left as none, which is a real finding. Applied to stored
+ * results as well as fresh ones, so an analysis already on the page is
+ * mended without being run again.
+ */
+export function settleBestFit(result: StructureAnalysis): StructureAnalysis {
+  const keys: readonly string[] = MODEL_KEYS;
+  const named = (said: string): string | null => {
+    const folded = foldFramework(said);
+    if (!folded) return null;
+    return (
+      MODEL_KEYS.find((key) => foldFramework(key) === folded || foldFramework(MODEL_LABELS[key]) === folded) ?? null
+    );
+  };
+
+  if (result.bestFit && keys.includes(result.bestFit)) return result;
+  const fromName = result.bestFit ? named(result.bestFit) : null;
+  if (fromName) return { ...result, bestFit: fromName };
+
+  const why = ` ${foldFramework(result.bestFitWhy ?? "")} `;
+  const mentioned = MODEL_KEYS.filter((key) => why.includes(` ${foldFramework(MODEL_LABELS[key])} `));
+  if (mentioned.length === 1) return { ...result, bestFit: mentioned[0]! };
+
+  const top = Math.max(...result.models.map((m) => RANK[m.fit] ?? 0));
+  const leaders = result.models.filter((m) => (RANK[m.fit] ?? 0) === top);
+  if (top === RANK.good && leaders.length === 1) return { ...result, bestFit: leaders[0]!.model };
+
+  return { ...result, bestFit: null };
 }
 
 const CHARACTER_SCHEMA = {

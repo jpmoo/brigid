@@ -39,6 +39,7 @@ import { badRequest, notFound } from "../lib/errors.js";
 import {
   analyseStructure,
   buildRoster,
+  settleBestFit,
   foldName,
   rosterFromCast,
 } from "./analysis.js";
@@ -444,7 +445,7 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
         kind: row.kind,
         subject: row.subject,
         model: row.model,
-        result: inChartOrder(row.result),
+        result: row.kind === "structure" ? settleBestFit(row.result as unknown as StructureAnalysis) : inChartOrder(row.result),
         createdAt: row.createdAt,
         /** False once the manuscript has moved on since this was judged. */
         current: row.digestFingerprint === mark,
@@ -598,8 +599,8 @@ export async function analysisRoutes(app: FastifyInstance): Promise<void> {
     const sections = await readyDigest(workId);
 
     const stored = await db.select().from(analyses).where(eq(analyses.workId, workId));
-    const structure =
-      (stored.find((r) => r.kind === "structure")?.result as StructureAnalysis | undefined) ?? null;
+    const found = stored.find((r) => r.kind === "structure")?.result as StructureAnalysis | undefined;
+    const structure = found ? settleBestFit(found) : null;
     const profiles = stored
       .filter((r) => r.kind === "character")
       .map((r) => r.result as unknown as CharacterAnalysis);

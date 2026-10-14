@@ -71,6 +71,33 @@ export function AiPane({ workId }: { workId: string }) {
   }, [reload]);
 
   /**
+   * Whether the writer says the book is done. Null until known, so the box
+   * isn't shown unticked for a moment on a manuscript that is finished.
+   */
+  const [finished, setFinished] = useState<boolean | null>(null);
+  useEffect(() => {
+    let live = true;
+    api
+      .getWork(workId)
+      .then(({ work }) => live && setFinished(work.finished))
+      .catch(() => live && setFinished(false));
+    return () => {
+      live = false;
+    };
+  }, [workId]);
+
+  async function markFinished(next: boolean) {
+    const was = finished;
+    setFinished(next);
+    try {
+      await api.updateWork(workId, { finished: next });
+    } catch (err) {
+      setFinished(was);
+      setError(err instanceof ApiError ? err.message : "could not save that");
+    }
+  }
+
+  /**
    * While the walk is under way the counts move, so they are re-read. Once it
    * is done the polling stops — there is nothing left to watch, and a settings
    * page left open shouldn't keep a server busy all afternoon.
@@ -166,6 +193,8 @@ export function AiPane({ workId }: { workId: string }) {
               run={shapeRun}
               busy={busy === "structure"}
               onRun={() => void start("structure")}
+              finished={finished}
+              onFinished={(next) => void markFinished(next)}
             />
           ) : tab === "characters" ? (
             <CharactersPane
@@ -524,6 +553,8 @@ function StructurePane({
   run,
   busy,
   onRun,
+  finished,
+  onFinished,
 }: {
   report: AnalysisBundle["reports"][number] | undefined;
   labels: Record<string, string>;
@@ -531,6 +562,8 @@ function StructurePane({
   run: StructureRunProgress | null;
   busy: boolean;
   onRun: () => void;
+  finished: boolean | null;
+  onFinished: (next: boolean) => void;
 }) {
   const result = report?.result as StructureAnalysis | undefined;
   /**
@@ -565,6 +598,21 @@ function StructurePane({
           </span>
         ) : null}
       </div>
+
+      {finished !== null ? (
+        <label className="check" style={{ marginTop: 10 }}>
+          <input
+            type="checkbox"
+            checked={finished}
+            disabled={working}
+            onChange={(e) => onFinished(e.target.checked)}
+          />
+          <span>
+            The manuscript is finished{" "}
+            <em>&mdash; the last section is the ending, not where the draft stops. Run again to apply.</em>
+          </span>
+        </label>
+      ) : null}
 
       {run?.status === "failed" && run.lastError ? (
         <div className="alert error">

@@ -222,7 +222,7 @@ async function drainStructure(workId: string, signal: AbortSignal): Promise<void
   if (!config) return;
 
   const [work] = await db
-    .select({ title: works.title })
+    .select({ title: works.title, finished: works.finished })
     .from(works)
     .where(eq(works.id, workId))
     .limit(1);
@@ -247,6 +247,7 @@ async function drainStructure(workId: string, signal: AbortSignal): Promise<void
       title: work.title,
       totalWords: sections.reduce((sum, sec) => sum + sec.words, 0),
       sections,
+      finished: work.finished,
       signal,
     });
 

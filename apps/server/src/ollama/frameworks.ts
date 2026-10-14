@@ -8,13 +8,33 @@
  * structures in any manuscript and score every character a 4 on every axis.
  */
 
-export const STRUCTURE_PRINCIPLES = `You are judging how well a manuscript fits each of eight narrative structure models.
-
-THE MANUSCRIPT IS PROBABLY UNFINISHED. This is a draft in progress, not a published book, and it is the single most likely reason a model appears not to fit. Before recording a gap, ask whether the element is ABSENT or merely NOT WRITTEN YET.
+/**
+ * What the judge is told about whether the book is done.
+ *
+ * Only the writer knows. Told nothing, a judge reading a draft will mistake an
+ * ending it hasn't reached for an ending that is missing, and mark every model
+ * down for it — so the default warns that the draft may stop short. But the
+ * warning used to be the default for everyone, stated as a likelihood, and a
+ * judge primed that way finds a finished book unfinished: its quiet ending
+ * reads as a draft breaking off. So the writer can say, and when they have,
+ * the judge is told so as a fact.
+ */
+const UNFINISHED_MAYBE = `THE MANUSCRIPT MAY BE UNFINISHED. The writer has not said whether this draft is complete. Before recording a gap, ask whether the element is ABSENT or merely NOT WRITTEN YET — but decide that from the text, not by assumption.
 - Every one of these models makes claims about the ending. A manuscript that stops partway has no resolution, no return, no catastrophe, no ketsu — and that is not evidence against any framework. It is evidence of an unfinished draft.
-- Positions are computed as a fraction of WHAT EXISTS SO FAR, not of the finished book. If the draft breaks off mid-story, an event at "90%" may be nowhere near the ending the model has in mind. Say so rather than treating the last written scene as a climax.
-- Signs a manuscript is unfinished: it ends without resolving its central question; the last sections are shorter or thinner than the rest; late positions contain setup rather than payoff; a stated goal is never answered.
-- When you judge a manuscript to be incomplete, say so plainly in the overview, and do NOT lower a fit rating for elements that would fall in the unwritten part. Rate what the written portion supports and name the elements you could not assess. "Cannot yet be judged — the draft stops before this would appear" is a better finding than a bad fit.
+- Positions are computed as a fraction of WHAT EXISTS SO FAR. If the draft breaks off mid-story, an event at "90%" may be nowhere near the ending the model has in mind. Say so rather than treating the last written scene as a climax.
+- Signs a manuscript is unfinished: it breaks off without resolving its central question; the last sections are much shorter or thinner than the rest; late positions contain setup rather than payoff; a stated goal is never answered.
+- An ending that is quiet, open, ambiguous, or unhappy is still an ending. Do not call a manuscript unfinished because its resolution is understated or because it declines to tie everything up. Only say it is unfinished when the evidence above is clearly present.
+- When you do judge a manuscript to be incomplete, say so plainly in the overview, and do NOT lower a fit rating for elements that would fall in the unwritten part. "Cannot yet be judged — the draft stops before this would appear" is a better finding than a bad fit.`;
+
+const FINISHED = `THE WRITER HAS MARKED THIS MANUSCRIPT AS FINISHED. That is a fact, not a judgment for you to revisit.
+- The last section is the ending. Read it as the resolution the writer chose, however quiet, open, or unexpected it is.
+- Positions are fractions of the whole, finished book. "90%" is genuinely near the end.
+- Do NOT describe the manuscript as unfinished, incomplete, a draft in progress, or likely to continue, anywhere in your answer. Do not excuse a missing element as "not written yet": if a model's ending, return, or resolution is absent, it is absent, and that counts in the rating.`;
+
+export function structurePrinciples(finished: boolean): string {
+  return `You are judging how well a manuscript fits each of eight narrative structure models.
+
+${finished ? FINISHED : UNFINISHED_MAYBE}
 
 TREAT THIS MANUSCRIPT AS AN UNPUBLISHED, ORIGINAL WORK YOU HAVE NEVER SEEN.
 
@@ -32,6 +52,7 @@ Governing principles — these matter more than the model descriptions:
 6. Voice-driven, frame-narrated, and episodic fiction often obeys rhetorical or associative logic rather than beat logic. (One model here, the Immram, is itself episodic — test episodic work against it before concluding nothing fits, but do not grant it fit for episodes alone.) WEAK FIT TO ALL MODELS IS A LEGITIMATE AND INFORMATIVE FINDING, not an evaluation failure. Do not manufacture fit to be helpful.
 
 Rate each model: "good" (strong fit), "moderate" (partial), "low" (weak but arguable), "bad" (the story's shape contradicts the model), or "na" (not applicable — wrong length class, e.g. a fifteen-beat commercial structure against a very short work). "na" is not a bad score; it means the question cannot be asked of this manuscript.`;
+}
 
 export const STRUCTURE_MODELS = `THE EIGHT MODELS
 

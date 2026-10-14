@@ -224,7 +224,10 @@ export async function worksRoutes(app: FastifyInstance): Promise<void> {
       .partial()
       // Null cancels the goal rather than deleting anything, so there is never
       // a second one to reconcile with the first.
-      .extend({ totalWordGoal: z.number().int().min(1).max(100000000).nullable().optional() })
+      .extend({
+        totalWordGoal: z.number().int().min(1).max(100000000).nullable().optional(),
+        finished: z.boolean().optional(),
+      })
       .parse(req.body);
 
     const [updated] = await db
