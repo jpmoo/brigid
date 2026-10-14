@@ -370,7 +370,7 @@ export function stopDigestWorker(): void {
  * Everything read so far, placed in the finished book.
  *
  * This is both what the writer can inspect and what the judging pass consumes.
- * The placement is the reason it exists in this shape: five of the seven
+ * The placement is the reason it exists in this shape: most of the eight
  * structure models make proportional claims, and the reference document is
  * explicit that a mapping doesn\'t count if the midpoint has to be dragged to
  * the 80% mark to work. A model asked to eyeball proportions from prose will

@@ -85,7 +85,7 @@ export interface SectionDigest {
  * Position is computed when the digest is read, never stored: it is a fraction
  * of a whole that shifts whenever any other section changes length, and a
  * stored percentage would be wrong the moment the writer added a paragraph
- * anywhere earlier. Since five of the seven structure models make proportional
+ * anywhere earlier. Since most of the eight structure models make proportional
  * claims, a stale percentage is not a cosmetic problem.
  */
 export interface PlacedDigest extends SectionDigest {

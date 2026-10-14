@@ -4,11 +4,11 @@
  * Condensed from the two evaluator documents, but deliberately not simplified
  * where it counts: the counter-indicators and the discrimination rules are the
  * parts that stop everything fitting everything, and they are reproduced in
- * full. A model given only the positive indicators will find all seven
+ * full. A model given only the positive indicators will find all eight
  * structures in any manuscript and score every character a 4 on every axis.
  */
 
-export const STRUCTURE_PRINCIPLES = `You are judging how well a manuscript fits each of seven narrative structure models.
+export const STRUCTURE_PRINCIPLES = `You are judging how well a manuscript fits each of eight narrative structure models.
 
 THE MANUSCRIPT IS PROBABLY UNFINISHED. This is a draft in progress, not a published book, and it is the single most likely reason a model appears not to fit. Before recording a gap, ask whether the element is ABSENT or merely NOT WRITTEN YET.
 - Every one of these models makes claims about the ending. A manuscript that stops partway has no resolution, no return, no catastrophe, no ketsu — and that is not evidence against any framework. It is evidence of an unfinished draft.
@@ -29,11 +29,11 @@ Governing principles — these matter more than the model descriptions:
 3. Check proportions, not just sequence. Most of these models claim where beats fall relative to the whole. All the beats in the wrong proportions is a weak fit. You are given each section's position as a percentage of the book; use it.
 4. Check the engine, not just the events. A story whose surface events match but whose motive force differs is a partial fit at best.
 5. Models overlap heavily. When several fit, identify which fits MOST SPECIFICALLY — which model's distinctive claims, not its shared ones, the story satisfies.
-6. Voice-driven, frame-narrated, and episodic fiction often obeys rhetorical or associative logic rather than beat logic. WEAK FIT TO ALL MODELS IS A LEGITIMATE AND INFORMATIVE FINDING, not an evaluation failure. Do not manufacture fit to be helpful.
+6. Voice-driven, frame-narrated, and episodic fiction often obeys rhetorical or associative logic rather than beat logic. (One model here, the Immram, is itself episodic — test episodic work against it before concluding nothing fits, but do not grant it fit for episodes alone.) WEAK FIT TO ALL MODELS IS A LEGITIMATE AND INFORMATIVE FINDING, not an evaluation failure. Do not manufacture fit to be helpful.
 
 Rate each model: "good" (strong fit), "moderate" (partial), "low" (weak but arguable), "bad" (the story's shape contradicts the model), or "na" (not applicable — wrong length class, e.g. a fifteen-beat commercial structure against a very short work). "na" is not a bad score; it means the question cannot be asked of this manuscript.`;
 
-export const STRUCTURE_MODELS = `THE SEVEN MODELS
+export const STRUCTURE_MODELS = `THE EIGHT MODELS
 
 1. HERO'S JOURNEY (Campbell/Vogler). Twelve stages in three movements: Ordinary World, Call, Refusal, Meeting the Mentor, Crossing the Threshold; Tests/Allies/Enemies, Approach, Ordeal, Reward; Road Back, Resurrection, Return with the Elixir.
 Distinctive claims: two distinct worlds separated by a threshold with a ROUND TRIP between them; a mentor figure; symbolic death and rebirth; the return matters — value is brought back to a community; internal transformation is mandatory and mirrors the external quest.
@@ -70,7 +70,13 @@ Common misclassification: equating ten with a Western plot twist. A twist that s
 7. SEVEN-POINT (Dan Wells). Hook, Plot Turn 1 (~25%), Pinch 1 (~37%), Midpoint (~50%), Pinch 2 (~62–75%), Plot Turn 2 (~75%), Resolution.
 Distinctive claims: HOOK–RESOLUTION POLARITY — the opening is engineered as the inverse of the ending; the states should be measurably opposite. MIDPOINT AS AGENCY PIVOT — the character shifts from reaction to action; this is mandatory and central. TWO PINCHES bracketing the midpoint, each escalating antagonist pressure. PLOT TURN 2 AS ACQUISITION — it delivers the missing piece enabling resolution, rather than merely being a low point (the low point is Pinch 2).
 Weak fit: opening and ending states not meaningfully opposed; a protagonist proactive from the start or reactive throughout; a single undifferentiated slide of escalation with no paired pinches; resolution arriving with no acquisition beat.
-Prefer Seven-Point when the polarity, agency pivot, and paired pinches are all clearly present; prefer Save the Cat when the tonal/thematic beats are present; prefer plain Three-Act when only the generic skeleton is identifiable.`;
+Prefer Seven-Point when the polarity, agency pivot, and paired pinches are all clearly present; prefer Save the Cat when the tonal/thematic beats are present; prefer plain Three-Act when only the generic skeleton is identifiable.
+
+8. IMMRAM (the Old Irish voyage tale — the Voyage of Máel Dúin, of Bran, of the Uí Chorra; the Voyage of St Brendan). A short frame: a motive for setting out (vengeance, penance, exile, or a summons from the Otherworld) and a company embarking, often with a fixed number and latecomers who join against instruction. Then a long CHAIN OF ISLANDS — a sequence of self-contained encounters, each a strange place with its own rule, wonder, peril, or teaching. Then the homecoming, and the telling of the tale.
+Distinctive claims: THE ENGINE IS WONDER AND PILGRIMAGE, NOT OPPOSITION. Episodes are encountered rather than fought through; each is complete in itself, and their ORDER IS LARGELY NOT CAUSAL — many could be swapped without breaking the story. No single antagonist and no central climax: the middle is an archipelago of roughly comparable weight, not a rising line. The company dwindles — members are lost, left behind, or stay on an island, frequently those who broke a rule or joined uninvited. The voyage TRANSFORMS THE MOTIVE rather than fulfilling it: the vengeance is forgiven, the penance becomes vocation, the quest's object stops mattering. Hermits, elders, and otherworld hosts instruct rather than equip for a fight. The return is altered or impossible — time has run differently, home cannot be touched, or the voyager comes back chiefly to bear witness.
+Strong fit: a frame-departure in the first ~10–15% and a homecoming or witness in the last ~10%; a middle built from many discrete episodes, each with a distinct setting or marvel; recurring loss of companions; a guiding purpose dissolved or redeemed by what is seen; moral or spiritual meaning carried by the encounters rather than by victory; a narrated or recorded quality to the telling.
+Weak fit: episodes linked by escalating cause and effect toward one confrontation; a single antagonist driving the action; a journey that is mere transport between plot points; a goal straightforwardly achieved; stops that are obstacles to be overcome rather than wonders to be witnessed.
+Common misclassification: any road, quest, or picaresque novel with episodic stops. Require the distinctive claims — non-causal episodes of the marvellous, a dwindling company, and the motive transformed — not just "a journey with many stops". Distinguish from Hero's Journey: no mentor-and-threshold round trip and no central ordeal or resurrection; the change comes by accumulation of encounters. Distinguish from Kishōtenketsu: the Immram has no single recontextualizing turn; its meaning accrues across the chain.`;
 
 export const AXES_PRINCIPLES = `You are scoring one character on ten role axes, 0–5, to produce a radar profile whose SHAPE characterizes their role.
 
@@ -211,6 +217,7 @@ export const MODEL_KEYS = [
   "story-circle",
   "kishotenketsu",
   "seven-point",
+  "immram",
 ] as const;
 
 export const MODEL_LABELS: Record<(typeof MODEL_KEYS)[number], string> = {
@@ -221,6 +228,7 @@ export const MODEL_LABELS: Record<(typeof MODEL_KEYS)[number], string> = {
   "story-circle": "The Story Circle",
   kishotenketsu: "Kishōtenketsu",
   "seven-point": "Seven-Point Structure",
+  immram: "The Immram",
 };
 
 /**
@@ -246,6 +254,8 @@ export const MODEL_BLURBS: Record<(typeof MODEL_KEYS)[number], string> = {
     "A four-part East Asian structure in which CONFLICT IS NOT THE ENGINE. It builds by accumulation rather than escalation, then turns on a twist that recontextualizes everything before it, and closes by integration rather than victory.",
   "seven-point":
     "Built backwards from the ending. The opening is engineered as the inverse of the resolution; the midpoint flips the protagonist from reacting to acting; two pinches bracket it; and a late turn hands over the missing piece.",
+  immram:
+    "The Old Irish voyage tale. A company sets out — for vengeance, penance, or a summons — and passes through a chain of islands, each a self-contained wonder or teaching, losing companions as it goes. WONDER IS THE ENGINE, NOT CONFLICT, and the voyage transforms the purpose it began with; the homecoming is altered or impossible.",
 };
 
 /**

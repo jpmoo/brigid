@@ -153,8 +153,8 @@ const placed = [
 placed[0]!.events = [{ what: "the door is unlocked", kind: "decision", weight: "notable" }];
 
 const timeline = timelineFor(placed);
-// Positions are the whole reason the digest exists in this shape: five of the
-// seven structure models make proportional claims and the reference document
+// Positions are the whole reason the digest exists in this shape: most of the
+// eight structure models make proportional claims and the reference document
 // refuses a mapping that has to drag a beat to make itself work.
 check("the timeline carries positions", timeline.includes("[0–25%]") && timeline.includes("[75–100%]"));
 check("and the kind of turn", timeline.includes("(decision, notable)"));

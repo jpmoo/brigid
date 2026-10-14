@@ -258,7 +258,7 @@ Below is the manuscript's event timeline. Each section is marked with its positi
 
 TIMELINE:${timelineFor(opts.sections)}
 
-Judge all seven models. Return one entry per model, using these exact keys: ${MODEL_KEYS.join(", ")}.
+Judge all eight models. Return one entry per model, using these exact keys: ${MODEL_KEYS.join(", ")}.
 
 For each: the fit rating, the distinctive elements you found with the events instantiating them and their positions, the distinctive elements that are absent or mislocated, and a summary of a few sentences explaining the rating in plain language.
 

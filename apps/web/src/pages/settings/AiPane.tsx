@@ -574,9 +574,9 @@ function StructurePane({
 
       {!result ? (
         <p className="tpl-note">
-          Seven frameworks, each rated on how well the manuscript actually fits it &mdash;
+          Eight frameworks, each rated on how well the manuscript actually fits it &mdash;
           judged on where the turns fall, not just whether they exist. A weak fit to all
-          seven is a legitimate finding, not a failure.
+          eight is a legitimate finding, not a failure.
         </p>
       ) : (
         <>
@@ -630,7 +630,7 @@ function StructurePane({
  * "Not applicable" sorts last rather than lowest: the framework was never
  * asked, so it belongs after the answers rather than at the bottom of them,
  * where it would read as the worst result. Within a band the canonical order
- * is kept — sorting a copy, and JS sorts stably — so the seven don't reshuffle
+ * is kept — sorting a copy, and JS sorts stably — so the eight don't reshuffle
  * between runs that rate them the same.
  */
 const FIT_ORDER: Record<ModelFit["fit"], number> = {
