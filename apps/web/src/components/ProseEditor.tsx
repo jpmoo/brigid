@@ -1013,6 +1013,16 @@ export function ProseEditor({
   const [words, setWords] = useState(0);
   const [menu, setMenu] = useState<SpellMenu | null>(null);
   const saveTimer = useRef<number | null>(null);
+  /**
+   * When the middle button last went down in the editor, so the paste it
+   * brings with it can be refused.
+   *
+   * On Linux a middle-click pastes whatever was last selected — and while
+   * proofreading that is nearly always the words just struck, because a
+   * suggested deletion is made by selecting what it takes. The writer clicks
+   * somewhere else and the passage they were replacing turns up there.
+   */
+  const middlePressAt = useRef(0);
   /** Read by handlers bound once, so the mode can change without a remount. */
   const suggestingRef = useRef(suggesting);
   suggestingRef.current = suggesting;
@@ -1397,6 +1407,8 @@ export function ProseEditor({
   const onKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     const el = ref.current;
     if (!el) return;
+    // Any key after a middle-click means a paste that follows is Ctrl+V.
+    middlePressAt.current = 0;
 
     if (event.key === "Escape") {
       event.preventDefault();
@@ -2030,8 +2042,26 @@ export function ProseEditor({
           window.setTimeout(recheck, 0);
           scheduleSave();
         }}
+        // Middle-click paste refused at every step a browser might act on it:
+        // Chrome pastes on the release unless that is handled, Firefox on the
+        // click. The paste handler below is the backstop for whichever slips by.
+        onMouseDown={(event) => {
+          if (event.button !== 1) return;
+          middlePressAt.current = Date.now();
+          event.preventDefault();
+        }}
+        onMouseUp={(event) => {
+          if (event.button === 1) event.preventDefault();
+        }}
+        onAuxClick={(event) => {
+          if (event.button === 1) event.preventDefault();
+        }}
         onPaste={(event) => {
           event.preventDefault();
+          if (Date.now() - middlePressAt.current < 1000) {
+            middlePressAt.current = 0;
+            return;
+          }
           remember();
 
           // Text copied from Brigid keeps its bold and italic. Anything else is
